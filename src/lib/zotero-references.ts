@@ -1,4 +1,4 @@
-import { EditorPosition, MarkdownView, Notice, TFile, getLinkpath, requestUrl } from 'obsidian';
+import { EditorPosition, MarkdownView, Notice, Platform, TFile, getLinkpath, requestUrl } from 'obsidian';
 
 import { PDFPlusLibSubmodule } from './submodule';
 
@@ -505,17 +505,70 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 
 	async requestZoteroJson(path: string) {
 		const base = this.settings.zoteroLocalApiBaseUrl.replace(/\/+$/, '') || 'http://127.0.0.1:23119';
+		const url = base + path;
+		let requestUrlError: unknown = null;
+
 		try {
 			const response = await requestUrl({
-				url: base + path,
+				url,
 				throw: false,
 			});
 			if (response.status >= 400) return null;
 			return response.json;
 		} catch (err) {
-			console.warn(`${this.plugin.manifest.name}: Zotero local API request failed.`, err);
-			return null;
+			requestUrlError = err;
 		}
+
+		const nodeResult = await this.requestZoteroJsonWithNode(url);
+		if (nodeResult !== null) return nodeResult;
+
+		console.warn(`${this.plugin.manifest.name}: Zotero local API request failed.`, requestUrlError);
+		return null;
+	}
+
+	async requestZoteroJsonWithNode(url: string) {
+		if (!Platform.isDesktopApp) return null;
+		const nodeRequire = (window as any).require as ((moduleName: string) => any) | undefined;
+		if (!nodeRequire) return null;
+
+		return await new Promise<unknown | null>((resolve) => {
+			let settled = false;
+			const finish = (value: unknown | null) => {
+				if (settled) return;
+				settled = true;
+				resolve(value);
+			};
+
+			try {
+				const parsed = new URL(url);
+				const client = nodeRequire(parsed.protocol === 'https:' ? 'https' : 'http');
+				const request = client.get(url, { headers: { Accept: 'application/json' } }, (response: any) => {
+					let body = '';
+					response.setEncoding('utf8');
+					response.on('data', (chunk: string) => {
+						body += chunk;
+					});
+					response.on('end', () => {
+						if ((response.statusCode ?? 0) >= 400) {
+							finish(null);
+							return;
+						}
+						try {
+							finish(JSON.parse(body));
+						} catch {
+							finish(null);
+						}
+					});
+				});
+				request.setTimeout(5000, () => {
+					request.destroy();
+					finish(null);
+				});
+				request.on('error', () => finish(null));
+			} catch {
+				finish(null);
+			}
+		});
 	}
 
 	recordFromZoteroItem(item: any): ScholiaReferenceRecord | null {
