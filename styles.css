@@ -1,7 +1,7 @@
 /* @settings
 
-name: PDF++
-id: pdf-plus
+name: PDF Scholia Scribe
+id: pdf-scholia-scribe
 settings:
     - 
         id: pdf-highlight
@@ -691,4 +691,51 @@ body {
 body.pdf-plus-vim-hint-inverted {
     --pdf-plus-vim-hint-color: var(--text-on-accent);
     --pdf-plus-vim-hint-background-color: hsl(var(--accent-h), var(--accent-s), var(--accent-l));
+}
+
+/* Keep citation links quiet when themes add icons before internal links. */
+body.link-icon .markdown-rendered a.internal-link:is(
+    [data-href*=".pdf#" i],
+    [data-href*=".pdf?" i],
+    [data-href$=".pdf" i]
+)::before,
+body.link-icon .markdown-preview-view a.internal-link:is(
+    [data-href*=".pdf#" i],
+    [data-href*=".pdf?" i],
+    [data-href$=".pdf" i]
+)::before,
+body.link-icon .markdown-source-view .HyperMD-quote .cm-hmd-internal-link > .cm-underline::before {
+    content: none !important;
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+}
+
+.pdf-scholia-zotero-results {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-2);
+    margin-top: var(--size-4-3);
+}
+
+.pdf-scholia-zotero-result {
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    padding: var(--size-4-2);
+}
+
+.pdf-scholia-zotero-result-zotero {
+    border-color: var(--interactive-accent);
+}
+
+.pdf-scholia-zotero-result > div {
+    margin-bottom: var(--size-2-1);
+}
+
+.pdf-scholia-zotero-result-source {
+    color: var(--text-accent);
+    font-size: var(--font-ui-smaller);
+    font-weight: var(--font-semibold);
+    text-transform: uppercase;
 }

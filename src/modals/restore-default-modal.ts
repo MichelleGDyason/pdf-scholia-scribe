@@ -9,7 +9,7 @@ export class RestoreDefaultModal extends PDFPlusModal {
         this.containerEl.addClass('pdf-plus-restore-default-modal');
         this.titleEl.setText(`${this.plugin.manifest.name}: Restore default settings`);
         this.contentEl.createEl('p', {
-            text: `This operation will overwrite your PDF++ config file (${(
+            text: `This operation will overwrite your ${this.plugin.manifest.name} config file (${(
                 this.plugin.manifest.dir
                 ?? (this.app.vault.configDir + '/plugins/' + this.plugin.manifest.id)
             ) + '/data.json'

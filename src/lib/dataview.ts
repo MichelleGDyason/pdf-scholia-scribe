@@ -136,7 +136,7 @@ export class DataviewInlineFieldsModal extends PDFPlusModal {
                     a.onclick = () => {
                         this.plugin.openSettingTab().scrollTo('proxyMDProperty');
                     };
-                    setTooltip(a, 'Open in PDF++ settings', { placement: 'top' });
+                    setTooltip(a, `Open in ${this.plugin.manifest.name} settings`, { placement: 'top' });
                 }),
                 ' setting, ',
                 createEl('a', { text: 'Dataview', href: 'obsidian://show-plugin?id=dataview' }),

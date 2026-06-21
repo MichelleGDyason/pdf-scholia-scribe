@@ -76,14 +76,26 @@ export const DEFAULT_BACKLINK_HOVER_COLOR = 'green';
 
 const ACTION_ON_CITATION_HOVER = {
 	'none': 'Same as other internal links',
-	'pdf-plus-bib-popover': 'PDF++\'s custom bibliography popover',
+	'pdf-plus-bib-popover': 'Custom bibliography popover',
 	'google-scholar-popover': 'Google Scholar popover',
 } as const;
 
 const MOBILE_COPY_ACTIONS = {
 	'text': 'Copy text',
 	'obsidian': 'Obsidian default (copy as quote)',
-	'pdf-plus': 'Run PDF++\'s copy command',
+	'pdf-plus': 'Run PDF Scholia Scribe\'s copy command',
+} as const;
+
+const ZOTERO_IN_TEXT_CITATION_STYLES = {
+	'asa': 'Author date with colon page: (Deleuze 1983:124)',
+	'harvard': 'Author date with p.: (Deleuze 1983, p. 124)',
+	'apa': 'APA-style: (Deleuze, 1983, p. 124)',
+	'numeric': 'Numbered placeholder: [?, p. 124]',
+} as const;
+
+const ZOTERO_REFERENCE_LIST_TYPES = {
+	'bullet': 'Bulleted list',
+	'numbered': 'Numbered list',
 } as const;
 
 export interface PDFPlusSettings {
@@ -92,6 +104,7 @@ export interface PDFPlusSettings {
 	syncDisplayTextFormat: boolean;
 	syncDefaultDisplayTextFormat: boolean;
 	copyCommands: NamedTemplate[];
+	preserveItalicsInCopiedText: boolean;
 	useAnotherCopyTemplateWhenNoSelection: boolean;
 	copyTemplateWhenNoSelection: string;
 	trimSelectionEmbed: boolean;
@@ -128,6 +141,7 @@ export interface PDFPlusSettings {
 	syncColorPaletteItem: boolean;
 	syncDefaultColorPaletteItem: boolean;
 	colorPaletteInToolbar: boolean;
+	displayTextFormatDropdownInToolbar: boolean;
 	noColorButtonInColorPalette: boolean;
 	colorPaletteInEmbedToolbar: boolean;
 	quietColorPaletteTooltip: boolean;
@@ -204,6 +218,7 @@ export interface PDFPlusSettings {
 	clickOutlineItemWithModifierKey: boolean;
 	clickThumbnailWithModifierKey: boolean;
 	focusEditorAfterAutoPaste: boolean;
+	preserveEditorScrollAfterAutoPaste: boolean;
 	clearSelectionAfterAutoPaste: boolean;
 	respectCursorPositionWhenAutoPaste: boolean;
 	blankLineAboveAppendedContent: boolean;
@@ -283,6 +298,12 @@ export interface PDFPlusSettings {
 	enableBibInHoverPopover: boolean;
 	enableBibInCanvas: boolean;
 	citationIdPatterns: string;
+	zoteroLocalApiBaseUrl: string;
+	zoteroPreferVaultLinks: boolean;
+	zoteroInTextCitationStyle: keyof typeof ZOTERO_IN_TEXT_CITATION_STYLES;
+	zoteroBibliographyStyle: string;
+	zoteroReferenceListHeading: string;
+	zoteroReferenceListType: keyof typeof ZOTERO_REFERENCE_LIST_TYPES;
 	copyAsSingleLine: boolean;
 	removeWhitespaceBetweenCJChars: boolean;
 	// Follows the same format as Obsidian's "Default location for new attachments
@@ -312,6 +333,26 @@ export interface PDFPlusSettings {
 
 export const DEFAULT_SETTINGS: PDFPlusSettings = {
 	displayTextFormats: [
+		{
+			name: 'Harvard author-date',
+			template: '{{citation.harvard}}',
+		},
+		{
+			name: 'APA author-date',
+			template: '{{citation.apa}}',
+		},
+		{
+			name: 'ASA author-date',
+			template: '{{citation.asa}}',
+		},
+		{
+			name: 'Numbered citation',
+			template: '{{citation.numeric}}',
+		},
+		{
+			name: 'Numbered citation & page',
+			template: '{{citation.numericPage}}',
+		},
 		// {
 		// 	name: 'Obsidian default',
 		// 	template: '{{file.basename}}, page {{page}}',
@@ -337,16 +378,24 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 			template: ''
 		}
 	],
-	defaultDisplayTextFormatIndex: 0,
+	defaultDisplayTextFormatIndex: 2,
 	syncDisplayTextFormat: true,
 	syncDefaultDisplayTextFormat: false,
 	copyCommands: [
 		{
-			name: 'Quote',
-			template: '> ({{linkWithDisplay}})\n> {{text}}\n',
+			name: 'Citation quote',
+			template: '{{linkWithDisplay}}\n> {{textMarkdown}}\n',
 		},
 		{
-			name: 'Link',
+			name: 'In-text citation',
+			template: '"{{textMarkdown}}" {{linkWithDisplay}}',
+		},
+		{
+			name: 'Quote',
+			template: '> ({{linkWithDisplay}})\n> {{textMarkdown}}\n',
+		},
+		{
+			name: 'Citation only',
 			template: '{{linkWithDisplay}}'
 		},
 		{
@@ -355,13 +404,14 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 		},
 		{
 			name: 'Callout',
-			template: '> [!{{calloutType}}|{{color}}] {{linkWithDisplay}}\n> {{text}}\n',
+			template: '> [!{{calloutType}}|{{color}}] {{colorLabel ? colorLabel + " - " : ""}}{{linkWithDisplay}}\n> {{textMarkdown}}\n',
 		},
 		{
 			name: 'Quote in callout',
-			template: '> [!{{calloutType}}|{{color}}] {{linkWithDisplay}}\n> > {{text}}\n> \n> ',
+			template: '> [!{{calloutType}}|{{color}}] {{colorLabel ? colorLabel + " - " : ""}}{{linkWithDisplay}}\n> > {{textMarkdown}}\n> \n> ',
 		}
 	],
+	preserveItalicsInCopiedText: true,
 	useAnotherCopyTemplateWhenNoSelection: false,
 	copyTemplateWhenNoSelection: '{{linkToPageWithDisplay}}',
 	trimSelectionEmbed: false,
@@ -403,6 +453,7 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 	syncColorPaletteItem: true,
 	syncDefaultColorPaletteItem: false,
 	colorPaletteInToolbar: true,
+	displayTextFormatDropdownInToolbar: false,
 	noColorButtonInColorPalette: true,
 	colorPaletteInEmbedToolbar: false,
 	quietColorPaletteTooltip: false,
@@ -414,7 +465,7 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 	singleMDLeafInSidebar: true,
 	alwaysUseSidebar: true,
 	ignoreExistingMarkdownTabIn: [],
-	defaultColorPaletteActionIndex: 4,
+	defaultColorPaletteActionIndex: 6,
 	syncColorPaletteAction: true,
 	syncDefaultColorPaletteAction: false,
 	proxyMDProperty: 'PDF',
@@ -427,9 +478,9 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 	alwaysRecordHistory: true,
 	renderMarkdownInStickyNote: false,
 	enablePDFEdit: false,
-	author: '',
+	author: 'PDF Scholia Scribe',
 	writeHighlightToFileOpacity: 0.2,
-	defaultWriteFileToggle: false,
+	defaultWriteFileToggle: true,
 	syncWriteFileToggle: true,
 	syncDefaultWriteFileToggle: false,
 	enableAnnotationDeletion: true,
@@ -454,9 +505,9 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 		{ id: 'page', visible: true },
 		{ id: 'settings', visible: true },
 	],
-	selectionProductMenuConfig: ['color', 'copy-format', 'display'],
-	writeFileProductMenuConfig: ['color', 'copy-format', 'display'],
-	annotationProductMenuConfig: ['copy-format', 'display'],
+	selectionProductMenuConfig: ['color', 'copy-format'],
+	writeFileProductMenuConfig: ['color', 'copy-format'],
+	annotationProductMenuConfig: ['copy-format'],
 	updateColorPaletteStateFromContextMenu: true,
 	mobileCopyAction: 'pdf-plus',
 	showContextMenuOnTablet: false,
@@ -482,7 +533,7 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 	showAnnotationPopupOnHover: true,
 	useCallout: true,
 	calloutType: 'PDF',
-	calloutIcon: 'highlighter',
+	calloutIcon: '',
 	// canvasContextMenu: true
 	highlightBacklinksInEmbed: false,
 	highlightBacklinksInHoverPopover: false,
@@ -491,6 +542,7 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 	clickOutlineItemWithModifierKey: true,
 	clickThumbnailWithModifierKey: true,
 	focusEditorAfterAutoPaste: true,
+	preserveEditorScrollAfterAutoPaste: true,
 	clearSelectionAfterAutoPaste: true,
 	respectCursorPositionWhenAutoPaste: true,
 	blankLineAboveAppendedContent: true,
@@ -570,6 +622,12 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 	enableBibInHoverPopover: false,
 	enableBibInCanvas: true,
 	citationIdPatterns: '^cite.\n^bib\\d+$',
+	zoteroLocalApiBaseUrl: 'http://127.0.0.1:23119',
+	zoteroPreferVaultLinks: true,
+	zoteroInTextCitationStyle: 'asa',
+	zoteroBibliographyStyle: 'apa',
+	zoteroReferenceListHeading: 'References',
+	zoteroReferenceListType: 'bullet',
 	copyAsSingleLine: true,
 	removeWhitespaceBetweenCJChars: true,
 	dummyFileFolderPath: '',
@@ -593,7 +651,7 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 	vimHintChars: 'hjklasdfgyuiopqwertnmzxcvb',
 	vimHintArgs: 'all',
 	PATH: '',
-	autoCheckForUpdates: true,
+	autoCheckForUpdates: false,
 	fixObsidianTextSelectionBug: true,
 };
 
@@ -657,7 +715,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 						item.setTitle('Copy link to this setting')
 							.setIcon('lucide-link')
 							.onClick(() => {
-								navigator.clipboard.writeText(`obsidian://pdf-plus?setting=${settingName}`);
+								navigator.clipboard.writeText(`obsidian://pdf-scholia-scribe?setting=${settingName}`);
 							});
 					})
 					.showAtMouseEvent(evt);
@@ -693,7 +751,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 					item.setTitle('Copy link to this heading')
 						.setIcon('lucide-link')
 						.onClick(() => {
-							navigator.clipboard.writeText(`obsidian://pdf-plus?setting=heading:${id}`);
+							navigator.clipboard.writeText(`obsidian://pdf-scholia-scribe?setting=heading:${id}`);
 						});
 				})
 				.showAtMouseEvent(evt);
@@ -1097,7 +1155,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			'lucide-heart',
 			({ iconEl }) => postProcessIcon(iconEl)
 		)
-			.setDesc('If you find PDF++ helpful, please consider supporting the development to help me keep this plugin alive.\n\nIf you prefer PayPal, please make donations via Ko-fi. Thank you!')
+			.setDesc('If you find PDF Scholia Scribe helpful, please consider supporting the development to help me keep this plugin alive.\n\nIf you prefer PayPal, please make donations via Ko-fi. Thank you!')
 			.then((setting) => {
 				const infoEl = setting.infoEl;
 				const iconEl = setting.settingEl.firstElementChild;
@@ -1617,7 +1675,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			], el);
 			const linkEl = document.getElementById('pdf-plus-funding-link-placeholder');
 			if (linkEl) {
-				linkEl.textContent = 'Help me keep PDF++ alive!';
+				linkEl.textContent = 'Help me keep PDF Scholia Scribe alive!';
 				linkEl.onclick = (evt) => {
 					this.scrollToHeading('funding', { behavior: 'smooth' });
 					this.updateHeaderElClassOnScroll(evt);
@@ -1629,7 +1687,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		this.addHeading('Editing PDF files', 'edit', 'lucide-save')
 			.then((setting) => {
 				this.renderMarkdown([
-					'By allowing PDF++ to modify PDF files directly, you can:',
+					'By allowing PDF Scholia Scribe to modify PDF files directly, you can:',
 					'- Add, edit and delete highlights and links in PDF files.',
 					'- Add, insert, delete or extract PDF pages and auto-update links.',
 					'- Add, rename, move and delete outline items.',
@@ -1642,7 +1700,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			.setName('Enable PDF editing')
 			.then((setting) => {
 				this.renderMarkdown([
-					'PDF++ will not modify PDF files themselves unless you turn on this option. <span style="color: var(--text-warning);">The author assumes no responsibility for any data corruption. Please make sure you have a backup of your files.</span> Also note that PDF++ currently does not support editing encrypted PDFs.',
+					'PDF Scholia Scribe will not modify PDF files themselves unless you turn on this option. <span style="color: var(--text-warning);">The author assumes no responsibility for any data corruption. Please make sure you have a backup of your files.</span> Also note that PDF Scholia Scribe currently does not support editing encrypted PDFs.',
 				], setting.descEl);
 			});
 		if (this.plugin.settings.enablePDFEdit) {
@@ -1702,7 +1760,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		}
 		this.addSetting('ignoreExistingMarkdownTabIn')
 			.setName('Ignore existing markdown tabs in...')
-			.setDesc('If some notes are opened in the ignored splits, PDF++ will still open the backlink in the way specified in the previous setting. For example, you might want to ignore the left sidebar if you are pinning a certain note (e.g. daily note) in it.');
+			.setDesc('If some notes are opened in the ignored splits, PDF Scholia Scribe will still open the backlink in the way specified in the previous setting. For example, you might want to ignore the left sidebar if you are pinning a certain note (e.g. daily note) in it.');
 		const splits = {
 			'leftSplit': 'Left sidebar',
 			'rightSplit': 'Right sidebar',
@@ -1832,7 +1890,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			}));
 
 
-		this.addHeading('PDF++ callouts', 'callout', 'lucide-quote')
+		this.addHeading('PDF Scholia Scribe callouts', 'callout', 'lucide-quote')
 			.then((setting) => {
 				this.renderMarkdown(
 					'Create [callouts](https://help.obsidian.md/Editing+and+formatting/Callouts) with the same color as the highlight color without any CSS snippet scripting.',
@@ -1840,7 +1898,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				);
 			});
 		this.addToggleSetting('useCallout')
-			.setName('Use PDF++ callouts')
+			.setName('Use PDF Scholia Scribe callouts')
 			.then((setting) => {
 				this.renderMarkdown([
 					'You can also disable this option and choose to use your own custom [CSS snippets](https://help.obsidian.md/Extending+Obsidian/CSS+snippets). See our [README](https://github.com/RyotaUshio/obsidian-pdf-plus?tab=readme-ov-file#css-customization) for the details.'
@@ -1903,6 +1961,9 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				this.addToggleSetting('syncDefaultColorPaletteItem')
 					.setName('Share the color with newly opened color palettes as well');
 			}
+			this.addToggleSetting('displayTextFormatDropdownInToolbar', () => this.redisplay())
+				.setName('Show citation-style dropdown in the PDF toolbar')
+				.setDesc('Off by default. Citation style is usually chosen once in Copy templates > Display text format. Turn this on only if you want to switch between Harvard, APA, ASA, numbered, and other citation labels from the PDF toolbar.');
 			this.addToggleSetting('quietColorPaletteTooltip')
 				.setName('Quiet tooltips in color palette')
 				.setDesc(`When disabled${!DEFAULT_SETTINGS.quietColorPaletteTooltip ? ' (default)' : ''}, the tooltip will show the color name as well as the selected copy format and display text format. If enabled, only the color name will be shown.`);
@@ -1970,7 +2031,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		this.addHeading('Context menu in PDF viewer', 'context-menu', 'lucide-mouse-pointer-click')
 			.setDesc('(Desktop & tablet only) Customize the behavior of the context menu that pops up when you right-click in the PDF viewer. For mobile users, see also the next section.');
 		this.addToggleSetting('replaceContextMenu', () => this.redisplay())
-			.setName('Replace the built-in context menu with PDF++\'s custom menu');
+			.setName('Replace the built-in context menu with PDF Scholia Scribe\'s custom menu');
 		if (!this.plugin.settings.replaceContextMenu) {
 			this.addSetting()
 				.setName('Display text format')
@@ -2117,7 +2178,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			.setName('Set up hotkeys for copying links')
 			.then((setting) => {
 				this.renderMarkdown([
-					'PDF++ offers two commands for quickly copying links via hotkeys.',
+					'PDF Scholia Scribe offers two commands for quickly copying links via hotkeys.',
 					'',
 					'1. **Copy link to selection or annotation:**',
 					'   Copies a link to the text selection or focused annotation in the PDF viewer, which is formatted according to the options specified in the PDF toolbar.',
@@ -2141,14 +2202,15 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		this.addSetting()
 			.then((setting) => {
 				this.renderMarkdown([
-					'PDF++ also offers the following commands for reducing mouse clicks on the PDF toolbar by assigning hotkeys to them.',
+					'PDF Scholia Scribe also offers the following commands for reducing mouse clicks on the PDF toolbar by assigning hotkeys to them.',
 					'',
 					'- **Show outline** / **show thumbnail**',
 					'- **Close PDF siderbar**',
 					'- **Zoom in** / **zoom out**',
 					'- **Fit width** / **fit height**',
 					'- **Go to page**: This command brings the cursor to the page number input field in the PDF toolbar. Enter a page number and press Enter to jump to the page.',
-					'- **Show copy format menu** / **show display text format menu**: By running thes commands via hotkeys and then using the arrow keys, you can quickly select a format from the menu without using the mouse.',
+					'- **Show copy format menu**: opens the paste-format menu, such as in-text citation, quote, or callout.',
+					'- **Show display text format menu**: opens the citation-label menu, such as Harvard, APA, ASA, or numbered style.',
 					'- **Enable PDF edit** / **disable PDF edit**',
 					'- And more...',
 				], setting.descEl);
@@ -2174,55 +2236,92 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 
 
 		this.addHeading('Copy templates', 'template', 'lucide-copy')
-			.setDesc('The template format that will be used when copying a link to a selection or an annotation in PDF viewer. ');
+			.setDesc('Choose what gets pasted into your note when you copy or colour-highlight text in a PDF.');
 		this.addSetting()
 			.then((setting) => this.renderMarkdown([
-				// 'The template format that will be used when copying a link to a selection or an annotation in PDF viewer. ',
-				'Each `{{...}}` will be evaluated as a JavaScript expression given the variables listed below.',
+				'Plain English version:',
 				'',
-				'Available variables are:',
+				'- **Copy format** controls the whole pasted block. For example, it can paste a citation line plus the quoted text.',
+				'- **Display text format** controls the words you see inside the PDF link. This is where citation styles such as `(Deleuze 1983, p. 124)` or `[1, p. 124]` are chosen.',
+				'- In normal writing, set **Display text format** once here, then use the PDF toolbar only to choose the paste shape: in-text citation, quote, or callout.',
+				'- The **Text** display format means "use the selected PDF sentence as the clickable link label". It is not plain-text paste, and some themes may show a link/file icon throughout the sentence.',
+				'- The PDF link is still there even when the display text is short. That hidden link is what lets the plugin reopen and highlight the exact PDF selection.',
 				'',
-				'- `file` or `pdf`: The PDF file ([`TFile`](https://docs.obsidian.md/Reference/TypeScript+API/TFile)). Use `file.basename` for the file name without extension, `file.name` for the file name with extension, `file.path` for the full path relative to the vault root, etc.',
-				'- `page`: The page number (`Number`). The first page is always page 1.',
-				'- `pageLabel`: The page number displayed in the counter in the toolbar (`String`). This can be different from `page`.',
-				'    - **Tip**: You can modify page labels with PDF++\'s "Edit page labels" command.',
-				'- `pageCount`: The total number of pages (`Number`).',
-				'- `text` or `selection`: The selected text (`String`). In the case of links to annotations written directly in the PDF file, this is the text covered by the annotation.',
-				'- `comment`: In the case of links to annotations written directly in the PDF file, this is the comment associated with the annotation (`String`). Otherwise, it is an empty string `""`.',
-				'- `folder`: The folder containing the PDF file ([`TFolder`](https://docs.obsidian.md/Reference/TypeScript+API/TFolder)). This is an alias for `file.parent`.',
-				'- `obsidian`: The Obsidian API. See the [official developer documentation](https://docs.obsidian.md/Home) and the type definition file [`obsidian.d.ts`](https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts) for the details.',
-				'- `dv`: Available if the [Dataview](obsidian://show-plugin?id=dataview) plugin is enabled. See Dataview\'s [official documentation](https://blacksmithgu.github.io/obsidian-dataview/api/code-reference/) for the details. You can use it almost the same as the `dv` variable available in `dataviewjs` code blocks, but there are some differences. For example, `dv.current()` is not available.',
-				// '- `tp`: Available if the [Templater](obsidian://show-plugin?id=templater-obsidian) plugin is enabled. See Templater\'s [official documentation](https://silentvoid13.github.io/Templater/internal-functions/overview.html) for the details.',
-				'- `quickAddApi`: Available if the [QuickAdd](obsidian://show-plugin?id=quickadd) plugin is enabled. See QuickAdd\'s [official documentation](https://quickadd.obsidian.guide/docs/QuickAddAPI) for the details.',
-				'- `app`: The global Obsidian app object ([`App`](https://docs.obsidian.md/Reference/TypeScript+API/App)).',
-				'- and other global variables such as:',
-				'  - [`moment`](https://momentjs.com/docs/#/displaying/): For exampe, use `moment().format("YYYY-MM-DD")` to get the current date in the "YYYY-MM-DD" format.',
+				'Where author and date come from:',
 				'',
-				`Additionally, you have access to the following variables when the PDF file has a corresponding markdown file specified via the "${this.plugin.settings.proxyMDProperty}" property(see the "Property to associate a markdown file to a PDF file" setting below): `,
+				'PDF Scholia Scribe first checks the front matter/properties of the note you are pasting into. If it cannot find citation details there, it checks a separate reference note linked to the PDF, then finally the PDF file name.',
 				'',
-				'- `md`: The markdown file associated with the PDF file ([`TFile`](https://docs.obsidian.md/Reference/TypeScript+API/TFile)). If there is no such file, this is `null`.',
-				'- `properties`: The properties of `md` as an `Object` mapping each property name to the corresponding value. If `md` is `null` or the `md` has no properties, this is an empty object `{}`.',
-				'\n<span style="color: var(--text-warning);">The following variables are deprecated and will be removed in the near future</span>: `linkedFile`, `linkedFileProperties`. Remove them from your templates if you are using them.',
+				'For an author-date citation, use either of these in the note front matter:',
+				'',
+				'```yaml',
+				'author: Deleuze',
+				'year: 1983',
+				'```',
+				'',
+				'or:',
+				'',
+				'```yaml',
+				'shortCitation: Deleuze 1983',
+				'```',
+				'',
+				'For a numbered citation such as `[1]`, add one of these:',
+				'',
+				'```yaml',
+				'referenceNumber: 1',
+				'```',
+				'',
+				'If you see `Unknown author n.d.`, the plugin could not find an author and year in those places.',
+				'',
+				'For books where the PDF page number is not the printed page number, add a page offset in the source note. Example: if PDF page 58 is printed page 47, use `citationPageOffset: -11`.',
+				'',
+				'Advanced custom formats:',
+				'',
+				'- `{{linkWithDisplay}}` means "the PDF link hidden under the chosen display text". This is the default, so clicking the citation opens the PDF source.',
+				'- `{{display}}` means "the chosen display text, without making it a clickable link".',
+				'- `{{pdfLinkMarker}}` means "a small clickable PDF link". Use this only if you want the citation text to be plain text and the PDF source link to be separate.',
+				'- `{{text}}` means "the selected quote from the PDF".',
+				'- `{{textMarkdown}}` means "the selected quote from the PDF, with italics kept when PDF Scholia Scribe can detect them".',
+				'- `{{citation.harvard}}` gives `(Deleuze 1983, p. 124)`.',
+				'- `{{citation.apa}}` gives `(Deleuze, 1983, p. 124)`.',
+				'- `{{citation.asa}}` gives `(Deleuze 1983:124)`.',
+				'- `{{citation.numeric}}` gives `[1]`.',
+				'- `{{citation.numericPage}}` gives `[1, p. 124]`.',
 			], setting.descEl));
 		this.addTextSetting('proxyMDProperty', undefined, () => this.redisplay())
-			.setName('Property to associate a markdown file to a PDF file')
+			.setName('PDF link property for separate reference notes')
 			.then((setting) => {
 				this.renderMarkdown([
-					'Create a markdown file with this property to associate it with a PDF file. The PDF file is specified by a link, e.g. `[[file.pdf]]`.',
-					'It can be used to store properties/metadata that can be used when copying links.',
+					'You can ignore this setting if your author and date are in the note you are pasting into.',
 					'',
-					'<span style="color: var(--text-warning);">[Dataview](obsidian://show-plugin?id=dataview)\'s inline field syntax such as `' + this.plugin.settings.proxyMDProperty + ':: [[file.pdf]]` is supported for the time being, but it is deprecated and will likely not work in the future.</span>',
+					'Use this only when you keep a separate source/reference note for the PDF. In that reference note, add a property whose value links to the PDF file.',
 					'',
-					'Remarks:',
-					'- Make sure the associated markdown file can be uniquely identified. For example, if you have two markdown files `file1.md` and `file2.md` and both of their `' + this.plugin.settings.proxyMDProperty + '` properties point to the same PDF file, PDF++ cannot determine which markdown file is associated with `file.pdf`. However, PDF++ v1.0.0 or later will add support for this.',
-					'- If you are in Source Mode, be sure to enclose the link in double quotes.',
-				], setting.descEl);
+					'Example:',
+					'',
+					'```yaml',
+				'PDF: "[[file.pdf]]"',
+				'author: Deleuze',
+				'year: 1983',
+				'citationPageOffset: -11',
+				'```',
+				'',
+				'<span style="color: var(--text-warning);">[Dataview](obsidian://show-plugin?id=dataview)\'s inline field syntax such as `' + this.plugin.settings.proxyMDProperty + ':: [[file.pdf]]` is supported for the time being, but it is deprecated and will likely not work in the future.</span>',
+				'',
+				'Only one reference note should point to each PDF. If two notes both point to the same PDF, the plugin will not know which metadata to use.',
+				'Use `citationPageOffset` in that reference note when the book has front-matter pages before page 1.',
+				'If you type the property in Source Mode, put the PDF link in quotes as shown above.',
+			], setting.descEl);
 			});
+		this.addToggleSetting('preserveItalicsInCopiedText')
+			.setName('Preserve italic words in copied PDF text')
+			.setDesc('Best effort. When the PDF exposes italic font information, PDF Scholia Scribe will paste those words with Markdown italics, like `*this*`. If a PDF hides its font style, the copied text will stay plain.');
 		this.addSetting('displayTextFormats')
 			.setName('Display text format')
 			.then((setting) => this.renderMarkdown([
-				// 'For example, the default format is `{{ file.basename }}, page { { page } } `. Another example of a useful format is `{ { file.basename } }, p.{ { pageLabel } } `. ',
-				'This format will be also used when copying a link to a selection or an annotation from the context menu.'
+				'Choose what the PDF link looks like when it is rendered in your note.',
+				'',
+				'For less visual noise, choose one of the citation formats such as **Harvard author-date**, **APA author-date**, **ASA author-date**, **Numbered citation**, or **Numbered citation & page**.',
+				'',
+				'This does not remove the link to the PDF. It only changes the visible label.'
 			], setting.descEl))
 			.addButton((button) => {
 				button
@@ -2254,18 +2353,30 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		this.addSetting('copyCommands')
 			.setName('Custom copy formats')
 			.then((setting) => this.renderMarkdown([
-				'Customize the format to use when you copy a link by clicking a color palette item or running the commands while selecting a range of text in PDF viewer.',
+				'Choose what is pasted after you click a colour or run a copy command.',
 				'',
-				'In addition to the variables listed above, here you can use',
+				'**In-text citation** pastes the selected PDF sentence in quotation marks, followed by the citation, for example `"Since..." (Deleuze 1983:123)`.',
 				'',
-				'- `link`: The link without display text, e.g. `[[file.pdf#page=1&selection=0,1,2,3&color=red]]`,',
-				'- `linkWithDisplay`: The link with display text, e.g. `[[file.pdf#page=1&selection=0,1,2,3&color=red|file, page 1]]`,',
-				'- `linktext`: The text content of the link without brackets and the display text, e.g. `file.pdf#page=1&selection=0,1,2,3&color=red`<br>(if the "Use \\[\\[Wikilinks\\]\\]" setting is turned off, `linktext` will be properly encoded for use in markdown links),',
-				'- `display`: The display text formatted according to the above setting, e.g. `file, page 1`,',
-				'- `linkToPage`: The link to the page without display text, e.g. `[[file.pdf#page=1]]`,',
-				'- `linkToPageWithDisplay`: The link to the page with display text, e.g. `[[file.pdf#page=1|file, page 1]]`,',
-				'- `calloutType`: The callout type you specify in the "Callout type name" setting above, in this case, ' + `"${this.plugin.settings.calloutType}", and`,
-				'- `color` (or `colorName`): In the case of text selections, this is the name of the selected color in lowercase, e.g. `red`. If no color is specified, it will be an empty string. For text markup annotations (e.g. highlights and underlines), this is the RGB value of the color, e.g. `255,208,0`.',
+				'**Citation only** pastes just the clickable citation, for example `(Deleuze 1983:123)`, for times when you are writing the sentence yourself.',
+				'',
+				'**Quote in callout** pastes the citation as the callout title, the selected PDF text as a quote, and leaves a blank callout line where you can add your own words underneath.',
+				'',
+				'Useful building blocks:',
+				'',
+				'- `{{linkWithDisplay}}`: the PDF link, using the display text format selected above. This keeps the source link under the citation itself.',
+				'- `{{display}}`: the display text only, not clickable.',
+				'- `{{pdfLinkMarker}}`: a compact link labelled `PDF` that opens the exact PDF selection, useful only if you want a separate source marker.',
+				'- `{{text}}`: the selected text from the PDF, without Markdown styling.',
+				'- `{{textMarkdown}}`: the selected text from the PDF, with italic words kept when the PDF exposes them.',
+				'- `{{color}}`: the colour name you clicked, such as `yellow` or `red`.',
+				'- `{{colorLabel}}`: the colour name as readable header text, such as `conceptual information`.',
+				'',
+				'Example:',
+				'',
+				'```text',
+				'{{linkWithDisplay}}',
+				'> {{text}}',
+				'```',
 			], setting.descEl))
 			.addButton((button) => {
 				button
@@ -2300,6 +2411,47 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			this.addTextSetting('copyTemplateWhenNoSelection')
 				.setName('Link copy template used when no text is selected');
 		}
+
+		this.addHeading('Writing citations and reference lists', 'zotero-reference-list', 'lucide-library')
+			.setDesc('Insert citations while writing, then build a reference list for the current note from Zotero and your vault notes.');
+		this.addSetting()
+			.then((setting) => this.renderMarkdown([
+				'Plain English version:',
+				'',
+				'- Use the command **Insert citation from Zotero or vault** when you are writing in a note.',
+				'- Search by author, title, year, or citekey. PDF Scholia Scribe looks in your vault notes and in Zotero.',
+				'- If the vault has too many duplicates, set **Search in** to **Zotero only** in the citation window.',
+				'- If you have already named the author in your sentence, set **Citation wording** to **Date only**. For example: `Pires argues ... (2011:42)`.',
+				'- If a source note in the vault has `citekey`, `author`, `year`, and `title` in its properties, it can be cited even if Zotero is closed.',
+				'- If Zotero is open, PDF Scholia Scribe can use Zotero to fill in missing details and make the reference-list entry.',
+				'- Use the command **Update reference list for current note** when you want the `## References` section refreshed.',
+				'',
+				'The updater recognises:',
+				'',
+				'- citations inserted by this command;',
+				'- ordinary `@citekey` citations;',
+				'- links to vault source notes;',
+				'- PDF quote links that point to a PDF with a source note in your vault.',
+				'',
+				'The reference list is kept inside a small managed block. PDF Scholia Scribe replaces only that managed block when you update it.',
+			], setting.descEl));
+		this.addTextSetting('zoteroLocalApiBaseUrl')
+			.setName('Zotero local address')
+			.setDesc('Leave this as `http://127.0.0.1:23119` unless you deliberately changed Zotero.');
+		this.addToggleSetting('zoteroPreferVaultLinks')
+			.setName('Prefer links to vault source notes')
+			.setDesc('When a source note exists in the vault, inserted citations link to that note. If this is off, citations prefer Zotero links.');
+		this.addDropdownSetting('zoteroInTextCitationStyle', ZOTERO_IN_TEXT_CITATION_STYLES)
+			.setName('Inserted citation style')
+			.setDesc('This controls the citation inserted while you write. Page numbers are optional in the insert-citation window.');
+		this.addTextSetting('zoteroBibliographyStyle')
+			.setName('Zotero reference-list style')
+			.setDesc('Used when Zotero formats the reference entry. Examples: `apa`, `harvard-cite-them-right`, `american-sociological-association`. If Zotero cannot provide a formatted entry, PDF Scholia Scribe makes a plain author-date entry from available metadata.');
+		this.addTextSetting('zoteroReferenceListHeading')
+			.setName('Reference-list heading')
+			.setDesc('The heading to use at the end of the note. Default: `References`.');
+		this.addDropdownSetting('zoteroReferenceListType', ZOTERO_REFERENCE_LIST_TYPES)
+			.setName('Reference-list shape');
 
 
 		this.addHeading('Auto-copy / auto-focus / auto-paste', 'auto', 'lucide-zap')
@@ -2374,7 +2526,10 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			.setName('Target markdown file to paste links to');
 		this.addToggleSetting('focusEditorAfterAutoPaste', () => this.events.trigger('update'))
 			.setName('Focus editor after auto-pasting')
-			.setDesc('If enabled, auto-paste will focus on the editor after pasting.');
+			.setDesc('After PDF Scholia Scribe pastes into a note, move keyboard focus back to that note.');
+		this.addToggleSetting('preserveEditorScrollAfterAutoPaste')
+			.setName('Keep the note from jumping after auto-paste')
+			.setDesc('Recommended for editing beside a PDF. PDF Scholia Scribe will paste at the cursor, then restore the note to the same visible position instead of scrolling back to an older cursor position.');
 		this.showConditionally(
 			this.addToggleSetting('clearSelectionAfterAutoPaste')
 				.setName('Clear text selection after auto-pasting')
@@ -2416,7 +2571,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			this.showConditionally(
 				this.addToggleSetting('closeHoverEditorWhenLostFocus')
 					.setName('Close Hover Editor when it loses focus')
-					.setDesc('This option will not affect the behavior of Hover Editor outside of PDF++.'),
+					.setDesc('This option will not affect the behavior of Hover Editor outside of PDF Scholia Scribe.'),
 				() => this.plugin.settings.howToOpenAutoFocusTargetIfNotOpened === 'hover-editor'
 			);
 			this.addToggleSetting('closeSidebarWhenLostFocus')
@@ -2429,8 +2584,8 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		}
 		this.addToggleSetting('executeCommandWhenTargetNotIdentified', () => this.redisplay())
 			.setName('Execute command when target file cannot be determined')
-			.setDesc('When PDF++ cannot determine which markdown file to focus on or paste to, it will execute the command specified in the next option to let you pick a target file.');
-		const commandName = this.app.commands.findCommand(`${this.plugin.manifest.id}:create-new-note`)?.name ?? 'PDF++: Create new note for auto-focus or auto-paste';
+			.setDesc('When PDF Scholia Scribe cannot determine which markdown file to focus on or paste to, it will execute the command specified in the next option to let you pick a target file.');
+		const commandName = this.app.commands.findCommand(`${this.plugin.manifest.id}:create-new-note`)?.name ?? 'PDF Scholia Scribe: Create new note for auto-focus or auto-paste';
 		if (this.plugin.settings.executeCommandWhenTargetNotIdentified) {
 			this.addSetting('commandToExecuteWhenTargetNotIdentified')
 				.setName('Command to execute')
@@ -2522,7 +2677,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				.setName('Highlight opacity');
 			this.addToggleSetting('defaultWriteFileToggle')
 				.setName('Write highlight to file by default')
-				.setDesc('You can turn this on and off with the toggle button in the PDF viewer toolbar.');
+				.setDesc('Recommended if you want every copied quote to remain highlighted in the PDF. This saves a real highlight into the PDF file, so Obsidian may briefly reload the PDF after each saved highlight. Turn this off for a smoother copy that only uses the note link/backlink highlight. You can turn this on and off with the pencil button in the PDF viewer toolbar.');
 			this.addToggleSetting('syncWriteFileToggle')
 				.setName('Share the same toggle state among all PDF viewers')
 				.setDesc('If disabled, you can specify whether to write highlights to files for each PDF viewer.');
@@ -2593,9 +2748,9 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		this.addHeading('Citations in PDF (experimental)', 'citation', 'lucide-graduation-cap')
 			.then((setting) => {
 				this.renderMarkdown([
-					'Enjoy supercharged experiences of working with citations in PDF files, just like in [Google Scholar\'s PDF viewer](https://scholar.googleblog.com/2024/03/supercharge-your-pdf-reading-follow.html).',
+					'These settings are only for citation links that already exist inside a PDF, such as links from an in-text citation to the bibliography at the end of the PDF.',
 					'',
-					'The current implementation is based on some pretty primitive hand-crafted rules, and there is a lot of room for improvement. Code contribution is much appreciated!'
+					'You do not need this section to paste your own highlighted passages into notes. For pasted highlights, use the **Copy templates** section above.'
 				], setting.descEl);
 			});
 		{
@@ -2603,8 +2758,8 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				.setName(`Hover(+${modKey}) on a citation link to show...`)
 				.then((setting) => {
 					this.renderMarkdown([
-						`- **${ACTION_ON_CITATION_HOVER['pdf-plus-bib-popover']}**: ` + ' Recommended. It works without any additional stuff, but you can further boost the visibility by installing [AnyStyle](https://github.com/inukshuk/anystyle) (desktop only).',
-						`- **${ACTION_ON_CITATION_HOVER['google-scholar-popover']}**: ` + ' Requires [Surfing](obsidian://show-plugin?id=surfing) ver. 0.9.9 or higher enabled. Be careful not to exceed the rate limit of Google Scholar.',
+						`- **${ACTION_ON_CITATION_HOVER['pdf-plus-bib-popover']}**: Show a small popup with the bibliography text found in the PDF.`,
+						`- **${ACTION_ON_CITATION_HOVER['google-scholar-popover']}**: Open a Google Scholar preview. This requires the Surfing plugin and can hit Google Scholar rate limits.`,
 					], setting.descEl);
 				});
 			this.showConditionally(
@@ -2627,7 +2782,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 						this.renderMarkdown([
 							'The path to the [AnyStyle](https://github.com/inukshuk/anystyle) executable. ',
 							'',
-							'PDF++ extracts the bibliography text from the PDF file for each citation link and uses AnyStyle to convert the extracted text into a structured metadata.',
+							'PDF Scholia Scribe extracts the bibliography text from the PDF file for each citation link and uses AnyStyle to convert the extracted text into structured metadata.',
 							'It works just fine without AnyStyle, but you can further boost the visibility by installing it and providing its path here.',
 							'',
 							'Note: This setting is saved in the [local storage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage) instead of `data.json` in the plugin folder.'
@@ -2844,7 +2999,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 					'Each page in a PDF document can be assigned a ***page label***, which can be different from the page indices.',
 					'For example, a book might have a preface numbered as "i", "ii", "iii", ... and the main content numbered as "1", "2", "3", ...',
 					'',
-					'PDF++ allows you to choose whether page labels should be kept unchanged or updated when inserting/removing/extracting pages. [Learn more](https://github.com/RyotaUshio/obsidian-pdf-plus/wiki/Page-labels)',
+					'PDF Scholia Scribe allows you to choose whether page labels should be kept unchanged or updated when inserting/removing/extracting pages. [Learn more](https://github.com/RyotaUshio/obsidian-pdf-plus/wiki/Page-labels)',
 					'',
 					'You can also modify page labels directly using the command "Edit page labels".'
 				], setting.descEl);
@@ -3009,7 +3164,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			this.addDropdownSetting(
 				'backlinkHoverColor',
 				['', ...Object.keys(this.plugin.settings.colors)],
-				(option) => option || 'PDF++ default',
+				(option) => option || 'PDF Scholia Scribe default',
 				() => this.plugin.loadStyle()
 			)
 				.setName('Highlight color for hover sync (Backlinks pane → PDF viewer)')
@@ -3192,7 +3347,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				.setName('Vimrc file path (optional)')
 				.then(async (setting) => {
 					await this.renderMarkdown([
-						'Only the [Ex commands supported by PDF++](https://github.com/RyotaUshio/obsidian-pdf-plus/blob/main/src/vim/ex-commands.ts) are allowed.',
+						'Only the [Ex commands supported by PDF Scholia Scribe](https://github.com/RyotaUshio/obsidian-pdf-plus/blob/main/src/vim/ex-commands.ts) are allowed.',
 						'',
 						'Example (not necessarily recommendations):',
 						'```',
@@ -3214,7 +3369,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 						'map <C-i> :obcommand app:go-forward',
 						'```',
 						'',
-						'After changing the path or the file content, you need to reopen the PDF viewer. If the vimrc file is a hidden file or is under a hidden folder, you need to reload PDF++ or the app.',
+						'After changing the path or the file content, you need to reopen the PDF viewer. If the vimrc file is a hidden file or is under a hidden folder, you need to reload PDF Scholia Scribe or the app.',
 					], setting.descEl);
 
 					const inputEl = (setting.components[0] as TextComponent).inputEl;
@@ -3284,7 +3439,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 						'',
 						'This is inspired by [Tridactyl](https://github.com/tridactyl/tridactyl)\'s hint mode.',
 						'',
-						'Also check out Style Settings > PDF++ > Vim keybindings > Hint mode.'
+						'Also check out Style Settings > PDF Scholia Scribe > Vim keybindings > Hint mode.'
 					], setting.descEl);
 				}),
 			this.addTextSetting('vimHintChars')
@@ -3323,7 +3478,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		this.addHeading('Misc', 'misc', 'lucide-more-horizontal');
 		this.addToggleSetting('autoCheckForUpdates', () => this.plugin.checkForUpdatesIfNeeded())
 			.setName('Automatically check for updates')
-			.setDesc('If enabled, PDF++ will automatically check for updates every 24 hours and notify you if a new version is available.');
+			.setDesc('If enabled, PDF Scholia Scribe will automatically check for updates every 24 hours and notify you if a new version is available.');
 		this.addToggleSetting('fixObsidianTextSelectionBug')
 			.setName(`Fix Obsidian 1.9's text selection bug`)
 			.then((setting) => {
@@ -3376,12 +3531,12 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 					}
 				})
 				.setName('"PATH" environment variable')
-				.setDesc('Provide the "PATH" environment variable for PDF++ to run shell commands without the full paths specified. In MacOS and Linux, you can run "echo $PATH" in Terminal and then copy & paste the result here. Currently, it will be used only when you run ":!<command>" in Vim mode.');
+				.setDesc('Provide the "PATH" environment variable for PDF Scholia Scribe to run shell commands without the full paths specified. In MacOS and Linux, you can run "echo $PATH" in Terminal and then copy & paste the result here. Currently, it will be used only when you run ":!<command>" in Vim mode.');
 		}
 
 
 		this.addHeading('Style settings', 'style-settings', 'lucide-settings-2')
-			.setDesc('You can find more options in Style Settings > PDF++.')
+			.setDesc('You can find more options in Style Settings > PDF Scholia Scribe.')
 			.addButton((button) => {
 				button.setButtonText('Open style settings')
 					.onClick(() => {

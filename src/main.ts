@@ -1,7 +1,7 @@
 import { Constructor, EventRef, Events, FileSystemAdapter, Keymap, Menu, Notice, ObsidianProtocolData, PaneType, Platform, Plugin, SettingTab, TFile, addIcon, apiVersion, loadPdfJs, requireApiVersion } from 'obsidian';
 import * as pdflib from '@cantoo/pdf-lib';
 
-import { patchPDFView, patchPDFInternals, patchBacklink, patchWorkspace, patchPagePreview, patchClipboardManager, patchPDFInternalFromPDFEmbed, patchMenu } from 'patchers';
+import { patchPDFView, patchPDFInternals, patchBacklink, patchWorkspace, patchPagePreview, patchPDFInternalFromPDFEmbed, patchMenu } from 'patchers';
 import { PDFPlusLib } from 'lib';
 import { AutoCopyMode } from 'auto-copy';
 import { ColorPalette } from 'color-palette';
@@ -117,7 +117,7 @@ export default class PDFPlus extends Plugin {
 
 		this.startTrackingActiveMarkdownFile();
 
-		this.registerObsidianProtocolHandler('pdf-plus', this.obsidianProtocolHandler.bind(this));
+		this.registerObsidianProtocolHandler('pdf-scholia-scribe', this.obsidianProtocolHandler.bind(this));
 
 		this.addSettingTab(this.settingTab = new PDFPlusSettingTab(this));
 
@@ -228,6 +228,7 @@ export default class PDFPlus extends Plugin {
 				delete cmd.format;
 			}
 		}
+		this.migrateCitationCopyCommands();
 
 		if (this.settings.hasOwnProperty('aliasFormat')) {
 			this.settings.displayTextFormats.push({
@@ -284,6 +285,59 @@ export default class PDFPlus extends Plugin {
 		}
 	}
 
+	private migrateCitationCopyCommands() {
+		const migrateTemplate = (name: string, oldTemplates: string[], newTemplate: string) => {
+			const command = this.settings.copyCommands.find((cmd) => cmd.name === name);
+			if (command && oldTemplates.includes(command.template)) {
+				command.template = newTemplate;
+			}
+		};
+
+		const citationQuote = this.settings.copyCommands.find((cmd) => cmd.name === 'Citation quote');
+		if (citationQuote?.template === '{{display}}\n> {{text}}\n{{pdfLinkMarker}}\n') {
+			citationQuote.template = '{{linkWithDisplay}}\n> {{textMarkdown}}\n';
+		}
+		migrateTemplate('Citation quote', ['{{linkWithDisplay}}\n> {{text}}\n'], '{{linkWithDisplay}}\n> {{textMarkdown}}\n');
+
+		const inTextCitation = this.settings.copyCommands.find((cmd) => cmd.name === 'In-text citation');
+		if (
+			inTextCitation?.template === '{{display}} {{pdfLinkMarker}}'
+			|| inTextCitation?.template === '{{linkWithDisplay}}'
+			|| inTextCitation?.template === '"{{text}}"{{linkWithDisplay}}'
+			|| inTextCitation?.template === '"{{text}}" {{linkWithDisplay}}'
+		) {
+			inTextCitation.template = '"{{textMarkdown}}" {{linkWithDisplay}}';
+		}
+		migrateTemplate('Quote', ['> ({{linkWithDisplay}})\n> {{text}}\n'], '> ({{linkWithDisplay}})\n> {{textMarkdown}}\n');
+		migrateTemplate(
+			'Callout',
+			[
+				'> [!{{calloutType}}|{{color}}] {{linkWithDisplay}}\n> {{text}}\n',
+				'> [!{{calloutType}}|{{color}}] {{linkWithDisplay}}\n> {{textMarkdown}}\n',
+			],
+			'> [!{{calloutType}}|{{color}}] {{colorLabel ? colorLabel + " - " : ""}}{{linkWithDisplay}}\n> {{textMarkdown}}\n'
+		);
+		migrateTemplate(
+			'Quote in callout',
+			[
+				'> [!{{calloutType}}|{{color}}] {{linkWithDisplay}}\n> > {{text}}\n> \n> ',
+				'> [!{{calloutType}}|{{color}}] {{linkWithDisplay}}\n> > {{textMarkdown}}\n> \n> ',
+			],
+			'> [!{{calloutType}}|{{color}}] {{colorLabel ? colorLabel + " - " : ""}}{{linkWithDisplay}}\n> > {{textMarkdown}}\n> \n> '
+		);
+
+		const citationOnly = this.settings.copyCommands.find((cmd) => cmd.name === 'Link');
+		if (citationOnly?.template === '{{linkWithDisplay}}') {
+			citationOnly.name = 'Citation only';
+		}
+
+		const currentDisplayFormat = this.settings.displayTextFormats[this.settings.defaultDisplayTextFormatIndex];
+		if (currentDisplayFormat?.template === '{{text}}') {
+			const asaIndex = this.settings.displayTextFormats.findIndex((format) => format.template === '{{citation.asa}}');
+			if (asaIndex >= 0) this.settings.defaultDisplayTextFormatIndex = asaIndex;
+		}
+	}
+
 	private loadContextMenuConfig() {
 		const defaultConfig = this.getDefaultSettings().contextMenuConfig;
 		const config: typeof defaultConfig = [];
@@ -312,9 +366,9 @@ export default class PDFPlus extends Plugin {
 			const notice = new Notice('', 0)
 				.setMessage(createFragment((el) => {
 					const linkEl = createEl('a', {
-						href: 'obsidian://pdf-plus?setting=' + settingId
+						href: 'obsidian://pdf-scholia-scribe?setting=' + settingId
 					});
-					el.append('PDF++: ');
+					el.append(this.manifest.name + ': ');
 					setMessage(el, linkEl);
 				}));
 			notice.containerEl.addClass('pdf-plus-deprecated-setting-notice');
@@ -402,7 +456,7 @@ export default class PDFPlus extends Plugin {
 
 			const notice = new Notice(
 				createFragment((el) => el.append(
-					`PDF++: Please consider moving the "${this.settings.proxyMDProperty}" Dataview inline fields to the properties (YAML frontmatter).`,
+					`${this.manifest.name}: Please consider moving the "${this.settings.proxyMDProperty}" Dataview inline fields to the properties (YAML frontmatter).`,
 					createEl('br'),
 					'Click ',
 					createEl('a', {
@@ -567,7 +621,6 @@ export default class PDFPlus extends Plugin {
 		this.tryPatchUntilSuccess(patchPDFView);
 		this.tryPatchUntilSuccess(patchPDFInternalFromPDFEmbed);
 		this.tryPatchUntilSuccess(patchBacklink);
-		this.tryPatchUntilSuccess(patchClipboardManager);
 	}
 
 	tryPatchUntilSuccess(patcher: (plugin: PDFPlus) => boolean, noticeOnFail?: () => Notice | undefined) {
@@ -753,9 +806,9 @@ export default class PDFPlus extends Plugin {
 			await this.cleanUpResources();
 		}));
 
-		// 
-		// https://github.com/RyotaUshio/obsidian-pdf-plus/issues/285
-		this.registerEvent(this.app.workspace.on('editor-drop', (evt, editor, info) => this.lib.dummyFileManager.createDummyFilesOnEditorDrop(evt, editor, info)));
+		// Do not patch Markdown editor drag/drop in PDF Scholia Scribe's default build.
+		// The citation workflow uses color-click copy/paste; editor drag/drop hooks can
+		// make unstable editor selection behavior harder to diagnose.
 	}
 
 	registerOneTimeEvent<T extends Events>(events: T, ...[evt, callback, ctx]: OverloadParameters<T['on']>) {
@@ -776,10 +829,10 @@ export default class PDFPlus extends Plugin {
 			this.app.workspace.onLayoutReady(() => {
 				new Notice(createFragment((el) => {
 					el.append(
-						'PDF++: There is a newer version available! ',
+						`${this.manifest.name}: There is a newer version available! `,
 						createEl('a', {
 							text: 'Update now',
-							href: 'obsidian://show-plugin?id=pdf-plus',
+							href: 'obsidian://show-plugin?id=pdf-scholia-scribe',
 						})
 					);
 				}));
@@ -795,32 +848,32 @@ export default class PDFPlus extends Plugin {
 	private registerHoverLinkSources() {
 		this.registerHoverLinkSource('pdf-plus', {
 			defaultMod: true,
-			display: 'PDF++: backlink highlights'
+			display: `${this.manifest.name}: backlink highlights`
 		});
 
 		this.registerHoverLinkSource(PDFInternalLinkPostProcessor.HOVER_LINK_SOURCE_ID, {
 			defaultMod: true,
-			display: 'PDF++: internal links in PDF (except for citations)'
+			display: `${this.manifest.name}: internal links in PDF (except for citations)`
 		});
 
 		this.registerHoverLinkSource(BibliographyManager.HOVER_LINK_SOURCE_ID, {
 			defaultMod: false,
-			display: 'PDF++: citation links in PDF'
+			display: `${this.manifest.name}: citation links in PDF`
 		});
 
 		this.registerHoverLinkSource(PDFExternalLinkPostProcessor.HOVER_LINK_SOURCE_ID, {
 			defaultMod: true,
-			display: 'PDF++: external links in PDF'
+			display: `${this.manifest.name}: external links in PDF`
 		});
 
 		this.registerHoverLinkSource(PDFOutlineItemPostProcessor.HOVER_LINK_SOURCE_ID, {
 			defaultMod: true,
-			display: 'PDF++: outlines (bookmarks)'
+			display: `${this.manifest.name}: outlines (bookmarks)`
 		});
 
 		this.registerHoverLinkSource(PDFThumbnailItemPostProcessor.HOVER_LINK_SOURCE_ID, {
 			defaultMod: true,
-			display: 'PDF++: thumbnails'
+			display: `${this.manifest.name}: thumbnails`
 		});
 	}
 

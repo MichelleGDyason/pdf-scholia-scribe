@@ -5,3 +5,4 @@ export * from './outline-modals';
 export * from './page-label-modals';
 export * from './dummy-file-modals';
 export * from './installer-version-modal';
+export * from './zotero-citation-modal';

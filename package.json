@@ -1,7 +1,19 @@
 {
-    "name": "obsidian-pdf-plus",
-    "version": "0.40.31",
-    "description": "The most Obsidian-native PDF annotation tool ever.",
+    "name": "obsidian-pdf-scholia-scribe",
+    "version": "0.40.32",
+    "description": "Citation-focused PDF annotation and note-linking for Obsidian.",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/MichelleGDyason/pdf-scholia-scribe.git"
+    },
+    "bugs": {
+        "url": "https://github.com/MichelleGDyason/pdf-scholia-scribe/issues"
+    },
+    "homepage": "https://github.com/MichelleGDyason/pdf-scholia-scribe#readme",
+    "funding": [
+        "https://github.com/sponsors/MichelleGDyason",
+        "https://www.buymeacoffee.com/MichelleGDyason"
+    ],
     "scripts": {
         "dev": "node esbuild.config.mjs",
         "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
@@ -10,7 +22,7 @@
         "version": "node version-bump.mjs && git add manifest.json versions.json"
     },
     "keywords": [],
-    "author": "Ryota Ushio",
+    "author": "Michelle G Dyason",
     "license": "MIT",
     "devDependencies": {
         "@cantoo/pdf-lib": "^2.4.3",

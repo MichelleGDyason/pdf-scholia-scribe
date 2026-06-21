@@ -76,7 +76,9 @@ export class ColorPalette extends PDFPlusComponent {
         }
 
         this.actionMenuEl = this.addCopyActionDropdown(this.paletteEl);
-        this.displayTextFormatMenuEl = this.addDisplayTextFormatDropdown(this.paletteEl);
+        if (this.plugin.settings.displayTextFormatDropdownInToolbar) {
+            this.displayTextFormatMenuEl = this.addDisplayTextFormatDropdown(this.paletteEl);
+        }
 
         this.addCropButton(this.paletteEl);
 
@@ -154,10 +156,32 @@ export class ColorPalette extends PDFPlusComponent {
 
         const template = this.plugin.settings.copyCommands[this.actionIndex].template;
 
+        let handled = false;
         if (this.writeFile) {
-            this.lib.copyLink.writeHighlightAnnotationToSelectionIntoFileAndCopyLink(false, { copyFormat: template }, name ?? undefined);
-        } else {
-            this.lib.copyLink.copyLinkToSelection(false, { copyFormat: template }, name ?? undefined);
+            handled = this.lib.copyLink.writeHighlightAnnotationToSelectionIntoFileAndCopyLink(false, { copyFormat: template }, name ?? undefined);
+        }
+
+        if (!handled) {
+            handled = this.lib.copyLink.copyLinkToSelection(false, { copyFormat: template }, name ?? undefined);
+        }
+
+        if (!handled) {
+            const annotation = this.lib.copyLink.getAnnotationLinkInfo();
+            if (annotation) {
+                handled = this.lib.copyLink.copyLinkToAnnotation(
+                    annotation.child,
+                    false,
+                    { copyFormat: template },
+                    annotation.page,
+                    annotation.id,
+                    undefined,
+                    true
+                );
+            }
+        }
+
+        if (!handled) {
+            this.setStatus('Select PDF text or click an existing PDF highlight first', this.lib.copyLink.statusDurationMs);
         }
 
         evt.preventDefault();

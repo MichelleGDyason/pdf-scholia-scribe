@@ -3,7 +3,7 @@ import { Editor, EditorRange, MarkdownFileInfo, MarkdownView, Notice, TFile } fr
 import { PDFPlusLibSubmodule } from './submodule';
 import { PDFPlusTemplateProcessor } from 'template';
 import { encodeLinktext, getOffsetInTextLayerNode, getTextLayerInfo, getTextLayerNode, paramsToSubpath, parsePDFSubpath, subpathToParams } from 'utils';
-import { Canvas, PDFOutlineTreeNode, PDFViewerChild, Rect } from 'typings';
+import { Canvas, PDFOutlineTreeNode, PDFViewerChild, Rect, TextContentItem } from 'typings';
 import { ColorPalette } from 'color-palette';
 
 
@@ -85,6 +85,8 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
             ...subpathParams
         });
 
+        const plainText = this.lib.toSingleLine(selection.toString());
+
         return {
             child,
             file,
@@ -92,8 +94,145 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
             page,
             pageCount: child.pdfViewer.pagesCount,
             pageLabel: child.getPage(page).pageLabel ?? ('' + page),
-            text: this.lib.toSingleLine(selection.toString()),
+            text: plainText,
+            textMarkdown: this.getSelectedTextMarkdown(child, page, this.getPageAndTextRangeFromSelection(selection)?.selection) ?? plainText,
         };
+    }
+
+    getSelectedTextMarkdown(child: PDFViewerChild, page: number, selection?: { beginIndex: number, beginOffset: number, endIndex: number, endOffset: number }) {
+        if (!this.settings.preserveItalicsInCopiedText || !selection) return null;
+
+        const textLayer = child.getPage(page).textLayer;
+        const textLayerInfo = textLayer && getTextLayerInfo(textLayer);
+        if (!textLayerInfo) return null;
+
+        const { textContentItems, textDivs } = textLayerInfo;
+        const inferredItalicIndexes = this.getInferredItalicTextItemIndexes(textContentItems, textDivs);
+        const segments: { text: string, italic: boolean }[] = [];
+
+        for (let i = selection.beginIndex; i <= selection.endIndex; i++) {
+            const item = textContentItems[i];
+            if (!item) continue;
+
+            const from = i === selection.beginIndex ? selection.beginOffset : 0;
+            const to = i === selection.endIndex ? selection.endOffset : item.str.length;
+            const text = item.str.slice(from, to);
+            if (!text) continue;
+
+            segments.push({
+                text,
+                italic: this.isItalicTextItem(item, textDivs[i]) || inferredItalicIndexes.has(i),
+            });
+
+            if (item.hasEOL && i < selection.endIndex) {
+                segments.push({ text: '\n', italic: false });
+            }
+        }
+
+        if (!segments.length) return null;
+        return this.lib.toSingleLine(this.formatMarkdownTextSegments(segments));
+    }
+
+    getInferredItalicTextItemIndexes(textContentItems: TextContentItem[], textDivs: HTMLElement[]) {
+        const indexes = new Set<number>();
+        const stats = new Map<string, { chars: number, count: number, sizeSum: number }>();
+
+        for (let i = 0; i < textContentItems.length; i++) {
+            const item = textContentItems[i];
+            if (!item?.str.trim()) continue;
+            if (this.isItalicTextItem(item, textDivs[i])) continue;
+
+            const fontName = item.fontName;
+            const stat = stats.get(fontName) ?? { chars: 0, count: 0, sizeSum: 0 };
+            stat.chars += item.str.replace(/\s+/g, '').length;
+            stat.count++;
+            stat.sizeSum += this.getTextItemFontSize(item);
+            stats.set(fontName, stat);
+        }
+
+        const dominant = Array.from(stats.entries())
+            .sort((a, b) => b[1].chars - a[1].chars)[0];
+        if (!dominant) return indexes;
+
+        const [dominantFontName, dominantStats] = dominant;
+        const dominantSize = dominantStats.sizeSum / dominantStats.count;
+
+        for (let i = 0; i < textContentItems.length; i++) {
+            const item = textContentItems[i];
+            if (!item?.str.trim() || item.fontName === dominantFontName) continue;
+            if (this.isItalicTextItem(item, textDivs[i])) continue;
+            if (!this.hasSimilarFontSize(item, dominantSize)) continue;
+            if (!this.isInlineWithDominantFont(i, textContentItems, dominantFontName)) continue;
+
+            indexes.add(i);
+        }
+
+        return indexes;
+    }
+
+    getTextItemFontSize(item: TextContentItem) {
+        return Math.max(Math.abs(item.transform[0] ?? 0), Math.abs(item.transform[3] ?? 0), item.height || 0);
+    }
+
+    hasSimilarFontSize(item: TextContentItem, dominantSize: number) {
+        const size = this.getTextItemFontSize(item);
+        if (!size || !dominantSize) return false;
+
+        const ratio = size / dominantSize;
+        return ratio >= 0.75 && ratio <= 1.25;
+    }
+
+    isInlineWithDominantFont(index: number, textContentItems: TextContentItem[], dominantFontName: string) {
+        const item = textContentItems[index];
+        const y = item.transform[5];
+        const tolerance = Math.max(this.getTextItemFontSize(item) * 0.5, 2);
+
+        return textContentItems.some((other, otherIndex) => {
+            if (otherIndex === index || other.fontName !== dominantFontName || !other.str.trim()) return false;
+            const otherY = other.transform[5];
+            return typeof y === 'number'
+                && typeof otherY === 'number'
+                && Math.abs(y - otherY) <= tolerance;
+        });
+    }
+
+    isItalicTextItem(item: TextContentItem, textDiv?: HTMLElement) {
+        const style = textDiv?.style;
+        const candidates = [
+            item.fontName,
+            style?.fontStyle,
+            style?.fontFamily,
+            style?.cssText,
+            textDiv?.className.toString(),
+            textDiv?.dataset.fontName,
+            textDiv?.getAttribute('style'),
+        ].filter((value): value is string => !!value);
+
+        return candidates.some((value) => {
+            return /(italic|oblique|slanted|kursiv)/i.test(value)
+                || /(^|[-_+,\s])(it|ital)([-_+,\s]|$)/i.test(value);
+        });
+    }
+
+    formatMarkdownTextSegments(segments: { text: string, italic: boolean }[]) {
+        const merged: { text: string, italic: boolean }[] = [];
+        for (const segment of segments) {
+            const previous = merged.last();
+            if (previous && previous.italic === segment.italic) {
+                previous.text += segment.text;
+            } else {
+                merged.push({ ...segment });
+            }
+        }
+
+        return merged.map((segment) => {
+            const text = segment.text.replace(/\\/g, '\\\\').replace(/\*/g, '\\*');
+            if (!segment.italic) return text;
+
+            const match = text.match(/^(\s*)([\s\S]*?)(\s*)$/);
+            if (!match?.[2]) return text;
+            return `${match[1]}*${match[2]}*${match[3]}`;
+        }).join('');
     }
 
     getLinkTemplateVariables(child: PDFViewerChild, displayTextFormat: string | undefined, file: TFile, subpath: string, page: number, text: string, comment: string, sourcePath?: string) {
@@ -107,19 +246,23 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
         // https://github.com/obsidianmd/obsidian-api/issues/154
         // const linkWithDisplay = app.fileManager.generateMarkdownLink(file, sourcePath, subpath, display).slice(1);
         const linkWithDisplay = this.lib.generateMarkdownLink(file, sourcePath, subpath, display || undefined).slice(1);
+        const pdfLinkMarker = this.lib.generateMarkdownLink(file, sourcePath, subpath, 'PDF').slice(1);
 
         const linkToPage = this.app.fileManager.generateMarkdownLink(file, sourcePath, `#page=${page}`).slice(1);
         // https://github.com/obsidianmd/obsidian-api/issues/154
         // const linkToPageWithDisplay = app.fileManager.generateMarkdownLink(file, sourcePath, `#page=${page}`, display).slice(1);
         const linkToPageWithDisplay = this.lib.generateMarkdownLink(file, sourcePath, `#page=${page}`, display || undefined).slice(1);
+        const pdfPageLinkMarker = this.lib.generateMarkdownLink(file, sourcePath, `#page=${page}`, 'PDF').slice(1);
 
         return {
             link,
             linktext,
             display,
             linkWithDisplay,
+            pdfLinkMarker,
             linkToPage,
-            linkToPageWithDisplay
+            linkToPageWithDisplay,
+            pdfPageLinkMarker
         };
     }
 
@@ -170,7 +313,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
      * (See also: https://github.com/RyotaUshio/obsidian-pdf-plus/issues/260)
      * @returns 
      */
-    getTextToCopy(child: PDFViewerChild, template: string, displayTextFormat: string | undefined, file: TFile, page: number, subpath: string, text: string, colorName: string, sourcePath?: string, comment?: string) {
+    getTextToCopy(child: PDFViewerChild, template: string, displayTextFormat: string | undefined, file: TFile, page: number, subpath: string, text: string, colorName: string, sourcePath?: string, comment?: string, textMarkdown = text) {
         const pageView = child.getPage(page);
 
         // need refactor
@@ -181,20 +324,28 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
             comment = this.lib.toSingleLine(comment || '');
         }
 
+        const linkVariables = this.lib.copyLink.getLinkTemplateVariables(child, displayTextFormat, file, subpath, page, text, comment, sourcePath);
         const processor = new PDFPlusTemplateProcessor(this.plugin, {
             file,
             page,
             pageLabel: pageView.pageLabel ?? ('' + page),
             pageCount: child.pdfViewer.pagesCount,
             text,
+            textMarkdown,
             comment,
             colorName,
             calloutType: this.settings.calloutType,
-            ...this.lib.copyLink.getLinkTemplateVariables(child, displayTextFormat, file, subpath, page, text, comment, sourcePath)
+            ...linkVariables
         });
 
-        const evaluated = processor.evalTemplate(template);
-        return evaluated;
+        try {
+            const evaluated = processor.evalTemplate(template);
+            return evaluated;
+        } catch (err) {
+            console.error(err);
+            new Notice(`${this.plugin.manifest.name}: Copy template is invalid. Copying a plain PDF link instead. Error: ${err.message}`, 6000);
+            return linkVariables.linkWithDisplay;
+        }
     }
 
     async getTextToCopyForOutlineItem(child: PDFViewerChild, file: TFile, item: PDFOutlineTreeNode, sourcePath?: string) {
@@ -272,7 +423,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
 
             if (!checking) {
                 (async () => {
-                    const evaluated = this.getTextToCopy(child, templates.copyFormat, templates.displayTextFormat, file, page, subpath, text, colorName?.toLowerCase() ?? '');
+                    const evaluated = this.getTextToCopy(child, templates.copyFormat, templates.displayTextFormat, file, page, subpath, text, colorName?.toLowerCase() ?? '', undefined, undefined, variables.textMarkdown);
                     // Without await, the focus can move to a different document before `writeText` is completed
                     // if auto-focus is on and the PDF is opened in a secondary window, which causes the copy to fail.
                     // https://github.com/RyotaUshio/obsidian-pdf-plus/issues/93
@@ -376,24 +527,31 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
 
         if (!checking) {
             const palette = this.lib.getColorPaletteAssociatedWithSelection();
-            palette?.setStatus('Writing highlight annotation into file...', 10000);
+            const copied = this.copyLinkToSelection(false, templates, colorName, autoPaste);
+            if (!copied) return false;
+
+            palette?.setStatus('Link copied; saving PDF highlight...', 10000);
             this.lib.highlight.writeFile.addTextMarkupAnnotationToSelection(
                 this.settings.selectionBacklinkVisualizeStyle === 'highlight' ? 'Highlight' : 'Underline',
                 colorName
             )
                 .then((result) => {
-                    if (!result) return;
+                    if (!result) {
+                        palette?.setStatus('Link copied without saving PDF highlight', this.statusDurationMs);
+                        return;
+                    }
 
                     const { child, file, page, annotationID, rects } = result;
-                    if (!annotationID || !file) return;
+                    if (!annotationID || !file) {
+                        palette?.setStatus('Link copied without saving PDF highlight', this.statusDurationMs);
+                        return;
+                    }
 
                     setTimeout(() => {
-                        // After the file modification, the PDF viewer DOM is reloaded, so we need to 
+                        // After the file modification, the PDF viewer DOM is reloaded, so we need to
                         // get the new DOM to access the newly loaded color palette instance.
                         const newPalette = this.lib.getColorPaletteFromChild(child);
-                        newPalette?.setStatus('Link copied', this.statusDurationMs);
-                        const { r, g, b } = this.plugin.domManager.getRgb(colorName);
-                        this.copyLinkToAnnotationWithGivenTextAndFile(text, file, child, false, templates, page, annotationID, `${r}, ${g}, ${b}`, autoPaste);
+                        newPalette?.setStatus('PDF highlight saved', this.statusDurationMs);
 
                         // TODO: Needs refactor
                         if (rects) {
@@ -404,6 +562,11 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
                             }
                         }
                     }, 300);
+                })
+                .catch((err) => {
+                    console.error(err);
+                    new Notice(`${this.plugin.manifest.name}: Could not write the highlight into the PDF file, but the link was copied.`, 6000);
+                    palette?.setStatus('Link copied without writing to PDF', this.statusDurationMs);
                 });
         }
 
@@ -518,7 +681,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
             if (!text) return false;
 
             if (!checking) {
-                const evaluated = this.getTextToCopy(child, template, undefined, file, page, subpath, text, colorName?.toLowerCase() ?? '');
+                const evaluated = this.getTextToCopy(child, template, undefined, file, page, subpath, text, colorName?.toLowerCase() ?? '', undefined, undefined, variables.textMarkdown);
                 canvas.createTextNode({
                     pos: canvas.posCenter(),
                     position: 'center',
@@ -754,6 +917,10 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
             // First, I handled this by `setTimeout` but now, I have added the new `forceUseVault` parameter
             // and don't use the combination of `Editor` & `setTimeout` anymore.
 
+            const scrollInfo = this.settings.preserveEditorScrollAfterAutoPaste
+                ? editor.getScrollInfo()
+                : null;
+
             if (this.settings.respectCursorPositionWhenAutoPaste) {
                 editor.replaceSelection(text);
             } else {
@@ -771,7 +938,8 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
 
             await this.updateAndRevealCursorInEditor(leaf.view, {
                 focus: this.settings.focusEditorAfterAutoPaste,
-                goEnd: !this.settings.respectCursorPositionWhenAutoPaste
+                goEnd: !this.settings.respectCursorPositionWhenAutoPaste,
+                preserveScroll: scrollInfo
             });
         } else {
             // Otherwise we just use the vault interface
@@ -799,8 +967,8 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
         }
     }
 
-    async updateAndRevealCursorInEditor(view: MarkdownView, options: { focus: boolean, goEnd: boolean }) {
-        const { focus, goEnd } = options;
+    async updateAndRevealCursorInEditor(view: MarkdownView, options: { focus: boolean, goEnd: boolean, preserveScroll?: { left: number, top: number } | null }) {
+        const { focus, goEnd, preserveScroll } = options;
 
         const editor = view.editor;
 
@@ -810,6 +978,14 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
             await this.lib.workspace.revealLeaf(view.leaf);
             this.app.workspace.setActiveLeaf(view.leaf);
             editor.focus();
+        }
+
+        if (preserveScroll) {
+            const restoreScroll = () => editor.scrollTo(preserveScroll.left, preserveScroll.top);
+            restoreScroll();
+            activeWindow.requestAnimationFrame(restoreScroll);
+            activeWindow.setTimeout(restoreScroll, 0);
+            return;
         }
 
         // Scroll to the cursor position if it is not visible

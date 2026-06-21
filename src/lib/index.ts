@@ -22,6 +22,7 @@ import { Speech } from './speech';
 import * as utils from 'utils';
 import { DummyFileManager } from './dummy-file-manager';
 import { RenderParameters } from 'pdfjs-dist/types/src/display/api';
+import { ZoteroReferenceManager } from './zotero-references';
 
 
 type OptionalRenderParameters = Omit<RenderParameters, 'canvas' | 'canvasContext' | 'viewport' | 'transform'>
@@ -51,6 +52,7 @@ export class PDFPlusLib {
     composer: PDFComposer;
     dummyFileManager: DummyFileManager;
     speech: Speech;
+    zoteroReferences: ZoteroReferenceManager;
 
     utils = utils;
 
@@ -74,6 +76,7 @@ export class PDFPlusLib {
         this.composer = new PDFComposer(plugin);
         this.dummyFileManager = new DummyFileManager(plugin);
         this.speech = new Speech(plugin);
+        this.zoteroReferences = new ZoteroReferenceManager(plugin);
     }
 
     /** 

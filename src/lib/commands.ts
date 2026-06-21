@@ -1,7 +1,7 @@
 import { Command, MarkdownView, Notice, TFile, WorkspaceLeaf, normalizePath, setIcon } from 'obsidian';
 
 import { PDFPlusLibSubmodule } from './submodule';
-import { PDFComposerModal, PDFCreateModal, PDFPageDeleteModal, PDFPageLabelEditModal, PDFOutlineTitleModal, DummyFileModal } from 'modals';
+import { PDFComposerModal, PDFCreateModal, PDFPageDeleteModal, PDFPageLabelEditModal, PDFOutlineTitleModal, DummyFileModal, ZoteroCitationModal } from 'modals';
 import { PDFOutlines } from './outlines';
 import { TemplateProcessor } from 'template';
 import { getObsidianDebugInfo, getStyleSettings, parsePDFSubpath } from 'utils';
@@ -193,6 +193,14 @@ export class PDFPlusCommands extends PDFPlusLibSubmodule {
                 id: 'create-dummy',
                 name: 'Create dummy file for external PDF',
                 callback: () => this.createDummyForExternalPDF()
+            }, {
+                id: 'insert-zotero-citation',
+                name: 'Insert citation from Zotero or vault',
+                callback: () => this.insertZoteroCitation()
+            }, {
+                id: 'update-reference-list',
+                name: 'Update reference list for current note',
+                callback: () => this.updateReferenceList()
             }, {
                 id: 'restore-default',
                 name: 'Restore default settings',
@@ -995,7 +1003,7 @@ export class PDFPlusCommands extends PDFPlusLibSubmodule {
             }
             text += `- ${key}: ${value}\n`;
         }
-        text += '\n#### PDF++ debug info\n\n';
+        text += `\n#### ${this.plugin.manifest.name} debug info\n\n`;
         text += '```\n' + JSON.stringify({ settings, styleSettings, styleSheet }) + '\n```\n';
 
         await navigator.clipboard.writeText(text);
@@ -1061,6 +1069,29 @@ export class PDFPlusCommands extends PDFPlusLibSubmodule {
 
     createDummyForExternalPDF() {
         new DummyFileModal(this.plugin).open();
+    }
+
+    insertZoteroCitation() {
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (!view || !view.file) {
+            new Notice(`${this.plugin.manifest.name}: Open the note you want to cite in, then run this command again.`);
+            return;
+        }
+
+        new ZoteroCitationModal(this.plugin, view).open();
+    }
+
+    updateReferenceList() {
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (!view || !view.file) {
+            new Notice(`${this.plugin.manifest.name}: Open the note whose references you want to update, then run this command again.`);
+            return;
+        }
+
+        (async () => {
+            const count = await this.lib.zoteroReferences.updateReferenceList(view);
+            new Notice(`${this.plugin.manifest.name}: Updated reference list with ${count} source${count === 1 ? '' : 's'}.`);
+        })();
     }
 
     showContextMenu(checking: boolean) {

@@ -1,12 +1,13 @@
-<h1 align="center">Obsidian PDF++</h1>
+<h1 align="center">PDF Scholia Scribe</h1>
+
+PDF Scholia Scribe is a citation-focused fork of PDF++ for Obsidian.
+
+This fork adds compact citation-style display text for copied PDF selection links, including Harvard, APA, ASA, and numbered formats such as `[1]` or `[1, p. 101]`. The link still points to the exact PDF selection and can still drive backlink highlights, but the rendered note can read like an in-text citation instead of showing file, page, and color details.
 <p align="center">
-<img src="https://img.shields.io/badge/dynamic/json?logo=obsidian&color=%238a5cf5&label=downloads&query=%24%5B%22pdf-plus%22%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json" alt="Obsidian Downloads">
+<img src="https://img.shields.io/badge/dynamic/json?logo=obsidian&color=%238a5cf5&label=downloads&query=%24%5B%22pdf-scholia-scribe%22%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json" alt="Obsidian Downloads">
 </p>
 
-> [!note] 
-> I’m currently working on PDF++ v1.0.0. Because this release involves extensive refactoring, you probably won’t see any major updates for a few months—aside from minor bug fixes—until I can ship the 1.0.0 beta. But don’t worry: there’s a lot going on under the hood!
-> 
-> ⭐ Star this repo to show your support!
+PDF Scholia Scribe is maintained by [Michelle G Dyason](https://github.com/MichelleGDyason). It is a fork of [PDF++](https://github.com/RyotaUshio/obsidian-pdf-plus), with extra tools for quieter scholarly notes, citation-like PDF links, Zotero-backed citations, and reference-list generation.
 
 This is an [Obsidian.md](https://obsidian.md) plugin for a better PDF experience. Specifically:
 
@@ -399,14 +400,20 @@ Fortunately, it seems to be compatible with PDF++, meaning you can use features 
 
 ## Installation
 
-You can install this plugin from within Obsidian's community plugin browser.
+When approved, you will be able to install this plugin from within Obsidian's community plugin browser.
 
 Alternatively, you can try the cutting-edge, latest beta release using [BRAT](https://github.com/TfTHacker/obsidian42-brat).
 
 1. Install the latest version of BRAT and enable it.
 2. _(Optional but highly recommended)_ In the BRAT settings, turn on `Auto-update plugins at startup` at the top of the page.
-3. Open the following URL in the browser: `obsidian://brat?plugin=RyotaUshio/obsidian-pdf-plus`.
+3. Open the following URL in the browser: `obsidian://brat?plugin=MichelleGDyason/pdf-scholia-scribe`.
 4. Click the "Add Plugin" button.
+
+You can also add the plugin in BRAT with this repository slug:
+
+```text
+MichelleGDyason/pdf-scholia-scribe
+```
 
 ## Credits
 
@@ -443,10 +450,7 @@ The following plugin(s) alters Obsidian's internals in such a way that prevents 
 
 ## Support development
 
-If you find [my plugins](https://ryotaushio.github.io/the-hobbyist-dev/) useful, please support my work to ensure they continue to work!
+If PDF Scholia Scribe supports your reading and writing, you can support Michelle's work here:
 
-<a href="https://github.com/sponsors/RyotaUshio" target="_blank"><img src="https://img.shields.io/static/v1?label=Sponsor&message=%E2%9D%A4&logo=GitHub&color=%23fe8e86" alt="GitHub Sponsors" style="width: 180px; height:auto;"></a>
-
-<a href="https://www.buymeacoffee.com/ryotaushio" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="width: 180px; height:auto;"></a>
-
-<a href='https://ko-fi.com/E1E6U7CJZ' target='_blank'><img height='36' style='border:0px; width: 180px; height:auto;' src='https://storage.ko-fi.com/cdn/kofi2.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
+- GitHub Sponsors: [github.com/sponsors/MichelleGDyason](https://github.com/sponsors/MichelleGDyason)
+- Buy Me a Coffee: [buymeacoffee.com/MichelleGDyason](https://www.buymeacoffee.com/MichelleGDyason)

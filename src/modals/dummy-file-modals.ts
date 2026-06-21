@@ -105,7 +105,7 @@ export class DummyFileModal extends PDFPlusModal {
             .setName('Folder to save the dummy files')
             .setDesc(createFragment((el) => {
                 el.appendText('You can specify the default folder in the ');
-                el.createEl('a', { text: 'settings', href: 'obsidian://pdf-plus?setting=dummyFileFolderPath' });
+                el.createEl('a', { text: 'settings', href: 'obsidian://pdf-scholia-scribe?setting=dummyFileFolderPath' });
                 el.appendText('.');
             }))
             .addText((text) => {
