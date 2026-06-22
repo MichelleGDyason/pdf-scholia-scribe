@@ -1,13 +1,55 @@
 <h1 align="center">PDF Scholia Scribe</h1>
 
-PDF Scholia Scribe is a citation-focused fork of PDF++ for Obsidian.
+PDF Scholia Scribe is a citation-focused fork of PDF++ for Obsidian. It is built for reading PDFs while writing scholarly notes: copy a passage, keep the link back to the exact PDF selection, and show a quiet citation label in the note instead of a long file/page/colour link.
 
-This fork adds compact citation-style display text for copied PDF selection links, including Harvard, APA, ASA, and numbered formats such as `[1]` or `[1, p. 101]`. The link still points to the exact PDF selection and can still drive backlink highlights, but the rendered note can read like an in-text citation instead of showing file, page, and color details.
+The fork keeps the powerful PDF++ backlink-highlighting system, but changes the writing workflow around it:
+
+- copied PDF selections can render as author-date citations such as `(Deleuze 1983:124)`, APA or Harvard-style page citations, or numbered citations such as `[1]`;
+- in-text citation paste can produce `"quoted passage" (Author year:page)` with the PDF link hidden under the citation text;
+- quote and callout paste formats are still available, including callout headers that can use your colour labels instead of an icon;
+- PDF page labels are preferred over raw PDF page indexes, so books with front matter can cite page `47` instead of the PDF viewer's internal page number;
+- Zotero-backed citation insertion can search Zotero and vault source notes, with a `Zotero only` option for noisy vaults and a `Date only` option for sentences where the author is already named;
+- reference-list generation can collect citations in the current note and build a managed `References` section;
+- recent fixes make the colour-toolbar paste format obey the selected copy style, reduce paper/file icon noise, preserve editor scroll position after auto-paste, and use a desktop Zotero local-API fallback when Obsidian's browser-style request path cannot reach Zotero.
+
+This is still a PDF++ fork, not a replacement for Zotero. Zotero is used for citation metadata and formatted references; PDF Scholia Scribe handles the Obsidian PDF link, highlight, paste, and note-writing workflow.
 <p align="center">
 <img src="https://img.shields.io/badge/dynamic/json?logo=obsidian&color=%238a5cf5&label=downloads&query=%24%5B%22pdf-scholia-scribe%22%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json" alt="Obsidian Downloads">
 </p>
 
-PDF Scholia Scribe is maintained by [Michelle G Dyason](https://github.com/MichelleGDyason). It is a fork of [PDF++](https://github.com/RyotaUshio/obsidian-pdf-plus), with extra tools for quieter scholarly notes, citation-like PDF links, Zotero-backed citations, and reference-list generation.
+PDF Scholia Scribe is maintained by [Michelle G Dyason](https://github.com/MichelleGDyason). It is a fork of [PDF++](https://github.com/RyotaUshio/obsidian-pdf-plus), with extra tools for quieter scholarly notes, citation-like PDF links, Zotero-backed citations, date-only citations, labelled callouts, and reference-list generation.
+
+## About PDF Scholia Scribe
+
+PDF Scholia Scribe starts from the central PDF++ idea: a Markdown link to a PDF selection can become a highlight in the PDF viewer. That is useful because the note remains ordinary Markdown, while the PDF still shows where the quoted passage came from.
+
+The main change in this fork is how those links look and behave while writing. The original copied link could expose a lot of technical detail: file names, PDF page indexes, colour names, and source markers. PDF Scholia Scribe keeps the same link target, but lets the visible label read like a citation. A copied passage can therefore sit naturally in prose, for example:
+
+```text
+"Since the strong could prevent themselves from acting, the weak could act if they did not prevent themselves" (Deleuze 1983:123).
+```
+
+Changes made in this fork so far include:
+
+- renamed and rebranded the plugin as PDF Scholia Scribe, with Michelle G Dyason as maintainer and funding links in the plugin metadata;
+- added citation display formats for copied PDF links, including ASA-style author-date, Harvard, APA, and numbered citation labels;
+- added cleaner copy formats for citation-only paste, quoted sentence paste, quote blocks, and callouts;
+- hid the extra PDF/source marker under the citation text where possible, so the note is less cluttered;
+- removed the noisy callout icon by default and allowed callout headings to show the colour label you gave the highlight colour;
+- fixed the colour-toolbar copy action so choosing `In-text citation`, `Quote`, or `Quote in callout` is respected when you click a colour;
+- improved page-number handling by using page labels where the PDF provides them;
+- added a setting to reduce note-jumping after auto-paste;
+- added a desktop fallback for Zotero's local API, so Zotero search still works when Obsidian's browser-style request path cannot reach Zotero.
+
+The fork also adds a small Zotero-and-vault citation workflow. You can run **Insert citation from Zotero or vault**, search for a source, choose whether to search Zotero, the vault, or both, and insert either an author-date citation or a date-only citation. Date-only citations are useful when the sentence already names the author, for example:
+
+```text
+Pires argues that urban agriculture needs planning support (2011:47).
+```
+
+For notes with many citations, **Update reference list for current note** creates or refreshes a managed reference list at the end of the note. The updater recognises citations inserted by PDF Scholia Scribe, ordinary `@citekey` references, links to vault source notes, and PDF quote links that can be matched to a source note.
+
+These Zotero features are separate from PDF++'s original **Citations in PDF (experimental)** section. That original feature is for citation links already inside a PDF. PDF Scholia Scribe's added citation workflow is for writing in your Obsidian note, using Zotero metadata and your vault source notes.
 
 This is an [Obsidian.md](https://obsidian.md) plugin for a better PDF experience. Specifically:
 
