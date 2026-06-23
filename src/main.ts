@@ -229,6 +229,7 @@ export default class PDFPlus extends Plugin {
 			}
 		}
 		this.migrateCitationCopyCommands();
+		this.migrateOutlineCopySettings();
 
 		if (this.settings.hasOwnProperty('aliasFormat')) {
 			this.settings.displayTextFormats.push({
@@ -335,6 +336,15 @@ export default class PDFPlus extends Plugin {
 		if (currentDisplayFormat?.template === '{{text}}') {
 			const asaIndex = this.settings.displayTextFormats.findIndex((format) => format.template === '{{citation.asa}}');
 			if (asaIndex >= 0) this.settings.defaultDisplayTextFormatIndex = asaIndex;
+		}
+	}
+
+	private migrateOutlineCopySettings() {
+		if (this.settings.copyOutlineAsHeadingsFormat === '{{text}}\n\n{{linkWithDisplay}}') {
+			this.settings.copyOutlineAsHeadingsFormat = '{{linkWithDisplay}}';
+		}
+		if (this.settings.copyOutlineAsHeadingsDisplayTextFormat === 'p.{{pageLabel}}') {
+			this.settings.copyOutlineAsHeadingsDisplayTextFormat = '{{text}} (p.{{pageLabel}})';
 		}
 	}
 

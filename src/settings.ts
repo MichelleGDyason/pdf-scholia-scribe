@@ -581,8 +581,8 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 	askPageLabelUpdateWhenExtractPage: true,
 	copyOutlineAsListFormat: '{{linkWithDisplay}}',
 	copyOutlineAsListDisplayTextFormat: '{{text}}',
-	copyOutlineAsHeadingsFormat: '{{text}}\n\n{{linkWithDisplay}}',
-	copyOutlineAsHeadingsDisplayTextFormat: 'p.{{pageLabel}}',
+	copyOutlineAsHeadingsFormat: '{{linkWithDisplay}}',
+	copyOutlineAsHeadingsDisplayTextFormat: '{{text}} (p.{{pageLabel}})',
 	copyOutlineAsHeadingsMinLevel: 2,
 	newFileNameFormat: '',
 	newFileTemplatePath: '',
@@ -2884,7 +2884,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				});
 		}
 		this.addHeading('Copy outline as markdown', 'outline-copy')
-			.setDesc('You can copy PDF outline as a markdown list or headings using the commands "Copy outline as markdown list" and "Copy outline as markdown headings".');
+			.setDesc('Use the commands "Copy outline as markdown list" or "Copy outline as markdown headings" to copy the PDF table of contents into your note.');
 		this.addTextSetting('copyOutlineAsListDisplayTextFormat')
 			.setName('List: display text format')
 			.then((setting) => {
@@ -2901,13 +2901,14 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			});
 		this.addTextSetting('copyOutlineAsHeadingsDisplayTextFormat')
 			.setName('Headings: display text format')
+			.setDesc('This is the visible text inside the heading link. The default keeps the title and page number together, for example "Chapter title (p.47)".')
 			.then((setting) => {
 				const text = setting.components[0] as TextComponent;
 				text.inputEl.size = 30;
 			});
 		this.addTextAreaSetting('copyOutlineAsHeadingsFormat')
 			.setName('Headings: copy format')
-			.setDesc('You don\'t need to include leading hashes in the template.')
+			.setDesc('This is what each heading contains after the # marks. Use {{linkWithDisplay}} when you want the whole heading, including the page number, to open the PDF page.')
 			.then((setting) => {
 				const textarea = setting.components[0] as TextAreaComponent;
 				textarea.inputEl.rows = 3;
