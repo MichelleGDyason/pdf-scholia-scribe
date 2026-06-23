@@ -787,41 +787,49 @@ export class PDFPlusCommands extends PDFPlusLibSubmodule {
             const copyFormat = type === 'list' ? this.settings.copyOutlineAsListFormat : this.settings.copyOutlineAsHeadingsFormat;
             const displayTextFormat = type === 'list' ? this.settings.copyOutlineAsListDisplayTextFormat : this.settings.copyOutlineAsHeadingsDisplayTextFormat;
             const minHeadingLevel = this.settings.copyOutlineAsHeadingsMinLevel;
+            const progressNotice = new Notice(`${this.plugin.manifest.name}: Copying PDF outline to clipboard...`, 0);
 
             (async () => {
-                const outlines = await PDFOutlines.fromFile(file, this.plugin);
+                try {
+                    const outlines = await PDFOutlines.fromFile(file, this.plugin);
 
-                let text = '';
+                    let text = '';
 
-                const useTab = this.app.vault.getConfig('useTab');
-                const tabSize = this.app.vault.getConfig('tabSize');
-                const indent = useTab ? '\t' : ' '.repeat(tabSize);
+                    const useTab = this.app.vault.getConfig('useTab');
+                    const tabSize = this.app.vault.getConfig('tabSize');
+                    const indent = useTab ? '\t' : ' '.repeat(tabSize);
 
-                await outlines.iterAsync({
-                    enter: async (item) => {
-                        if (!item.isRoot()) {
-                            let subpath: string | null = null;
-                            const dest = item.getExplicitDestination();
-                            if (dest) subpath = await this.lib.destArrayToSubpath(dest);
+                    await outlines.iterAsync({
+                        enter: async (item) => {
+                            if (!item.isRoot()) {
+                                let subpath: string | null = null;
+                                const dest = item.getExplicitDestination();
+                                if (dest) subpath = await this.lib.destArrayToSubpath(dest);
 
-                            const pageNumber = subpath ? parsePDFSubpath(subpath)?.page : undefined;
+                                const pageNumber = subpath ? parsePDFSubpath(subpath)?.page : undefined;
 
-                            // item.title should be non-null for non-root items by the PDF spec
-                            const evaluated = subpath && pageNumber !== undefined
-                                ? this.lib.copyLink.getTextToCopy(child, copyFormat, displayTextFormat, file, pageNumber, subpath, item.title!, '', '')
-                                : item.title!;
+                                // item.title should be non-null for non-root items by the PDF spec
+                                const evaluated = subpath && pageNumber !== undefined
+                                    ? this.lib.copyLink.getTextToCopy(child, copyFormat, displayTextFormat, file, pageNumber, subpath, item.title!, '', '')
+                                    : item.title!;
 
-                            if (type === 'list') {
-                                text += `${indent.repeat(item.depth - 1)}- ${evaluated}\n`;
-                            } else if (type === 'heading') {
-                                text += `#`.repeat(item.depth + minHeadingLevel - 1) + ` ${evaluated}\n`;
+                                if (type === 'list') {
+                                    text += `${indent.repeat(item.depth - 1)}- ${evaluated}\n`;
+                                } else if (type === 'heading') {
+                                    text += `#`.repeat(item.depth + minHeadingLevel - 1) + ` ${evaluated}\n`;
+                                }
                             }
                         }
-                    }
-                });
+                    });
 
-                navigator.clipboard.writeText(text);
-                new Notice(`${this.plugin.manifest.name}: Outline copied to clipboard.`);
+                    await navigator.clipboard.writeText(text);
+                    progressNotice.hide();
+                    new Notice(`${this.plugin.manifest.name}: Outline copied to clipboard. Ready to paste.`);
+                } catch (error) {
+                    progressNotice.hide();
+                    console.error(`${this.plugin.manifest.name}: Failed to copy PDF outline.`, error);
+                    new Notice(`${this.plugin.manifest.name}: Could not copy the outline. Check the developer console for details.`);
+                }
             })();
         }
 
