@@ -36,8 +36,8 @@ export const exCommands = (vim: VimBindings): ExCommand[] => {
         },
         { id: 'pagetop', func: () => vim.scroll.scrollToTop() },
         { id: 'pagebottom', func: () => vim.scroll.scrollToBottom() },
-        { id: 'searchforward', pattern: /^search(f(orward)?)?$/, func: () => setTimeout(() => vim.search.start(true)) },
-        { id: 'searchbackward', pattern: /^searchb(ackward)?$/, func: () => setTimeout(() => vim.search.start(false)) },
+        { id: 'searchforward', pattern: /^search(f(orward)?)?$/, func: () => window.setTimeout(() => vim.search.start(true)) },
+        { id: 'searchbackward', pattern: /^searchb(ackward)?$/, func: () => window.setTimeout(() => vim.search.start(false)) },
         { id: 'findnext', func: () => vim.search.findNext() },
         { id: 'findprev', func: () => vim.search.findPrevious() },
         { id: 'zoom', description: ':zoom <number> - Set the zoom level to <number> percent.', minNargs: 1, func: (level) => vim.pdfViewer && (vim.pdfViewer.currentScale = 0.01 * +level) },
@@ -116,7 +116,7 @@ export const exCommands = (vim: VimBindings): ExCommand[] => {
                     }
                 }));
                 // Avoid re-entering normal mode after command execution (see commandLineMode.submitCommand()
-                setTimeout(() => vim.enterHintMode());
+                window.setTimeout(() => vim.enterHintMode());
             }
         }
     ];

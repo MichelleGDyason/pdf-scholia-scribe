@@ -423,7 +423,7 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
 
         if (sameFileLeaf.isVisible() && this.settings.highlightExistingTab) {
             sameFileLeaf.containerEl.addClass('pdf-plus-link-opened', 'is-highlighted');
-            setTimeout(() => sameFileLeaf.containerEl.removeClass('pdf-plus-link-opened', 'is-highlighted'), this.settings.existingTabHighlightDuration * 1000);
+            window.setTimeout(() => sameFileLeaf.containerEl.removeClass('pdf-plus-link-opened', 'is-highlighted'), this.settings.existingTabHighlightDuration * 1000);
         }
 
         const promise = this.openPDFLinkTextInLeaf(sameFileLeaf, linktext, sourcePath, openViewState);

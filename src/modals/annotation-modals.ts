@@ -225,7 +225,6 @@ export class PDFAnnotationEditModal extends PDFAnnotationModal {
                     slider
                         .setLimits(0, 1, 0.01)
                         .setValue(this.oldValues.opacity ?? 1)
-                        .setDynamicTooltip()
                         .onChange((value) => {
                             this.newValues.opacity = value;
                         });
@@ -416,7 +415,7 @@ export class PDFAnnotationDeleteModal extends PDFAnnotationModal {
             .addButton((button) => {
                 button
                     .setButtonText('Delete')
-                    .setWarning()
+                    .setDestructive()
                     .onClick(() => {
                         this.deleteAnnotation();
                         this.close();

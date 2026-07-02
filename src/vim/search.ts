@@ -50,7 +50,7 @@ export class VimSearch {
     }
 
     restoreSelectionAndExtendToMatch() {
-        setTimeout(() => {
+        window.setTimeout(() => {
             let selection = this.vim.doc.getSelection();
             if (!selection || selection.isCollapsed) {
                 this.vim.visualMode.restorePreviousSelection();
@@ -126,7 +126,7 @@ export class VimSearch {
 
     findAndSelectNextMatch(n?: number, sameDirection?: boolean) {
         this.findNext(n, sameDirection);
-        setTimeout(() => {
+        window.setTimeout(() => {
             const selection = this.vim.doc.getSelection();
             if (!selection) return;
 

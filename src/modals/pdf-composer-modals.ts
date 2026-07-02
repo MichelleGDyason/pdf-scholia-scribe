@@ -40,7 +40,7 @@ export class PDFPageDeleteModal extends PDFPlusModal {
             .addButton((button) => {
                 button
                     .setButtonText('Delete')
-                    .setWarning()
+                    .setDestructive()
                     .onClick(() => {
                         this.#resolve(true);
                         this.close();
@@ -173,7 +173,7 @@ export class PDFComposerModal extends PDFPlusModal {
                         }
                         this.close();
                     });
-                setTimeout(() => button.buttonEl.focus());
+                window.setTimeout(() => button.buttonEl.focus());
             })
             .addButton((button) => {
                 button
@@ -218,7 +218,7 @@ export class PDFCreateModal extends PDFPlusModal {
                 dropdown
                     .setValue(this.pageSize)
                     .onChange((value) => {
-                        if (PageSizes.hasOwnProperty(value)) {
+                        if (Object.prototype.hasOwnProperty.call(PageSizes, value)) {
                             this.pageSize = value as keyof typeof PageSizes;
                         }
                     });
@@ -244,7 +244,7 @@ export class PDFCreateModal extends PDFPlusModal {
                     .setButtonText('Create')
                     .setCta()
                     .then((button) => {
-                        setTimeout(() => button.buttonEl.focus());
+                        window.setTimeout(() => button.buttonEl.focus());
                     })
                     .onClick(async () => {
                         this.close();

@@ -617,7 +617,7 @@ export class ColorPalette extends PDFPlusComponent {
         if (this.plugin.settings.showStatusInToolbar && this.statusEl) {
             this.statusEl.setText(text);
             if (durationMs > 0) {
-                setTimeout(() => {
+                window.setTimeout(() => {
                     if (this.statusEl?.getText() === text) {
                         this.statusEl.setText('');
                     }

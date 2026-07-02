@@ -161,13 +161,17 @@ export class VimBindings extends PDFPlusComponent {
 
     onload() {
         this.lib.workspace.iteratePDFViews((view) => {
-            view.viewer === this.viewer && (view.scope = this.vimScope);
+            if (view.viewer === this.viewer) {
+                view.scope = this.vimScope;
+            }
         });
     }
 
     onunload() {
         this.lib.workspace.iteratePDFViews((view) => {
-            view.viewer === this.viewer && (view.scope = this.viewer.scope);
+            if (view.viewer === this.viewer) {
+                view.scope = this.viewer.scope;
+            }
         });
     }
 

@@ -33,7 +33,7 @@ export class ZoteroCitationModal extends PDFPlusModal {
 				this.component.registerDomEvent(text.inputEl, 'keydown', (evt) => {
 					if (evt.key === 'Enter') this.search();
 				});
-				setTimeout(() => text.inputEl.focus());
+					window.setTimeout(() => text.inputEl.focus());
 			})
 			.addButton((button) => {
 				button

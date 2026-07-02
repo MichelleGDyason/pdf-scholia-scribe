@@ -66,7 +66,7 @@ export class PDFCroppedEmbed extends Component implements Embed {
                 if (width) imgEl.setAttribute('width', width);
                 if (height) imgEl.setAttribute('height', height);
             });
-            activeWindow.setTimeout(() => reject(), 5000);
+            window.setTimeout(() => reject(), 5000);
         });
     }
 

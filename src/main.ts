@@ -221,7 +221,7 @@ export default class PDFPlus extends Plugin {
 
 		for (const cmd of this.settings.copyCommands) {
 			// @ts-ignore
-			if (cmd.hasOwnProperty('format')) {
+			if (Object.prototype.hasOwnProperty.call(cmd, 'format')) {
 				// @ts-ignore
 				cmd.template = cmd.format;
 				// @ts-ignore
@@ -231,7 +231,7 @@ export default class PDFPlus extends Plugin {
 		this.migrateCitationCopyCommands();
 		this.migrateOutlineCopySettings();
 
-		if (this.settings.hasOwnProperty('aliasFormat')) {
+		if (Object.prototype.hasOwnProperty.call(this.settings, 'aliasFormat')) {
 			this.settings.displayTextFormats.push({
 				name: 'Custom',
 				// @ts-ignore
@@ -241,7 +241,7 @@ export default class PDFPlus extends Plugin {
 			delete this.settings.aliasFormat;
 		}
 
-		if (this.settings.hasOwnProperty('showCopyLinkToSearchInContextMenu')) {
+		if (Object.prototype.hasOwnProperty.call(this.settings, 'showCopyLinkToSearchInContextMenu')) {
 			const searchSectionConfig = this.settings.contextMenuConfig.find(({ id }) => id === 'search');
 			if (searchSectionConfig) {
 				// @ts-ignore
@@ -269,7 +269,7 @@ export default class PDFPlus extends Plugin {
 	}
 
 	private renameSetting(oldId: string, newId: keyof PDFPlusSettings) {
-		if (this.settings.hasOwnProperty(oldId)) {
+		if (Object.prototype.hasOwnProperty.call(this.settings, oldId)) {
 			// @ts-ignore
 			this.settings[newId] = this.settings[oldId];
 			// @ts-ignore
@@ -794,13 +794,13 @@ export default class PDFPlus extends Plugin {
 		this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
 			if (file instanceof TFile && this.settings.newFileTemplatePath === oldPath) {
 				this.settings.newFileTemplatePath = file.path;
-				this.saveSettings();
+				void this.saveSettings();
 			}
 		}));
 		this.registerEvent(this.app.vault.on('delete', (file) => {
 			if (file instanceof TFile && this.settings.newFileTemplatePath === file.path) {
 				this.settings.newFileTemplatePath = '';
-				this.saveSettings();
+				void this.saveSettings();
 			}
 		}));
 

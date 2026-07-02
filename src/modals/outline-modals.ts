@@ -74,7 +74,11 @@ export class PDFOutlineTitleModal extends PDFPlusModal {
     }
 
     then(callback: (answer: OutlineInfo) => any) {
-        this.submitted && this.title !== null ? callback({ title: this.title }) : this.next.push(callback);
+        if (this.submitted && this.title !== null) {
+            callback({ title: this.title });
+        } else {
+            this.next.push(callback);
+        }
         return this;
     }
 

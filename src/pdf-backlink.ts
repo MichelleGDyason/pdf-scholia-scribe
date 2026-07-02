@@ -95,7 +95,11 @@ export class BacklinkPanePDFManager extends PDFPlusComponent {
 
     updatePageTracker() {
         this.navButtonEl!.toggleClass('is-active', this.isTrackingPage);
-        this.isTrackingPage ? this.pageTracker.load() : this.pageTracker.unload();
+        if (this.isTrackingPage) {
+            this.pageTracker.load();
+        } else {
+            this.pageTracker.unload();
+        }
     }
 
     findBacklinkItemEl(cache: PDFBacklinkCache): HTMLElement | null {

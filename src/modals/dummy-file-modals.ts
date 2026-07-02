@@ -37,7 +37,7 @@ export class DummyFileModal extends PDFPlusModal {
                 el.appendText(`You can also use ${keys.length ? (keys.map(getModifierNameInPlatform).join('+') + ' +') : ''} drag & drop to create dummy files. `);
                 el.createEl('a', { text: 'Learn more about dummy PDF files', href: 'https://ryotaushio.github.io/obsidian-pdf-plus/external-pdf-files' });
             }));
-            setTimeout(() => {
+            window.setTimeout(() => {
                 this.modalEl.insertBefore(div, this.contentEl);
             });
         });
@@ -191,7 +191,7 @@ export class DummyFileModal extends PDFPlusModal {
                     }
                     // auto-focus the last input
                     if (i === this.uris.length - 1) {
-                        setTimeout(() => text.inputEl.focus());
+                        window.setTimeout(() => text.inputEl.focus());
                     }
                 })
                 .addExtraButton((button) => {

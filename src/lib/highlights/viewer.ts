@@ -53,7 +53,7 @@ export class ViewerHighlightLib extends PDFPlusLibSubmodule {
 
                 child.highlightText(page, range);
                 if (duration > 0) {
-                    setTimeout(() => {
+                    window.setTimeout(() => {
                         child.clearTextHighlight();
                     }, duration * 1000);
                 }
@@ -70,7 +70,7 @@ export class ViewerHighlightLib extends PDFPlusLibSubmodule {
                 if (page !== pageNumber) return;
 
                 child.highlightAnnotation(page, id);
-                if (duration > 0) setTimeout(() => child.clearAnnotationHighlight(), duration * 1000);
+                if (duration > 0) window.setTimeout(() => child.clearAnnotationHighlight(), duration * 1000);
 
                 component.unload();
             });
@@ -86,7 +86,7 @@ export class ViewerHighlightLib extends PDFPlusLibSubmodule {
 
                 this.highlightRect(child, page, rect);
                 if (duration > 0) {
-                    setTimeout(() => {
+                    window.setTimeout(() => {
                         this.clearRectHighlight(child);
                     }, duration * 1000);
                 }
@@ -111,7 +111,7 @@ export class ViewerHighlightLib extends PDFPlusLibSubmodule {
 
                 // If `zoomToFitRect === true`, it will be handled by `PDFViewerChild.prototype.applySubpath` as a FitR destination.
                 if (!this.settings.zoomToFitRect) {
-                    activeWindow.setTimeout(() => {
+                    window.setTimeout(() => {
                         window.pdfjsViewer.scrollIntoView(child.rectHighlight, {
                             top: - this.settings.embedMargin
                         });

@@ -131,8 +131,8 @@ export class VimVisualMode extends VimBindingsMode {
             'C': () => {
                 const selection = this.doc.getSelection();
                 if (selection) {
-                    // Use setTimeout to avoid the menu hiden by this.enterNormalMode()
-                    setTimeout(() => {
+                    // Use window.setTimeout to avoid the menu hiden by this.enterNormalMode()
+                    window.setTimeout(() => {
                         this.viewer.then((child) => {
                             showContextMenuAtSelection(this.plugin, child, selection);
                         });
@@ -174,7 +174,7 @@ export class VimVisualMode extends VimBindingsMode {
             let n;
             let offset = 0;
             // depth-first
-            while (n = iter.nextNode()) {
+            while ((n = iter.nextNode())) {
                 if (n === node) {
                     offset += n.nodeType === Node.TEXT_NODE ? offsetInNode : Array.from(node.childNodes).slice(0, offsetInNode).map((node) => node.textContent!.length).reduce((acc, cur) => acc + cur, 0);
                     return offset;

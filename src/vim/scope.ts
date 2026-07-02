@@ -28,7 +28,7 @@ export class VimScope extends Scope {
         const cmp = (a: VimKeymap, b: VimKeymap) => stringCompare(a.keys, b.keys);
 
         for (const mode of modes) {
-            if (!this.modeToKeymaps.hasOwnProperty(mode)) {
+            if (!Object.prototype.hasOwnProperty.call(this.modeToKeymaps, mode)) {
                 this.modeToKeymaps[mode] = Object.entries(keymapDict)
                     .map(([keys, func]) => { return { keys, func }; })
                     .sort(cmp);
@@ -75,7 +75,7 @@ export class VimScope extends Scope {
 
     noremap(modes: string[], fromTo: Record<string, string>) {
         for (const mode of modes) {
-            if (this.modeToKeymaps.hasOwnProperty(mode)) {
+            if (Object.prototype.hasOwnProperty.call(this.modeToKeymaps, mode)) {
                 for (const from in fromTo) {
                     const to = fromTo[from];
                     const { found, index } = binarySearch(this.modeToKeymaps[mode], (map) => stringCompare(to, map.keys));
@@ -90,7 +90,7 @@ export class VimScope extends Scope {
 
     unmap(modes: string[], keys: string[]) {
         for (const mode of modes) {
-            if (this.modeToKeymaps.hasOwnProperty(mode)) {
+            if (Object.prototype.hasOwnProperty.call(this.modeToKeymaps, mode)) {
                 for (const key of keys) {
                     const { found, index } = binarySearch(this.modeToKeymaps[mode], (map) => stringCompare(key, map.keys));
                     if (found) {

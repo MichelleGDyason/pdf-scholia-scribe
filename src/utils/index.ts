@@ -122,7 +122,7 @@ export function getTextLayerNode(pageEl: HTMLElement, node: Node) {
     if (node.instanceOf(HTMLElement) && node.hasClass('textLayerNode')) return node;
 
     let n: Node | null = node;
-    while (n = n.parentNode) {
+    while ((n = n.parentNode)) {
         if (n === pageEl) return null;
         if (n.instanceOf(HTMLElement) && n.hasClass('textLayerNode'))
             return n;
@@ -166,7 +166,7 @@ export function getNodeAndOffsetOfTextPos(node: Node, offset: number) {
 export function* getCharacterBoundingBoxes(node: Node) {
     const iter = node.doc.createNodeIterator(node, NodeFilter.SHOW_TEXT);
     let textNode;
-    while (textNode = iter.nextNode()) {
+    while ((textNode = iter.nextNode())) {
         if (textNode.instanceOf(Text)) {
             for (let i = 0; i < textNode.length; i++) {
                 const range = textNode.doc.createRange();

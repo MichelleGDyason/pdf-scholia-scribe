@@ -600,7 +600,7 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                         parseSearchSettings('matchDiacritics');
                         parseSearchSettings('entireWord');
 
-                        setTimeout(() => lib.search(this.findBar, query, settings));
+                        window.setTimeout(() => lib.search(this.findBar, query, settings));
                         return;
                     }
 
@@ -761,7 +761,7 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                         const textDivLast = textDivs[indexLast];
 
                         if (textDivFirst && textDivLast) {
-                            setTimeout(() => {
+                            window.setTimeout(() => {
                                 const containerRect = this.pdfViewer.dom!.viewerContainerEl.getBoundingClientRect();
                                 const firstRect = textDivFirst!.getBoundingClientRect();
                                 const lastRect = textDivLast.getBoundingClientRect();
@@ -799,7 +799,7 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                     && !(plugin.settings.ignoreHeightParamInPopoverPreview
                         && this.pdfViewer.dom.containerEl.parentElement?.matches('.hover-popover'))
                 ) {
-                    setTimeout(() => {
+                    window.setTimeout(() => {
                         const el = getAnnotationEl();
                         if (el) {
                             const containerRect = this.pdfViewer.dom!.viewerContainerEl.getBoundingClientRect();
@@ -817,7 +817,7 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                 const el = getAnnotationEl();
 
                 if (el) {
-                    activeWindow.setTimeout(() => {
+                    window.setTimeout(() => {
                         window.pdfjsViewer.scrollIntoView(el, {
                             top: - plugin.settings.embedMargin
                         }, true);
@@ -967,10 +967,10 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                             }
                         }
                     });
-                    activeWindow.setTimeout(() => observer.observe(activeDocument.body, {
+                    window.setTimeout(() => observer.observe(activeDocument.body, {
                         childList: true,
                     }));
-                    activeWindow.setTimeout(() => observer.disconnect(), 1000);
+                    window.setTimeout(() => observer.disconnect(), 1000);
                 } else {
                     const popupMetaEl = this.activeAnnotationPopupEl?.querySelector<HTMLElement>('.popupMeta');
                     if (popupMetaEl) modifyAnnotationPopup(popupMetaEl);
@@ -1011,7 +1011,9 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                         onCopy(evt);
                         return;
                     case 'pdf-plus':
-                        setTimeout(() => lib.commands.copyLink(false));
+                        window.setTimeout(() => {
+                            void lib.commands.copyLink(false);
+                        });
                         return;
                     case 'obsidian':
                         return old.call(this, evt, pageView);

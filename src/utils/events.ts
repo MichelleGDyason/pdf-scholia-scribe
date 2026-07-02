@@ -152,7 +152,7 @@ export function showChildElOnParentElHover(config: {
             component.register(() => childEl && removeChildEl(childEl));
             component.load();
 
-            const requestCheck = () => setTimeout(() => {
+            const requestCheck = () => window.setTimeout(() => {
                 if (!isParentHovered && !isChildHovered) {
                     component.unload();
                 }

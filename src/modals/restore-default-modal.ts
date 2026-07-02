@@ -19,7 +19,7 @@ export class RestoreDefaultModal extends PDFPlusModal {
         this.contentEl.createDiv('modal-button-container', (el) => {
             new ButtonComponent(el)
                 .setButtonText('I understand, restore default settings')
-                .setWarning()
+                .setDestructive()
                 .onClick(async () => {
                     await this.plugin.restoreDefaultSettings();
                     this.close();
@@ -32,7 +32,7 @@ export class RestoreDefaultModal extends PDFPlusModal {
                 });
         });
 
-        setTimeout(() => {
+        window.setTimeout(() => {
             const activeEl = this.containerEl.doc.activeElement;
             if (activeEl && activeEl.instanceOf(HTMLButtonElement) && this.containerEl.contains(activeEl)) {
                 // Avoid an accidental press of the button

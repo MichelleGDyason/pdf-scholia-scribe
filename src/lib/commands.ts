@@ -466,7 +466,11 @@ export class PDFPlusCommands extends PDFPlusLibSubmodule {
         const sidebar = this.lib.getObsidianViewer(true)?.pdfSidebar;
         if (!sidebar) return false;
         if (!checking) {
-            sidebar.isOpen ? sidebar.close() : sidebar.open();
+            if (sidebar.isOpen) {
+                sidebar.close();
+            } else {
+                sidebar.open();
+            }
         }
         return true;
     }
@@ -486,7 +490,11 @@ export class PDFPlusCommands extends PDFPlusLibSubmodule {
         if (!pdfViewer.isEmbed || (el && el.contains(el.doc.activeElement))) {
             if (pdfViewer) {
                 if (!checking) {
-                    zoomIn ? pdfViewer.zoomIn() : pdfViewer.zoomOut();
+                    if (zoomIn) {
+                        pdfViewer.zoomIn();
+                    } else {
+                        pdfViewer.zoomOut();
+                    }
                 }
                 return true;
             }
@@ -937,7 +945,7 @@ export class PDFPlusCommands extends PDFPlusLibSubmodule {
             if (resolvedFile === file) {
                 this.app.metadataCache.offref(eventRef);
                 // I don't understand why, but without setTimeout (or with a shorter timeout like 50 ms), the file is not opened.
-                setTimeout(() => openFile(), 100);
+                window.setTimeout(() => openFile(), 100);
             }
         });
     }

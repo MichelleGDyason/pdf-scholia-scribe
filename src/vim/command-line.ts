@@ -27,7 +27,7 @@ export class VimCommandLineMode extends VimBindingsMode {
                 inputEl.placeholder = 'type a command or page number...';
 
                 inputEl.addEventListener('focusout', () => {
-                    setTimeout(() => {
+                    window.setTimeout(() => {
                         if (this.isActive) {
                             this.vim.enterNormalMode();
                         }
@@ -66,7 +66,7 @@ export class VimCommandLineMode extends VimBindingsMode {
         this.suggest = new ExcmdSuggest(this)
             .onSelect(({ item: { minNargs: nargs } }) =>
                 // Wait for the value of the input element to be updated
-                setTimeout(() => {
+                window.setTimeout(() => {
                     if (!nargs) {
                         this.submitCommand();
                         return;
@@ -79,7 +79,7 @@ export class VimCommandLineMode extends VimBindingsMode {
             this.viewer.then((child) => {
                 const eventBus = child.pdfViewer.eventBus;
                 if (eventBus) {
-                    eventBus.on('pagesloaded', () => setTimeout(() => {
+                    eventBus.on('pagesloaded', () => window.setTimeout(() => {
                         if (this.plugin.vimrc === null) {
                             const vimrcPath = normalizePath(this.settings.vimrcPath);
                             this.app.vault.adapter.read(vimrcPath)
@@ -107,7 +107,9 @@ export class VimCommandLineMode extends VimBindingsMode {
         // :<page number> - go to page
         if (/^[1-9]\d*$/.test(cmd)) {
             const pageNumber = +cmd;
-            this.pdfViewer && (this.pdfViewer.currentPageNumber = pageNumber);
+            if (this.pdfViewer) {
+                this.pdfViewer.currentPageNumber = pageNumber;
+            }
             return;
         }
 

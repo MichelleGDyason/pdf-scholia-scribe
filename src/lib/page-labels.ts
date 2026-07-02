@@ -20,7 +20,7 @@ export const PAGE_LABEL_NUMBERING_STYLES = {
 export type PageLabelNumberingStyle = keyof typeof PAGE_LABEL_NUMBERING_STYLES;
 
 export function isPageLabelNumberingStyle(value: string): value is PageLabelNumberingStyle {
-    return PAGE_LABEL_NUMBERING_STYLES.hasOwnProperty(value);
+    return Object.prototype.hasOwnProperty.call(PAGE_LABEL_NUMBERING_STYLES, value);
 }
 
 /** 

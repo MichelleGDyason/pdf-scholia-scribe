@@ -13,6 +13,20 @@ The fork keeps the powerful PDF++ backlink-highlighting system, but changes the 
 - recent fixes make the colour-toolbar paste format obey the selected copy style, reduce paper/file icon noise, preserve editor scroll position after auto-paste, and use a desktop Zotero local-API fallback when Obsidian's browser-style request path cannot reach Zotero.
 
 This is still a PDF++ fork, not a replacement for Zotero. Zotero is used for citation metadata and formatted references; PDF Scholia Scribe handles the Obsidian PDF link, highlight, paste, and note-writing workflow.
+
+## What is in the pipeline
+
+PDF Scholia Scribe is the Obsidian plugin part of a larger Scholia direction: helping a research library become easier to cite, review, and turn into finished scholarly notes. The plugin will keep focusing on the moment where reading becomes writing: PDF selections, clean citation labels, Zotero metadata, reference lists, and links that still point back to the exact passage.
+
+The next work is aimed at making that workflow calmer and more dependable:
+
+- cleaner citation and reference-list handling across Zotero records, vault source notes, and PDF quote links;
+- safer internals that stay closer to Obsidian review expectations while preserving the PDF++ annotation workflow;
+- better outline, page-label, and annotation-copy tools for long books and article collections;
+- clearer settings for people who want citation-first notes without having to understand every inherited PDF++ option.
+
+Scholia is the broader research-library project around this plugin. Where PDF Scholia Scribe works inside Obsidian while you read and write, Scholia is intended to help with the wider scholarly workflow: keeping sources organised, improving metadata, finding gaps in a literature set, and moving from collected PDFs toward usable arguments and bibliographies.
+
 <p align="center">
 <img src="https://img.shields.io/badge/dynamic/json?logo=obsidian&color=%238a5cf5&label=downloads&query=%24%5B%22pdf-scholia-scribe%22%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json" alt="Obsidian Downloads">
 </p>

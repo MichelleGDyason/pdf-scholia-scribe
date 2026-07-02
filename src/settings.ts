@@ -657,7 +657,7 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 
 
 export function isPDFPlusSettingsKey(key: string): key is keyof PDFPlusSettings {
-	return DEFAULT_SETTINGS.hasOwnProperty(key);
+	return Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, key);
 }
 
 
@@ -831,7 +831,11 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 
 	getVisibilityToggler(setting: Setting, condition: () => boolean) {
 		const toggleVisibility = () => {
-			condition() ? setting.settingEl.show() : setting.settingEl.hide();
+			if (condition()) {
+				setting.settingEl.show();
+			} else {
+				setting.settingEl.hide();
+			}
 		};
 		toggleVisibility();
 		return toggleVisibility;
@@ -1001,7 +1005,6 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			.addSlider((slider) => {
 				slider.setLimits(min, max, step)
 					.setValue(this.plugin.settings[settingName])
-					.setDynamicTooltip()
 					.onChange(async (value) => {
 						// @ts-ignore
 						this.plugin.settings[settingName] = value;
@@ -1032,7 +1035,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 						.onSelect(({ item: folder }) => {
 							// @ts-ignore
 							this.plugin.settings[folderPathSettingName] = folder.path;
-							this.plugin.saveSettings();
+							void this.plugin.saveSettings();
 						});
 				})
 				.then((setting) => {
@@ -1115,10 +1118,10 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 					});
 				new FuzzyFolderSuggest(this.app, text.inputEl)
 					.onSelect(() => {
-						setTimeout(async () => {
+						window.setTimeout(() => {
 							// @ts-ignore
 							this.plugin.settings[settingName] = getNewAttachmentFolderPath();
-							await this.plugin.saveSettings();
+							void this.plugin.saveSettings();
 						});
 					});
 				folderPathText = text;
@@ -1339,7 +1342,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 					});
 			})
 			.then((setting) => {
-				if (configs.value.hasOwnProperty('formRows')) {
+				if (Object.prototype.hasOwnProperty.call(configs.value, 'formRows')) {
 					setting.addTextArea((textarea) => {
 						textarea.setPlaceholder(configs.value.placeholder)
 							.then((textarea) => {
@@ -1504,7 +1507,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		return this.addTextSetting(settingName, undefined, (setting) => {
 			// @ts-ignore
 			this.plugin.settings[settingName] = normalizeIconNameNoPrefix(this.plugin.settings[settingName]);
-			this.plugin.saveSettings();
+			void this.plugin.saveSettings();
 			renderAndValidateIcon(setting);
 		})
 			.then((setting) => {
@@ -1584,7 +1587,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 								while (values.length > i) values.pop();
 							}
 
-							this.plugin.saveSettings();
+							void this.plugin.saveSettings();
 							this.redisplay();
 						});
 					dropdowns.push(dropdown);
@@ -1603,7 +1606,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				this.scrollTo(id, { behavior: 'smooth' });
 				this.updateHeaderElClassOnScroll(evt);
 			};
-			activeWindow.setTimeout(() => {
+			window.setTimeout(() => {
 				const setting = this.items[id];
 				if (!name && setting) {
 					name = '"' + setting.nameEl.textContent + '"';
@@ -1619,7 +1622,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				this.scrollToHeading(id, { behavior: 'smooth' });
 				this.updateHeaderElClassOnScroll(evt);
 			};
-			activeWindow.setTimeout(() => {
+			window.setTimeout(() => {
 				const setting = this.headings.get(id);
 				if (!name && setting) {
 					name = '"' + setting.nameEl.textContent + '"';
@@ -1655,7 +1658,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 
 
 		// Show which section is currently being displayed by highlighting the corresponding icon in the header.
-		activeWindow.setTimeout(() => this.updateHeaderElClass());
+		window.setTimeout(() => this.updateHeaderElClass());
 		for (const eventType of ['wheel', 'touchmove'] as const) {
 			this.component.registerDomEvent(
 				this.contentEl, eventType,
@@ -1774,8 +1777,12 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 					toggle
 						.setValue(ignoredSplits.includes(split))
 						.onChange((value) => {
-							value ? ignoredSplits.push(split) : ignoredSplits.remove(split);
-							this.plugin.saveSettings();
+							if (value) {
+								ignoredSplits.push(split);
+							} else {
+								ignoredSplits.remove(split);
+							}
+							void this.plugin.saveSettings();
 						});
 				})
 				.then((setting) => {
@@ -1995,7 +2002,6 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				.setName('Custom zoom level (%)')
 				.addSlider((slider) => {
 					slider.setLimits(10, 400, 5)
-						.setDynamicTooltip()
 						.setValue(this.plugin.settings.defaultZoomValue.startsWith('page-') ? 100 : parseInt(this.plugin.settings.defaultZoomValue))
 						.onChange(async (value) => {
 							this.plugin.settings.defaultZoomValue = '' + value;
@@ -2090,7 +2096,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 									.setValue(section.visible)
 									.onChange((value) => {
 										section.visible = value;
-										this.plugin.saveSettings();
+										void this.plugin.saveSettings();
 									});
 							})
 							.then((setting) => {
@@ -2658,7 +2664,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				new FuzzyMarkdownFileSuggest(this.app, inputEl)
 					.onSelect(({ item: file }) => {
 						this.plugin.settings.newFileTemplatePath = file.path;
-						this.plugin.saveSettings();
+						void this.plugin.saveSettings();
 					});
 			});
 
@@ -3346,7 +3352,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 					new FuzzyFileSuggest(this.app, inputEl)
 						.onSelect(({ item: file }) => {
 							this.plugin.settings.vimrcPath = file.path;
-							this.plugin.saveSettings();
+							void this.plugin.saveSettings();
 						});
 				}),
 			this.addHeading('Visual mode', 'vim-visual'),

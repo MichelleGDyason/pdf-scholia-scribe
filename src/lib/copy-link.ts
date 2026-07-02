@@ -547,7 +547,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
                         return;
                     }
 
-                    setTimeout(() => {
+                    window.setTimeout(() => {
                         // After the file modification, the PDF viewer DOM is reloaded, so we need to
                         // get the new DOM to access the newly loaded color palette instance.
                         const newPalette = this.lib.getColorPaletteFromChild(child);
@@ -761,17 +761,17 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
 
             // For commands such as "Create new note", the file-open will be triggered before long.
             // However, for commands such as "Quick switcher: Open quick switcher", the file-open will be triggered after a long time.
-            activeWindow.setTimeout(() => {
+            window.setTimeout(() => {
                 if (!isResolved) {
-                    const { noticeEl } = new Notice(`${this.plugin.manifest.name}: Could not find the auto-paste target markdown file within ${this.settings.autoPasteTargetDialogTimeoutSec} seconds.`);
-                    noticeEl.appendText(' Click ');
-                    noticeEl.createEl('a', { text: 'here' }, (anchorEl) => {
+                    const { messageEl } = new Notice(`${this.plugin.manifest.name}: Could not find the auto-paste target markdown file within ${this.settings.autoPasteTargetDialogTimeoutSec} seconds.`);
+                    messageEl.appendText(' Click ');
+                    messageEl.createEl('a', { text: 'here' }, (anchorEl) => {
                         anchorEl.addEventListener('click', () => {
                             this.plugin.openSettingTab()
                                 .scrollTo('autoPasteTargetDialogTimeoutSec');
                         });
                     });
-                    noticeEl.appendText(' to change the timeout duration.');
+                    messageEl.appendText(' to change the timeout duration.');
 
                     this.app.workspace.offref(eventRef);
                     resolve(false);
@@ -934,7 +934,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
             // MarkdownView's file saving is debounced, so we need to
             // explicitly save the new data right after pasting so that
             // the backlink highlight will be visibile as soon as possible.
-            view.save();
+            void view.save();
 
             await this.updateAndRevealCursorInEditor(leaf.view, {
                 focus: this.settings.focusEditorAfterAutoPaste,
@@ -955,9 +955,9 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
                 // When the file opened in some tab, 
                 // - focus the tab and move the cursor to the end of the file if the `focusEditorAfterAutoPaste` option is on
                 // - scroll to the end of the file without focusing if `focusEditorAfterAutoPaste` option is off
-                activeWindow.setTimeout(async () => {
+                window.setTimeout(() => {
                     if (leaf.view instanceof MarkdownView) {
-                        await this.updateAndRevealCursorInEditor(leaf.view, {
+                        void this.updateAndRevealCursorInEditor(leaf.view, {
                             focus: this.settings.focusEditorAfterAutoPaste,
                             goEnd: true
                         });
@@ -983,8 +983,8 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
         if (preserveScroll) {
             const restoreScroll = () => editor.scrollTo(preserveScroll.left, preserveScroll.top);
             restoreScroll();
-            activeWindow.requestAnimationFrame(restoreScroll);
-            activeWindow.setTimeout(restoreScroll, 0);
+            window.requestAnimationFrame(restoreScroll);
+            window.setTimeout(restoreScroll, 0);
             return;
         }
 
@@ -1029,7 +1029,9 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
                 // MarkdownView's file saving is debounced, so we need to
                 // explicitly save the new data right after pasting so that
                 // the backlink highlight will be visibile as soon as possible.
-                setTimeout(() => info.save());
+                window.setTimeout(() => {
+                    void info.save();
+                });
             }
         });
     }
