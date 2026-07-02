@@ -93,12 +93,14 @@ export function capitalize(text: string) {
 export function getWordAt(str: string, pos: number) {
     if (pos < 0 || pos >= str.length) return '';
 
-    let from = Math.max(0, str.slice(0, pos + 1).search(/(?<=[^\s.,][\s.,]+)[^\s.,]*$/));
-    str = str.slice(from);
-    from = Math.max(0, str.search(/[^\s.,]/));
-    str = str.slice(from);
-    const to = str.search(/[\s.,]/);
-    return to === -1 ? str : str.slice(0, to);
+    const isWordChar = (char: string) => !/[\s.,]/.test(char);
+    let from = pos;
+    while (from > 0 && isWordChar(str[from - 1])) from--;
+    while (from < str.length && !isWordChar(str[from])) from++;
+
+    let to = from;
+    while (to < str.length && isWordChar(str[to])) to++;
+    return str.slice(from, to);
 }
 
 // Thanks https://stackoverflow.com/a/6860916/13613783
@@ -277,22 +279,6 @@ export function getInstallerVersion(): string | null {
 }
 
 export function getAndroidWebViewVersion() {
-    if (!Platform.isAndroidApp) {
-        return null;
-    }
-
-    if ('userAgentData' in navigator && navigator.userAgentData) {
-        const androidWebViewBrand = navigator.userAgentData.brands.find((brand) => brand.brand === 'Android WebView');
-        if (androidWebViewBrand) {
-            return androidWebViewBrand.version;
-        }
-    }
-
-    const match = navigator.userAgent.match(/Chrome\/([\d]+)/);
-    if (match) {
-        return match[1];
-    }
-
     return null;
 }
 
@@ -302,14 +288,11 @@ export function getAndroidWebViewVersion() {
  */
 export async function getSystemInfo(): Promise<any> {
     if (window.electron) {
-         
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const os = require('os') as typeof import('os');
         return {
-            'Obsidian version': window.electron.ipcRenderer.sendSync('version'),
+            'API version': apiVersion,
             // @ts-ignore
             'Installer version': window.electron.remote.app.getVersion(),
-            'Operating system': os.version() + ' ' + os.release(),
+            'Operating system': Platform.isMacOS ? 'macOS' : Platform.isWin ? 'Windows' : Platform.isLinux ? 'Linux' : 'Desktop',
         };
     }
 
@@ -536,7 +519,7 @@ export function toSingleLine(str: string, removeWhitespaceBetweenCJChars = false
  * Implementation borrowed from Obsidian's app.js
  */
 export function encodeLinktext(linktext: string) {
-    // eslint-disable-next-line no-control-regex
+    // eslint-disable-next-line no-control-regex -- Link text needs to percent-encode ASCII control characters copied from Obsidian's own link serializer.
     return linktext.replace(/[\\\x00\x08\x0B\x0C\x0E-\x1F ]/g, (component) => encodeURIComponent(component));
 }
 
@@ -628,10 +611,6 @@ export function repeatable(func: () => any) {
 
 // Thank you Dataview
 // https://github.com/blacksmithgu/obsidian-dataview/blob/d05d6d6d5033c5b115420ac15532e1604bda39ef/src/api/inline-api.ts#L422
-export function evalInContext(code: string, ctx?: any) {
-    return (new Function(code.includes('await') ? '(async () => {' + code + '})()' : code)).call(ctx);
-}
-
 /**
  * Performs a depth-first traversal of the component tree rooted at the given component and calls the callback on each component.
  * @param component The component to start walking from.

@@ -15,27 +15,6 @@ import { PDFPlusComponent } from 'lib/component';
 export const onContextMenu = async (plugin: PDFPlus, child: PDFViewerChild, evt: MouseEvent): Promise<void> => {
     if (!child.palette) return;
 
-    // take from app.js
-    if (Platform.isDesktopApp) {
-        // Use window.electron, not evt.win.electron to avoid issues in secondary windows
-        // See https://github.com/RyotaUshio/obsidian-pdf-plus/issues/168
-        const electron = window.electron;
-
-        if (electron && evt.isTrusted) {
-            evt.stopPropagation();
-            evt.stopImmediatePropagation();
-            await new Promise((resolve) => {
-                // wait up to 1 sec
-                const timer = evt.win.setTimeout(() => resolve(null), 1000);
-                electron!.ipcRenderer.once('context-menu', (n, r) => {
-                    evt.win.clearTimeout(timer);
-                    resolve(r);
-                });
-                electron!.ipcRenderer.send('context-menu');
-            });
-        }
-    }
-
     if (!evt.defaultPrevented) {
         await showContextMenu(plugin, child, evt);
     }
@@ -487,20 +466,6 @@ export class PDFPlusContextMenu extends PDFPlusMenu {
         const isVisible = (id: string) => {
             return this.settings.contextMenuConfig.find((section) => section.id === id)?.visible;
         };
-
-        // If macOS, add "look up selection" action
-        if (Platform.isMacOS && Platform.isDesktopApp && this.win.electron && selectedText && isVisible('action')) {
-            this.addItem((item) => {
-                return item
-                    .setSection('action')
-                    .setTitle(`Look up "${selectedText.length <= 25 ? selectedText : selectedText.slice(0, 24).trim() + '…'}"`)
-                    .setIcon('lucide-library')
-                    .onClick(() => {
-                        // @ts-ignore
-                        this.win.electron!.remote.getCurrentWebContents().showDefinitionForSelection();
-                    });
-            });
-        }
 
         //// Add items ////
 

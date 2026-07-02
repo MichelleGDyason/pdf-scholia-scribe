@@ -1,14 +1,11 @@
 {
     "id": "pdf-scholia-scribe",
     "name": "PDF Scholia Scribe",
-    "version": "0.40.36",
+    "version": "0.40.37",
     "minAppVersion": "1.5.8",
-    "description": "Citation-focused PDF annotation and note-linking for Obsidian.",
+    "description": "Citation-focused PDF annotation and note-linking.",
     "author": "Michelle G Dyason",
     "authorUrl": "https://github.com/MichelleGDyason",
-    "fundingUrl": {
-        "GitHub Sponsors": "https://github.com/sponsors/MichelleGDyason",
-        "Buy Me a Coffee": "https://www.buymeacoffee.com/MichelleGDyason"
-    },
+    "fundingUrl": "https://github.com/sponsors/MichelleGDyason",
     "isDesktopOnly": false
 }

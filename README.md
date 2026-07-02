@@ -239,7 +239,7 @@ See [here](#pdf-internal-links-enhancement) for the details.
 
 #### Link copy templates
 
-You can customize the template format that will used when copying a link to a selection or an annotation in PDF viewer. Each `{{...}}` in the template will be evaluated as a JavaScript expression with many variables available. See the plugin settings for the details.
+You can customize the template format used when copying a link to a selection or an annotation in PDF viewer. Each `{{...}}` in the template resolves a supported template variable, such as `{{linkWithDisplay}}`, `{{textMarkdown}}`, or `{{citation.harvard}}`. See the plugin settings for the details.
 
 - **Custom display text format**
 - **Custom color palette actions**: Customize the commands that you can trigger by clicking a color palette item while selecting a range of text in PDF viewer.

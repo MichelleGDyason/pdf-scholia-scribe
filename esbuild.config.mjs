@@ -1,6 +1,6 @@
 import esbuild from "esbuild";
 import process from "process";
-import builtins from "builtin-modules";
+import { builtinModules } from "node:module";
 
 const banner =
 `/*
@@ -32,7 +32,7 @@ const context = await esbuild.context({
 		"@lezer/highlight",
 		"@lezer/lr",
 		"pdfjs-dist",
-		...builtins],
+		...builtinModules],
 	format: "cjs",
 	target: "es2018",
 	logLevel: "info",

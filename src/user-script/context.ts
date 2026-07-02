@@ -3,7 +3,7 @@ import * as obsidian from 'obsidian';
 import PDFPlus from 'main';
 import { PDFPlusComponent } from 'lib/component';
 import { PDFViewerChild } from 'typings';
-import { evalInContext, paramsToSubpath } from 'utils';
+import { paramsToSubpath } from 'utils';
 
 
 export class UserScriptContext extends PDFPlusComponent {
@@ -87,7 +87,7 @@ export class UserScriptContext extends PDFPlusComponent {
         return this.lib.write(obsidian.normalizePath(path), data, options?.existOk ?? false);
     }
 
-    async run(script: string) {
-        return evalInContext('const app=this.app;const api = this;' + script, this);
+    async run(_script: string) {
+        throw new Error('User JavaScript execution is disabled in this release.');
     }
 }

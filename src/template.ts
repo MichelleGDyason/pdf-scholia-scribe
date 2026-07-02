@@ -24,6 +24,188 @@ type CitationInfo = {
     inText: (style?: string) => string;
 };
 
+const IDENTIFIER_PATTERN = /^[A-Za-z_$][\w$]*$/;
+
+function stringifyTemplateValue(value: unknown): string {
+    if (value === null || value === undefined) return '';
+    if (Array.isArray(value)) return value.map((item): string => stringifyTemplateValue(item)).join(', ');
+    return String(value);
+}
+
+function splitTopLevel(expr: string, delimiter: string) {
+    const parts: string[] = [];
+    let start = 0;
+    let depth = 0;
+    let quote: '"' | "'" | null = null;
+
+    for (let i = 0; i < expr.length; i++) {
+        const char = expr[i];
+        if (quote) {
+            if (char === '\\') i++;
+            else if (char === quote) quote = null;
+            continue;
+        }
+        if (char === '"' || char === "'") {
+            quote = char;
+            continue;
+        }
+        if (char === '(' || char === '[' || char === '{') depth++;
+        else if (char === ')' || char === ']' || char === '}') depth--;
+        else if (char === delimiter && depth === 0) {
+            parts.push(expr.slice(start, i).trim());
+            start = i + 1;
+        }
+    }
+
+    parts.push(expr.slice(start).trim());
+    return parts;
+}
+
+function findTopLevelTernary(expr: string) {
+    let depth = 0;
+    let quote: '"' | "'" | null = null;
+    let questionIndex = -1;
+    let nestedQuestions = 0;
+
+    for (let i = 0; i < expr.length; i++) {
+        const char = expr[i];
+        if (quote) {
+            if (char === '\\') i++;
+            else if (char === quote) quote = null;
+            continue;
+        }
+        if (char === '"' || char === "'") {
+            quote = char;
+            continue;
+        }
+        if (char === '(' || char === '[' || char === '{') depth++;
+        else if (char === ')' || char === ']' || char === '}') depth--;
+        else if (char === '?' && depth === 0) {
+            if (questionIndex === -1) questionIndex = i;
+            else nestedQuestions++;
+        } else if (char === ':' && depth === 0 && questionIndex !== -1) {
+            if (nestedQuestions > 0) {
+                nestedQuestions--;
+                continue;
+            }
+            return { questionIndex, colonIndex: i };
+        }
+    }
+
+    return null;
+}
+
+function stripOuterParens(expr: string): string {
+    let stripped = expr.trim();
+    while (stripped.startsWith('(') && stripped.endsWith(')')) {
+        let depth = 0;
+        let quote: '"' | "'" | null = null;
+        let wrapsWholeExpression = true;
+
+        for (let i = 0; i < stripped.length; i++) {
+            const char = stripped[i];
+            if (quote) {
+                if (char === '\\') i++;
+                else if (char === quote) quote = null;
+                continue;
+            }
+            if (char === '"' || char === "'") {
+                quote = char;
+                continue;
+            }
+            if (char === '(') depth++;
+            else if (char === ')') {
+                depth--;
+                if (depth === 0 && i < stripped.length - 1) {
+                    wrapsWholeExpression = false;
+                    break;
+                }
+            }
+        }
+
+        if (!wrapsWholeExpression) break;
+        stripped = stripped.slice(1, -1).trim();
+    }
+    return stripped;
+}
+
+function parseStringLiteral(expr: string) {
+    const quote = expr[0];
+    if ((quote !== '"' && quote !== "'") || expr[expr.length - 1] !== quote) return null;
+
+    const raw = expr.slice(1, -1);
+    return raw.replace(/\\(['"\\nrt])/g, (_, escaped: string) => {
+        switch (escaped) {
+            case 'n': return '\n';
+            case 'r': return '\r';
+            case 't': return '\t';
+            default: return escaped;
+        }
+    });
+}
+
+function resolveTemplatePath(path: string, variables: Record<string, any>) {
+    const parts = path.split('.');
+    if (!parts.every((part) => IDENTIFIER_PATTERN.test(part))) {
+        throw new Error(`Unsupported template expression: ${path}`);
+    }
+
+    let value: unknown = variables[parts[0]];
+    for (const part of parts.slice(1)) {
+        if (value === null || value === undefined) return undefined;
+        value = (value as Record<string, unknown>)[part];
+    }
+    return value;
+}
+
+function isAllowedTemplateCall(path: string) {
+    return /^(citation|cite)\.(format|inText)$/.test(path);
+}
+
+function evaluateTemplateExpression(expr: string, variables: Record<string, any>): unknown {
+    expr = stripOuterParens(expr);
+    if (!expr) return '';
+
+    const ternary = findTopLevelTernary(expr);
+    if (ternary) {
+        const condition = expr.slice(0, ternary.questionIndex);
+        const whenTrue = expr.slice(ternary.questionIndex + 1, ternary.colonIndex);
+        const whenFalse = expr.slice(ternary.colonIndex + 1);
+        return evaluateTemplateExpression(condition, variables)
+            ? evaluateTemplateExpression(whenTrue, variables)
+            : evaluateTemplateExpression(whenFalse, variables);
+    }
+
+    const concatParts = splitTopLevel(expr, '+');
+    if (concatParts.length > 1) {
+        return concatParts.map((part) => stringifyTemplateValue(evaluateTemplateExpression(part, variables))).join('');
+    }
+
+    const stringLiteral = parseStringLiteral(expr);
+    if (stringLiteral !== null) return stringLiteral;
+    if (/^-?\d+(?:\.\d+)?$/.test(expr)) return Number(expr);
+    if (expr === 'true') return true;
+    if (expr === 'false') return false;
+    if (expr === 'null') return null;
+    if (expr === 'undefined') return undefined;
+
+    const callMatch = expr.match(/^([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\((.*)\)$/);
+    if (callMatch) {
+        const [, path, argSource] = callMatch;
+        if (!isAllowedTemplateCall(path)) {
+            throw new Error(`Unsupported template function: ${path}`);
+        }
+        const fn = resolveTemplatePath(path, variables);
+        if (typeof fn !== 'function') return '';
+        const args = argSource.trim()
+            ? splitTopLevel(argSource, ',').map((arg) => evaluateTemplateExpression(arg, variables))
+            : [];
+        return fn(...args);
+    }
+
+    return resolveTemplatePath(expr, variables);
+}
+
 const AUTHOR_KEYS = ['author', 'authors', 'creator', 'creators', 'by', 'writer', 'writers'];
 const YEAR_KEYS = ['year', 'date', 'published', 'publicationDate', 'publication_date', 'publicationYear', 'publication_year', 'issued'];
 const TITLE_KEYS = ['title', 'shortTitle', 'short_title', 'name'];
@@ -287,9 +469,7 @@ export class TemplateProcessor {
     }
 
     evalPart(expr: string) {
-        // avoid direct eval
-        const evaluated = new Function(...Object.keys(this.variables), `return ${expr};`)(...Object.values(this.variables));
-        return evaluated ?? '';
+        return stringifyTemplateValue(evaluateTemplateExpression(expr, this.variables));
     }
 
     evalTemplate(template: string) {

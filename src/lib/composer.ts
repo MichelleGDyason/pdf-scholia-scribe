@@ -237,8 +237,7 @@ export class PDFFileOperator extends PDFPlusLibSubmodule {
                 })
         );
 
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const [_, dstFile] = await Promise.all([
+        const [, dstFile] = await Promise.all([
             this.write(srcFile.path, srcDoc, true),
             this.write(dstPath, dstDoc, existOk)
         ]);
@@ -343,8 +342,9 @@ export class PDFLinkUpdater extends PDFPlusLibSubmodule {
     }
 
     getNewLinkText(oldLinktext: string, sourcePath: string, file: TFile, updater: LinkInfoUpdater) {
-        // eslint-disable-next-line prefer-const
-        let { path: linkpath, subpath } = parseLinktext(oldLinktext);
+        const parsedLinktext = parseLinktext(oldLinktext);
+        const linkpath = parsedLinktext.path;
+        let subpath = parsedLinktext.subpath;
 
         let oldPage: number | undefined;
         if (subpath.startsWith('#')) subpath = subpath.slice(1);

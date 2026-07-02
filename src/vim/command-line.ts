@@ -1,4 +1,4 @@
-import { Notice, Platform, normalizePath } from 'obsidian';
+import { Notice, normalizePath } from 'obsidian';
 
 import { VimBindings } from './vim';
 import { VimBindingsMode } from './mode';
@@ -102,25 +102,6 @@ export class VimCommandLineMode extends VimBindingsMode {
             this.history.push(cmd);
             if (this.history.length > 100) this.history.shift();
             this.historyIndex = this.history.length;
-        }
-
-        // shell command
-        if (cmd.startsWith('!')) {
-            if (!Platform.isDesktopApp) {
-                this.reportError(`${this.plugin.manifest.name} (Vim mode): Shell command is not supported on mobile`, options.error!);
-                return;
-            }
-
-            // eslint-disable-next-line @typescript-eslint/no-require-imports 
-            const { exec } = require('child_process') as typeof import('child_process');
-            const env = process.env;
-            if (this.settings.PATH) env.PATH = this.settings.PATH;
-
-            return new Promise<string>((resolve, reject) => exec(cmd.slice(1), { env }, (err, stdout, stderr) => {
-                if (err) reject(err);
-                if (stdout) alert(stdout), resolve(stdout);
-                if (stderr) console.warn(stderr);
-            }));
         }
 
         // :<page number> - go to page

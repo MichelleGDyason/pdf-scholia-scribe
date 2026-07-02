@@ -1,7 +1,7 @@
 {
     "name": "obsidian-pdf-scholia-scribe",
-    "version": "0.40.36",
-    "description": "Citation-focused PDF annotation and note-linking for Obsidian.",
+    "version": "0.40.37",
+    "description": "Citation-focused PDF annotation and note-linking.",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/MichelleGDyason/pdf-scholia-scribe.git"
@@ -10,10 +10,7 @@
         "url": "https://github.com/MichelleGDyason/pdf-scholia-scribe/issues"
     },
     "homepage": "https://github.com/MichelleGDyason/pdf-scholia-scribe#readme",
-    "funding": [
-        "https://github.com/sponsors/MichelleGDyason",
-        "https://www.buymeacoffee.com/MichelleGDyason"
-    ],
+    "funding": "https://github.com/sponsors/MichelleGDyason",
     "scripts": {
         "dev": "node esbuild.config.mjs",
         "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
@@ -34,7 +31,6 @@
         "@types/node": "^24.3.0",
         "@typescript-eslint/eslint-plugin": "8.x",
         "@typescript-eslint/parser": "8.x",
-        "builtin-modules": "5.0.0",
         "electron": "^37.4.0",
         "esbuild": "0.25.9",
         "eslint": "^9.34.0",

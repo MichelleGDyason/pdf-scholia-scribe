@@ -140,10 +140,8 @@ export class HighlightGeometryLib extends PDFPlusLibSubmodule {
     }
 
     areRectanglesMergeableHorizontally(rect1: Rect, rect2: Rect): boolean {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const [left1, bottom1, right1, top1] = rect1;
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const [left2, bottom2, right2, top2] = rect2;
+        const [, bottom1, , top1] = rect1;
+        const [, bottom2, , top2] = rect2;
         const y1 = (bottom1 + top1) / 2;
         const y2 = (bottom2 + top2) / 2;
         const height1 = Math.abs(top1 - bottom1);

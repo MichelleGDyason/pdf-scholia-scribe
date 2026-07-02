@@ -1305,8 +1305,7 @@ declare module 'obsidian' {
         transition(): void;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    interface AbstractTextComponent<T> {
+    interface AbstractTextComponent {
         changeCallback?: (value: string) => any;
     }
 

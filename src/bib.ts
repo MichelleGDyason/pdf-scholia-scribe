@@ -1,9 +1,9 @@
-import { ButtonComponent, HoverPopover, HoverParent, Platform, FileSystemAdapter, Notice, ExtraButtonComponent, Events } from 'obsidian';
+import { ButtonComponent, HoverPopover, HoverParent, Notice, ExtraButtonComponent, Events } from 'obsidian';
 import { PDFDocumentProxy } from 'pdfjs-dist';
 
 import PDFPlus from 'main';
 import { PDFPlusComponent } from 'lib/component';
-import { genId, isCanvas, isEmbed, isHoverPopover, isNonEmbedLike, onModKeyPress, toSingleLine } from 'utils';
+import { isCanvas, isEmbed, isHoverPopover, isNonEmbedLike, onModKeyPress, toSingleLine } from 'utils';
 import { PDFViewerChild, PDFJsDestArray, TextContentItem } from 'typings';
 
 
@@ -122,81 +122,7 @@ export class BibliographyManager extends PDFPlusComponent {
     }
 
     /** Parse a bibliography text using Anystyle. */
-    async parseBibliographyText(text: string): Promise<AnystyleJson[] | null> {
-        const { app, plugin, settings } = this;
-
-        const anystylePath = settings.anystylePath;
-        if (!anystylePath) return null;
-
-        const anystyleDirPath = plugin.getAnyStyleInputDir();
-        // Node.js is available only in the desktop app
-        if (Platform.isDesktopApp && app.vault.adapter instanceof FileSystemAdapter && anystyleDirPath) {
-            // Anystyle only accepts a file as input, so we need to write the text to a file.
-            // We store the file under the `anystyle` folder in the plugin's directory to avoid cluttering the vault.
-            const anystyleDirFullPath = app.vault.adapter.getFullPath(anystyleDirPath);
-            await FileSystemAdapter.mkdir(anystyleDirFullPath);
-
-            const anystyleInputPath = anystyleDirPath + `/${genId()}.txt`;
-            const anystyleInputFullPath = app.vault.adapter.getFullPath(anystyleInputPath);
-            await app.vault.adapter.write(anystyleInputPath, text);
-            // Clean up the file when this PDF viewer is unloaded
-            this.register(() => app.vault.adapter.remove(anystyleInputPath));
-
-            // eslint-disable-next-line @typescript-eslint/no-require-imports 
-            const { spawn } = require('child_process') as typeof import('child_process');
-
-            return new Promise<any>((resolve) => {
-                const anystyleProcess = spawn(anystylePath, ['parse', anystyleInputFullPath]);
-                let resultJson = '';
-                anystyleProcess.stdout.on('data', (resultBuffer: Buffer | null) => {
-                    if (resultBuffer) {
-                        resultJson += resultBuffer.toString();
-                        return;
-                    }
-                    resolve(null);
-                });
-                anystyleProcess.on('error', (err: Error & { code: string }) => {
-                    if ('code' in err && err.code === 'ENOENT') {
-                        const msg = `${plugin.manifest.name}: AnyStyle not found at the path "${anystylePath}".`;
-                        if (plugin.settings.anystylePath) {
-                            const notice = new Notice(msg, 8000);
-                            notice.noticeEl.appendText(' Click ');
-                            notice.noticeEl.createEl('a', { text: 'here' }, (anchorEl) => {
-                                anchorEl.addEventListener('click', () => {
-                                    plugin.openSettingTab().scrollTo('anystylePath');
-                                });
-                            });
-                            notice.noticeEl.appendText(' to update the path.');
-                            console.error(msg);
-                        }
-                        else console.warn(msg);
-                        return resolve(null);
-                    }
-                });
-                anystyleProcess.on('close', (code) => {
-                    if (code) return resolve(null);
-
-                    const results = JSON.parse(resultJson);
-
-                    if (Array.isArray(results)) {
-                        // Add 'year' entry to each result
-                        for (const result of results) {
-                            for (const date of result.date ?? []) {
-                                const yearMatch = date.match(/\d{4}/);
-                                if (yearMatch) {
-                                    result.year = yearMatch[0];
-                                    break;
-                                }
-                            }
-                        }
-                        resolve(results);
-                    }
-
-                    resolve(null);
-                });
-            });
-        }
-
+    async parseBibliographyText(_text: string): Promise<AnystyleJson[] | null> {
         return null;
     }
 
@@ -394,9 +320,6 @@ export class BibliographyDom extends PDFPlusComponent {
 
             if (bibText) {
                 this.containerEl.createDiv({ text: bibText });
-                if (Platform.isDesktopApp && this.settings.anystylePath) {
-                    this.registerRenderOn('parsed');
-                }
             } else {
                 if (this.bib.initialized) {
                     this.containerEl.createDiv({ text: 'No bibliography found' });

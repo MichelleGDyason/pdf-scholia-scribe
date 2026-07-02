@@ -1,4 +1,4 @@
-import { Menu, Notice, Platform, setIcon, setTooltip } from 'obsidian';
+import { Menu, Notice, Platform, requestUrl, setIcon, setTooltip } from 'obsidian';
 
 import PDFPlus from 'main';
 import { KeysOfType, getEventCoords, isHexString, showMenuUnderParentEl, isTargetHTMLElement } from 'utils';
@@ -427,9 +427,9 @@ export class ColorPalette extends PDFPlusComponent {
             return;
         }
 
-        const res = await fetch(url);
-        if (res.ok) {
-            const buffer = await res.arrayBuffer();
+        const res = await requestUrl({ url });
+        if (res.status >= 200 && res.status < 300) {
+            const buffer = res.arrayBuffer;
             await this.app.vault.modifyBinary(file, buffer);
 
             this.removeImportButton();

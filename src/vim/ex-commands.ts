@@ -1,8 +1,5 @@
-import { normalizePath } from 'obsidian';
-
 import { VimBindings } from './vim';
 import { VimHintTarget } from './hint';
-import { UserScriptContext } from 'user-script/context';
 import { MarkdownModal } from 'modals/markdown-modal';
 
 
@@ -88,17 +85,6 @@ export const exCommands = (vim: VimBindings): ExCommand[] => {
         { id: 'nunmap', pattern: /^nun(map)?$/, minNargs: 1, func: (key) => vim.vimScope.unmap(['normal'], [key]), description: ':nun[map] <key> - Unmap <key> in normal mode.' },
         { id: 'vunmap', pattern: /^vu(nmap)?$/, minNargs: 1, func: (key) => vim.vimScope.unmap(['visual'], [key]), description: ':vu[nmap] <key> - Unmap <key> in visual mode.' },
         { id: 'ounmap', pattern: /^ou(nmap)?$/, minNargs: 1, func: (key) => vim.vimScope.unmap(['outline'], [key]), description: ':ou[nmap] <key> - Unmap <key> in outline mode.' },
-        { id: 'js', pattern: /^js(command)?$/, minNargs: 1, func: (...code) => vim.evalUserScript(code.join(' ')), description: `:js[command] <code>: Execute the given javascript <code> in a context where "this" points to a "${UserScriptContext.name}" object.` },
-        {
-            id: 'jsfile',
-            minNargs: 1,
-            func: async (...splitPath) => {
-                const path = normalizePath(splitPath.join(' '));
-                const jsCode = await vim.app.vault.adapter.read(vim.app.metadataCache.getFirstLinkpathDest(path, '')?.path ?? path);
-                return await vim.evalUserScript(jsCode);
-            },
-            description: `:jsfile <path> - Execute the javascript code in the file at <path> (relative to the vault root; can be just the filename if it's unique). It can be any plain text file with arbitrary file extension. The code will be evaluated in a context where "this" points to a "${UserScriptContext.name}" object.`
-        },
         {
             id: 'obcommand',
             description: ':obcommand <command-id> - Execute the Obsidian command with the specified ID. Inspired by esm\'s awesome Vimrc Support plugin.',

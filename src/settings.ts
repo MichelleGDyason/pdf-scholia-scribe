@@ -2767,31 +2767,6 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				() => this.plugin.settings.actionOnCitationHover !== 'none'
 			);
 			this.showConditionally(
-				this.addSetting('anystylePath')
-					.setName('AnyStyle path')
-					.addText((text) => {
-						text.setPlaceholder('anystyle')
-							.setValue(this.plugin.settings.anystylePath)
-							.onChange((value) => {
-								this.plugin.settings.anystylePath = value;
-								this.plugin.saveLocalStorage('anystylePath', value);
-							});
-					})
-					.then((setting) => {
-						(setting.components[0] as TextComponent).inputEl.size = 35;
-						this.renderMarkdown([
-							'The path to the [AnyStyle](https://github.com/inukshuk/anystyle) executable. ',
-							'',
-							'PDF Scholia Scribe extracts the bibliography text from the PDF file for each citation link and uses AnyStyle to convert the extracted text into structured metadata.',
-							'It works just fine without AnyStyle, but you can further boost the visibility by installing it and providing its path here.',
-							'',
-							'Note: This setting is saved in the [local storage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage) instead of `data.json` in the plugin folder.'
-						], setting.descEl);
-					}),
-				() => Platform.isDesktopApp && this.plugin.settings.actionOnCitationHover === 'pdf-plus-bib-popover'
-			);
-
-			this.showConditionally(
 				this.addTextAreaSetting('citationIdPatterns', undefined, () => this.plugin.setCitationIdRegex())
 					.setName('Citation ID patterns')
 					.setDesc('You don\'t need to care about this option in most use cases - just leave it to the default value. For advanced users: most internal links in PDF files use so-called destination names to specify the target location. This option allows you to specify the regular expressions (separated by line breaks) that determine whether a given internal link is a citation link based on the dsetination name.'),
@@ -3356,12 +3331,6 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 						'map j J',
 						'map k K',
 						'',
-						'" JavaScript commands',
-						'" - Hit Ctrl-h in Normal mode to show a message',
-						'nmap <C-h> :js alert("Hello, world!")',
-						'" - Hit Ctrl-h in Visual mode to run a .js file',
-						'vmap <C-h> :jsfile filename.js',
-						'',
 						'" Obsidian commands',
 						'" - Open the current PDF in the OS-default app by hitting d, e, and then f',
 						'map def :obcommand open-with-default-app:open',
@@ -3428,7 +3397,6 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 						'- Use arrow down/up keys to go back and forth the command history.',
 						'- `<C-u>` clears the command line, and `<C-w>` deletes the last word (`C`=`Ctrl`).',
 						'- `:<page number>` will take you to the <page number>-th page, where the page number always starts from 1. To go to the page with the page label <page label> (e.g. "i, ii, ..., x, 1, 2, ..."), use `:gotopage <page label>` (or `:go <page label>`/`:goto <page label>` in short).',
-						'- `:!<command>` runs the shell command (not supported on mobile). By default, Obsidian does not know the value of the "PATH" environment variable, so you might need to explicitly provide it in the setting below (in the "Misc" section) to run some commands.',
 					], setting.descEl);
 				}),
 			this.addHeading('Hint mode (experimental)', 'vim-hint'),
@@ -3522,20 +3490,6 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				setting.descEl.appendChild(this.createLinkTo('mobileCopyAction'));
 				setting.descEl.appendText(' option.');
 			});
-		if (Platform.isDesktopApp) {
-			this.addTextAreaSetting('PATH')
-				.then((setting) => {
-					const component = setting.components[0];
-					if (component instanceof TextAreaComponent) {
-						component.inputEl.rows = 8;
-						component.inputEl.cols = 30;
-					}
-				})
-				.setName('"PATH" environment variable')
-				.setDesc('Provide the "PATH" environment variable for PDF Scholia Scribe to run shell commands without the full paths specified. In MacOS and Linux, you can run "echo $PATH" in Terminal and then copy & paste the result here. Currently, it will be used only when you run ":!<command>" in Vim mode.');
-		}
-
-
 		this.addHeading('Style settings', 'style-settings', 'lucide-settings-2')
 			.setDesc('You can find more options in Style Settings > PDF Scholia Scribe.')
 			.addButton((button) => {
