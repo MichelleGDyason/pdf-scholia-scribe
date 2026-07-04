@@ -443,10 +443,10 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 	highlightOnHoverBacklinkPane: true,
 	backlinkHoverColor: '',
 	colors: {
-		'Yellow': '#ffd000',
-		'Red': '#ea5252',
-		'Note': '#086ddd',
-		'Important': '#bb61e5',
+		'Great Insight!': '#ffd000',
+		'Controversial': '#ea5252',
+		'Conceptual information': '#086ddd',
+		'argument premise': '#bb61e5',
 	},
 	defaultColor: '',
 	defaultColorPaletteItemIndex: 0,
@@ -559,11 +559,11 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 	executeCommandWhenTargetNotIdentified: true,
 	commandToExecuteWhenTargetNotIdentified: 'switcher:open',
 	autoPasteTargetDialogTimeoutSec: 20,
-	autoCopyToggleRibbonIcon: true,
+	autoCopyToggleRibbonIcon: false,
 	autoCopyIconName: 'highlighter',
-	autoFocusToggleRibbonIcon: true,
+	autoFocusToggleRibbonIcon: false,
 	autoFocusIconName: 'zap',
-	autoPasteToggleRibbonIcon: true,
+	autoPasteToggleRibbonIcon: false,
 	autoPasteIconName: 'clipboard-paste',
 	viewSyncFollowPageNumber: true,
 	viewSyncPageDebounceInterval: 0.3,
@@ -625,7 +625,7 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 	zoteroLocalApiBaseUrl: 'http://127.0.0.1:23119',
 	zoteroPreferVaultLinks: true,
 	zoteroInTextCitationStyle: 'asa',
-	zoteroBibliographyStyle: 'apa',
+	zoteroBibliographyStyle: 'asa',
 	zoteroReferenceListHeading: 'References',
 	zoteroReferenceListType: 'bullet',
 	copyAsSingleLine: true,
@@ -1144,6 +1144,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 	}
 
 	addFundingButton() {
+		const fundingUrl = 'https://github.com/sponsors/MichelleGDyason';
 		const postProcessIcon = (iconEl: Element) => {
 			const svg = iconEl.firstElementChild;
 			if (svg?.tagName === 'svg') {
@@ -1158,7 +1159,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			'lucide-heart',
 			({ iconEl }) => postProcessIcon(iconEl)
 		)
-			.setDesc('If you find PDF Scholia Scribe helpful, please consider supporting the development to help me keep this plugin alive.\n\nIf you prefer PayPal, please make donations via Ko-fi. Thank you!')
+			.setDesc('If you find PDF Scholia Scribe helpful, please consider supporting development through GitHub Sponsors.')
 			.then((setting) => {
 				const infoEl = setting.infoEl;
 				const iconEl = setting.settingEl.firstElementChild;
@@ -1179,21 +1180,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				button
 					.setButtonText('GitHub Sponsors')
 					.onClick(() => {
-						open('https://github.com/sponsors/RyotaUshio');
-					});
-			})
-			.addButton((button) => {
-				button
-					.setButtonText('Buy Me a Coffee')
-					.onClick(() => {
-						open('https://www.buymeacoffee.com/ryotaushio');
-					});
-			})
-			.addButton((button) => {
-				button
-					.setButtonText('Ko-fi')
-					.onClick(() => {
-						open('https://ko-fi.com/ryotaushio');
+						open(fundingUrl);
 					});
 			});
 	}
@@ -2452,7 +2439,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			.setDesc('This controls the citation inserted while you write. Page numbers are optional in the insert-citation window.');
 		this.addTextSetting('zoteroBibliographyStyle')
 			.setName('Zotero reference-list style')
-			.setDesc('Used when Zotero formats the reference entry. Examples: `apa`, `harvard-cite-them-right`, `american-sociological-association`. If Zotero cannot provide a formatted entry, PDF Scholia Scribe makes a plain author-date entry from available metadata.');
+			.setDesc('Used when Zotero formats the reference entry. Examples: `asa`, `apa`, `harvard-cite-them-right`, `american-sociological-association`. If Zotero cannot provide a formatted entry, PDF Scholia Scribe makes a plain author-date entry from available metadata.');
 		this.addTextSetting('zoteroReferenceListHeading')
 			.setName('Reference-list heading')
 			.setDesc('The heading to use at the end of the note. Default: `References`.');

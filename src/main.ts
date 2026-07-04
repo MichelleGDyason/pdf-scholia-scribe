@@ -230,6 +230,7 @@ export default class PDFPlus extends Plugin {
 		}
 		this.migrateCitationCopyCommands();
 		this.migrateOutlineCopySettings();
+		this.migrateScholiaDefaults();
 
 		if (Object.prototype.hasOwnProperty.call(this.settings, 'aliasFormat')) {
 			this.settings.displayTextFormats.push({
@@ -345,6 +346,40 @@ export default class PDFPlus extends Plugin {
 		}
 		if (this.settings.copyOutlineAsHeadingsDisplayTextFormat === 'p.{{pageLabel}}') {
 			this.settings.copyOutlineAsHeadingsDisplayTextFormat = '{{text}} (p.{{pageLabel}})';
+		}
+	}
+
+	private migrateScholiaDefaults() {
+		const staleDefaultColors = {
+			'Yellow': '#ffd000',
+			'Red': '#ea5252',
+			'Note': '#086ddd',
+			'Important': '#bb61e5',
+		};
+		const scholiaColors = this.getDefaultSettings().colors;
+		const colorsMatch = (colors: Record<string, string>) => {
+			const entries = Object.entries(colors);
+			return entries.length === Object.keys(staleDefaultColors).length
+				&& entries.every(([name, color]) => staleDefaultColors[name as keyof typeof staleDefaultColors] === color);
+		};
+
+		if (colorsMatch(this.settings.colors)) {
+			this.settings.colors = scholiaColors;
+			if (this.settings.defaultColor === 'Yellow') {
+				this.settings.defaultColor = 'Great Insight!';
+			} else if (this.settings.defaultColor === 'Red') {
+				this.settings.defaultColor = 'Controversial';
+			} else if (this.settings.defaultColor === 'Note') {
+				this.settings.defaultColor = 'Conceptual information';
+			} else if (this.settings.defaultColor === 'Important') {
+				this.settings.defaultColor = 'argument premise';
+			}
+		}
+
+		if (this.settings.autoCopyToggleRibbonIcon && this.settings.autoFocusToggleRibbonIcon && this.settings.autoPasteToggleRibbonIcon) {
+			this.settings.autoCopyToggleRibbonIcon = false;
+			this.settings.autoFocusToggleRibbonIcon = false;
+			this.settings.autoPasteToggleRibbonIcon = false;
 		}
 	}
 
