@@ -428,11 +428,17 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
                     // if auto-focus is on and the PDF is opened in a secondary window, which causes the copy to fail.
                     // https://github.com/RyotaUshio/obsidian-pdf-plus/issues/93
                     await navigator.clipboard.writeText(evaluated);
-                    this.onCopyFinish(evaluated);
+                    this.onCopyFinish(evaluated, () => this.refreshBacklinkHighlightsForPDF(file));
 
                     const palette = this.lib.getColorPaletteFromChild(child);
                     palette?.setStatus('Link copied', this.statusDurationMs);
-                    this.autoFocusOrAutoPaste(evaluated, autoPaste, palette ?? undefined);
+                    void this.autoFocusOrAutoPaste(evaluated, autoPaste, palette ?? undefined)
+                        .then((success) => {
+                            if (success && (autoPaste || this.settings.autoPaste)) {
+                                this.refreshBacklinkHighlightsForPDF(file);
+                            }
+                        })
+                        .catch(console.error);
 
                     // TODO: Needs refactor
                     const result = parsePDFSubpath(subpath);
@@ -479,12 +485,18 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
                     }
                     const evaluated = this.getTextToCopy(child, templates.copyFormat, templates.displayTextFormat, file, page, subpath, text ?? '', color);
                     await navigator.clipboard.writeText(evaluated);
-                    this.onCopyFinish(evaluated);
+                    this.onCopyFinish(evaluated, () => this.refreshBacklinkHighlightsForPDF(file));
 
                     const palette = this.lib.getColorPaletteFromChild(child);
                     // This can be redundant because the copy button already shows the status.
                     if (shouldShowStatus) palette?.setStatus('Link copied', this.statusDurationMs);
-                    this.autoFocusOrAutoPaste(evaluated, autoPaste, palette ?? undefined);
+                    void this.autoFocusOrAutoPaste(evaluated, autoPaste, palette ?? undefined)
+                        .then((success) => {
+                            if (success && (autoPaste || this.settings.autoPaste)) {
+                                this.refreshBacklinkHighlightsForPDF(file);
+                            }
+                        })
+                        .catch(console.error);
 
                     // TODO: Needs refactor
                     const rect = annotData?.rect;
@@ -504,11 +516,17 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
             (async () => {
                 const evaluated = this.getTextToCopy(child, templates.copyFormat, templates.displayTextFormat, file, page, `#page=${page}&annotation=${id}`, text, colorName);
                 await navigator.clipboard.writeText(evaluated);
-                this.onCopyFinish(evaluated);
+                this.onCopyFinish(evaluated, () => this.refreshBacklinkHighlightsForPDF(file));
 
                 const palette = this.lib.getColorPaletteFromChild(child);
                 palette?.setStatus('Link copied', this.statusDurationMs);
-                this.autoFocusOrAutoPaste(evaluated, autoPaste, palette ?? undefined);
+                void this.autoFocusOrAutoPaste(evaluated, autoPaste, palette ?? undefined)
+                    .then((success) => {
+                        if (success && (autoPaste || this.settings.autoPaste)) {
+                            this.refreshBacklinkHighlightsForPDF(file);
+                        }
+                    })
+                    .catch(console.error);
             })();
         }
 
@@ -600,7 +618,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
                 if (!this.settings.rectEmbedStaticImage) {
                     await navigator.clipboard.writeText(text);
 
-                    this.onCopyFinish(text);
+                    this.onCopyFinish(text, () => this.refreshBacklinkHighlightsForPDF(file));
                 } else if (this.settings.rectImageFormat === 'file') {
                     const imagePath = await this.app.fileManager.getAvailablePathForAttachment(file.basename + '.' + extension, '');
                     const useWikilinks = !this.app.vault.getConfig('useMarkdownLinks');
@@ -627,9 +645,12 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
                     };
                     if (autoPaste) {
                         await createImageFile();
-                        this.onCopyFinish(text);
+                        this.onCopyFinish(text, () => this.refreshBacklinkHighlightsForPDF(file));
                     } else {
-                        this.onCopyFinish(text, createImageFile);
+                        this.onCopyFinish(text, async () => {
+                            await createImageFile();
+                            this.refreshBacklinkHighlightsForPDF(file);
+                        });
                     }
                 } else {
                     const dataUrl = await this.lib.pdfPageToImageDataUrl(page, { type: `image/${extension}`, cropRect: rect });
@@ -638,13 +659,16 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
 
                     await navigator.clipboard.writeText(text);
 
-                    this.onCopyFinish(text);
+                    this.onCopyFinish(text, () => this.refreshBacklinkHighlightsForPDF(file));
                 }
 
                 this.plugin.lastCopiedDestInfo = { file, destArray: [pageNumber - 1, 'FitR', ...rect] };
 
                 palette?.setStatus('Link copied', this.statusDurationMs);
-                await this.autoFocusOrAutoPaste(text, autoPaste, palette ?? undefined);
+                const success = await this.autoFocusOrAutoPaste(text, autoPaste, palette ?? undefined);
+                if (success && (autoPaste || this.settings.autoPaste)) {
+                    this.refreshBacklinkHighlightsForPDF(file);
+                }
             })();
         }
 
@@ -663,9 +687,12 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
 
             (async () => {
                 await navigator.clipboard.writeText(link);
-                this.onCopyFinish(link);
+                this.onCopyFinish(link, () => this.refreshBacklinkHighlightsForPDF(file));
                 palette?.setStatus('Link copied', this.statusDurationMs);
-                await this.autoFocusOrAutoPaste(link, autoPaste, palette ?? undefined);
+                const success = await this.autoFocusOrAutoPaste(link, autoPaste, palette ?? undefined);
+                if (success && (autoPaste || this.settings.autoPaste)) {
+                    this.refreshBacklinkHighlightsForPDF(file);
+                }
             })();
         }
 
@@ -934,7 +961,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
             // MarkdownView's file saving is debounced, so we need to
             // explicitly save the new data right after pasting so that
             // the backlink highlight will be visibile as soon as possible.
-            void view.save();
+            await view.save();
 
             await this.updateAndRevealCursorInEditor(leaf.view, {
                 focus: this.settings.focusEditorAfterAutoPaste,
@@ -1022,16 +1049,17 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
 
             if (clipboardTextNormalized === copiedTextNormalized) {
                 this.plugin.lastPasteFile = info.file;
-                onPaste?.();
-            }
-
-            if (info instanceof MarkdownView) {
-                // MarkdownView's file saving is debounced, so we need to
-                // explicitly save the new data right after pasting so that
-                // the backlink highlight will be visibile as soon as possible.
-                window.setTimeout(() => {
-                    void info.save();
-                });
+                if (info instanceof MarkdownView) {
+                    // MarkdownView's file saving is debounced, so we need to
+                    // explicitly save after the paste lands before refreshing PDF backlinks.
+                    window.setTimeout(() => {
+                        void info.save()
+                            .then(() => onPaste?.())
+                            .catch(console.error);
+                    }, 75);
+                } else {
+                    onPaste?.();
+                }
             }
         });
     }
@@ -1040,6 +1068,21 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
         this.watchPaste(text, onPaste);
         // update this.lastCopiedDestArray
         this.plugin.lastCopiedDestInfo = null;
+    }
+
+    refreshBacklinkHighlightsForPDF(file: TFile) {
+        const refresh = () => {
+            this.lib.workspace.iteratePDFViewerComponents((component, pdfFile) => {
+                if (pdfFile !== file) return;
+                const visualizer = component.visualizer;
+                if (!visualizer) return;
+                visualizer.index.init();
+                visualizer.refresh();
+            });
+        };
+
+        window.setTimeout(refresh, 100);
+        window.setTimeout(refresh, 500);
     }
 
     /**
@@ -1051,7 +1094,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
      * @param autoPaste True if called via the auto-paste commands and false otherwise even if the auto-paste toggle is on.
      * @param palette The relevant color palette instance whose status text will be updated.
      */
-    async autoFocusOrAutoPaste(evaluated: string, autoPaste?: boolean, palette?: ColorPalette) {
+    async autoFocusOrAutoPaste(evaluated: string, autoPaste?: boolean, palette?: ColorPalette): Promise<boolean> {
         if (autoPaste || this.settings.autoPaste) {
             const success = await this.autoPaste(evaluated);
             if (success) {
@@ -1063,11 +1106,14 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
                     }
                 }
             } else palette?.setStatus('Link copied but paste target not identified', this.statusDurationMs);
+            return success;
         } else {
             if (this.settings.autoFocus) {
                 const success = await this.autoFocus();
                 if (!success) palette?.setStatus('Link copied but paste target not identified', this.statusDurationMs);
+                return success;
             }
         }
+        return false;
     }
 }

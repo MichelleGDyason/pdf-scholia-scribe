@@ -335,7 +335,7 @@ export class PDFViewerBacklinkVisualizer extends PDFBacklinkVisualizer implement
 
         this.visualize();
         this.registerEvent(this.index.on('update', () => {
-            this.visualize();
+            this.refresh();
         }));
     }
 
@@ -354,51 +354,79 @@ export class PDFViewerBacklinkVisualizer extends PDFBacklinkVisualizer implement
         const viewer = this.child.pdfViewer;
 
         this.lib.onPageReady(viewer, this, (pageNumber) => {
-            this.domManager.clearDomInPage(pageNumber);
-
-            const pageIndex = this.index.getPageIndex(pageNumber);
-
-            for (const [id, caches] of pageIndex.XYZs) {
-                this.processXYZ(pageNumber, id, caches);
-            }
-            for (const [id, caches] of pageIndex.FitBHs) {
-                this.processFitBH(pageNumber, id, caches);
-            }
-            for (const [id, caches] of pageIndex.FitRs) {
-                this.processFitR(pageNumber, id, caches);
-            }
-
-            this.domManager.updateStatus(pageNumber, { onPageReady: true });
-            this.domManager.postProcessPageIfReady(pageNumber);
+            this.processPage(pageNumber);
         });
 
         this.lib.onTextLayerReady(viewer, this, (pageNumber) => {
-            const status = this.domManager.getStatus(pageNumber);
-            if (!status.onPageReady || status.onTextLayerReady) return;
-
-            const pageIndex = this.index.getPageIndex(pageNumber);
-
-            for (const [id, caches] of pageIndex.selections) {
-                this.processSelection(pageNumber, id, caches);
-            }
-
-            this.domManager.updateStatus(pageNumber, { onTextLayerReady: true });
-            this.domManager.postProcessPageIfReady(pageNumber);
+            this.processTextLayer(pageNumber);
         });
 
         this.lib.onAnnotationLayerReady(viewer, this, (pageNumber) => {
-            const status = this.domManager.getStatus(pageNumber);
-            if (!status.onPageReady || status.onAnnotationLayerReady) return;
-
-            const pageIndex = this.index.getPageIndex(pageNumber);
-
-            for (const [id, caches] of pageIndex.annotations) {
-                this.processAnnotation(pageNumber, id, caches);
-            }
-
-            this.domManager.updateStatus(pageNumber, { onAnnotationLayerReady: true });
-            this.domManager.postProcessPageIfReady(pageNumber);
+            this.processAnnotationLayer(pageNumber);
         });
+    }
+
+    refresh() {
+        const pages = this.child.pdfViewer.pdfViewer?._pages;
+        if (!pages) return;
+
+        pages.forEach((pageView, pageIndex) => {
+            const pageNumber = pageIndex + 1;
+            this.processPage(pageNumber);
+            if (pageView.textLayer) {
+                this.processTextLayer(pageNumber);
+            }
+            if (pageView.annotationLayer) {
+                this.processAnnotationLayer(pageNumber);
+            }
+        });
+    }
+
+    processPage(pageNumber: number) {
+        this.domManager.clearDomInPage(pageNumber);
+
+        const pageIndex = this.index.getPageIndex(pageNumber);
+
+        for (const [id, caches] of pageIndex.XYZs) {
+            this.processXYZ(pageNumber, id, caches);
+        }
+        for (const [id, caches] of pageIndex.FitBHs) {
+            this.processFitBH(pageNumber, id, caches);
+        }
+        for (const [id, caches] of pageIndex.FitRs) {
+            this.processFitR(pageNumber, id, caches);
+        }
+
+        this.domManager.updateStatus(pageNumber, { onPageReady: true });
+        this.domManager.postProcessPageIfReady(pageNumber);
+    }
+
+    processTextLayer(pageNumber: number) {
+        const status = this.domManager.getStatus(pageNumber);
+        if (!status.onPageReady || status.onTextLayerReady) return;
+
+        const pageIndex = this.index.getPageIndex(pageNumber);
+
+        for (const [id, caches] of pageIndex.selections) {
+            this.processSelection(pageNumber, id, caches);
+        }
+
+        this.domManager.updateStatus(pageNumber, { onTextLayerReady: true });
+        this.domManager.postProcessPageIfReady(pageNumber);
+    }
+
+    processAnnotationLayer(pageNumber: number) {
+        const status = this.domManager.getStatus(pageNumber);
+        if (!status.onPageReady || status.onAnnotationLayerReady) return;
+
+        const pageIndex = this.index.getPageIndex(pageNumber);
+
+        for (const [id, caches] of pageIndex.annotations) {
+            this.processAnnotation(pageNumber, id, caches);
+        }
+
+        this.domManager.updateStatus(pageNumber, { onAnnotationLayerReady: true });
+        this.domManager.postProcessPageIfReady(pageNumber);
     }
 
     processSelection(pageNumber: number, id: string, caches: Set<PDFBacklinkCache>) {
