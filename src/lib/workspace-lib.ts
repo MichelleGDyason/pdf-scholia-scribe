@@ -378,6 +378,7 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
         const { subpath } = parseLinktext(linktext);
         if (!this.plugin.patchStatus.pdfInternals) {
             this.plugin.subpathWhenPatched = subpath;
+            if (subpath) this.plugin.subpathsWhenPatched.set(leaf, subpath);
         }
 
         return leaf.openLinkText(linktext, sourcePath, openViewState).then(async () => {

@@ -1,4 +1,4 @@
-import { Constructor, EventRef, Events, FileSystemAdapter, Keymap, Menu, Notice, ObsidianProtocolData, PaneType, Platform, Plugin, SettingTab, TFile, addIcon, apiVersion, loadPdfJs, requireApiVersion } from 'obsidian';
+import { Constructor, EventRef, Events, FileSystemAdapter, Keymap, Menu, Notice, ObsidianProtocolData, PaneType, Platform, Plugin, SettingTab, TFile, WorkspaceLeaf, addIcon, apiVersion, loadPdfJs, requireApiVersion } from 'obsidian';
 import * as pdflib from '@cantoo/pdf-lib';
 
 import { patchPDFView, patchPDFInternals, patchBacklink, patchWorkspace, patchPagePreview, patchPDFInternalFromPDFEmbed, patchMenu } from 'patchers';
@@ -53,6 +53,8 @@ export default class PDFPlus extends Plugin {
 	 * properly if it is the first time the user opens a PDF link.
 	 */
 	subpathWhenPatched?: string;
+	/** Same as `subpathWhenPatched`, but scoped to the leaf that triggered delayed PDF internals patching. */
+	subpathsWhenPatched: WeakMap<WorkspaceLeaf, string> = new WeakMap();
 	classes: {
 		PDFView?: Constructor<PDFView>;
 		PDFViewerComponent?: Constructor<PDFViewerComponent>;

@@ -12,7 +12,7 @@ import { PDFViewerBacklinkVisualizer } from 'backlink-visualizer';
 import { PDFPlusToolbar } from 'toolbar';
 import { BibliographyManager } from 'bib';
 import { camelCaseToKebabCase, getCharactersWithBoundingBoxesInPDFCoords, getTextLayerInfo, hookInternalLinkMouseEventHandlers, isEmbed, isModifierName, isNonEmbedLike, selectDoubleClickedWord, selectTrippleClickedTextLayerNode, showChildElOnParentElHover } from 'utils';
-import { AnnotationElement, PDFOutlineViewer, PDFViewerComponent, PDFViewerChild, PDFSearchSettings, Rect, PDFAnnotationHighlight, PDFTextHighlight, PDFRectHighlight, ObsidianViewer, PDFPageView } from 'typings';
+import { AnnotationElement, PDFOutlineViewer, PDFViewerComponent, PDFViewerChild, PDFSearchSettings, Rect, PDFAnnotationHighlight, PDFTextHighlight, PDFRectHighlight, ObsidianViewer, PDFPageView, PDFView } from 'typings';
 import { SidebarView, SpreadMode } from 'pdfjs-enums';
 import { VimBindings } from 'vim/vim';
 import { PDFPlusSettings } from 'settings';
@@ -57,12 +57,23 @@ export const patchPDFInternals = async (plugin: PDFPlus, pdfViewerComponent: PDF
 function onPDFInternalsPatchSuccess(plugin: PDFPlus) {
     const { lib } = plugin;
     // For the detail of `plugin.subpathWhenPatched`, see its docstring.
-    lib.workspace.iteratePDFViews((view) => reloadPDFViewerComponent(view.viewer, view.file, plugin.subpathWhenPatched));
+    lib.workspace.iteratePDFViews((view) => reloadPDFViewerComponent(view.viewer, view.file, getSubpathForPDFViewReload(plugin, view)));
     // Without passing `embed.subpath`, the embed will display the first page of the PDF file regardless of the subpath,
     // in which case the subpath like `...#page=5` will be ignored.
     // See https://github.com/RyotaUshio/obsidian-pdf-plus/issues/322
     lib.workspace.iteratePDFEmbeds((embed) => reloadPDFViewerComponent(embed.viewer, embed.file, embed.subpath));
 }
+
+const getSubpathForPDFViewReload = (plugin: PDFPlus, view: PDFView): string | undefined => {
+    const pendingSubpath = plugin.subpathsWhenPatched.get(view.leaf);
+    if (pendingSubpath !== undefined) {
+        plugin.subpathsWhenPatched.delete(view.leaf);
+        return pendingSubpath;
+    }
+
+    const state = view.getState();
+    return plugin.lib.viewStateToSubpath(state) ?? (typeof state.page === 'number' ? `#page=${state.page}` : plugin.subpathWhenPatched);
+};
 
 const reloadPDFViewerComponent = (viewer: PDFViewerComponent, file: TFile | null, subpath?: string) => {
     // reflect the patch to existing PDF views
