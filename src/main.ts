@@ -1,4 +1,4 @@
-import { Constructor, EventRef, Events, FileSystemAdapter, Keymap, Menu, Notice, ObsidianProtocolData, PaneType, Platform, Plugin, SettingTab, TFile, WorkspaceLeaf, addIcon, apiVersion, loadPdfJs, requireApiVersion } from 'obsidian';
+import { Constructor, EventRef, Events, FileSystemAdapter, Keymap, Menu, Notice, ObsidianProtocolData, PaneType, Platform, Plugin, SettingTab, TFile, Workspace, WorkspaceLeaf, addIcon, apiVersion, loadPdfJs, requireApiVersion } from 'obsidian';
 import * as pdflib from '@cantoo/pdf-lib';
 
 import { patchPDFView, patchPDFInternals, patchBacklink, patchWorkspace, patchPagePreview, patchPDFInternalFromPDFEmbed, patchMenu } from 'patchers';
@@ -15,6 +15,10 @@ import { PDFExternalLinkPostProcessor, PDFInternalLinkPostProcessor, PDFOutlineI
 import { BibliographyManager } from 'bib';
 import { DataviewInlineFieldsModal, withFilesWithInlineFields } from 'lib/dataview';
 
+
+type WorkspaceWithProtocolUnregister = Workspace & {
+	unregisterObsidianProtocolHandler?: (action: string) => void;
+};
 
 export default class PDFPlus extends Plugin {
 	/** The core internal API. Not intended to be used by other plugins. */
@@ -89,6 +93,7 @@ export default class PDFPlus extends Plugin {
 	obsidianHasTextSelectionBug: boolean;
 	requiresDataviewInlineFieldsMigration = false;
 	isDebugMode: boolean = false;
+	private obsidianProtocolAction = 'pdf-scholia-scribe';
 
 	async onload() {
 		this.checkVersion();
@@ -119,7 +124,7 @@ export default class PDFPlus extends Plugin {
 
 		this.startTrackingActiveMarkdownFile();
 
-		this.registerObsidianProtocolHandler('pdf-scholia-scribe', this.obsidianProtocolHandler.bind(this));
+		this.registerPluginObsidianProtocolHandler();
 
 		this.addSettingTab(this.settingTab = new PDFPlusSettingTab(this));
 
@@ -129,6 +134,12 @@ export default class PDFPlus extends Plugin {
 		this.checkDataviewInlineFields();
 
 		this.registerAutoCheckForUpdates();
+	}
+
+	registerPluginObsidianProtocolHandler() {
+		const workspace = this.app.workspace as WorkspaceWithProtocolUnregister;
+		workspace.unregisterObsidianProtocolHandler?.(this.obsidianProtocolAction);
+		this.registerObsidianProtocolHandler(this.obsidianProtocolAction, this.obsidianProtocolHandler.bind(this));
 	}
 
 	async onunload() {
