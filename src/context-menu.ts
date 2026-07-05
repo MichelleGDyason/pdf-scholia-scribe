@@ -3,9 +3,10 @@ import { Keymap, Menu, MenuItem, Notice, Platform, TFile } from 'obsidian';
 import PDFPlus from 'main';
 import { PDFOutlineItem, PDFOutlines } from 'lib/outlines';
 import { PDFOutlineMoveModal, PDFOutlineTitleModal, PDFComposerModal, PDFAnnotationDeleteModal, PDFAnnotationEditModal } from 'modals';
-import { PDFOutlineTreeNode, PDFViewerChild } from 'typings';
+import { AnnotationElement, DestArray, PDFOutlineTreeNode, PDFViewerChild } from 'typings';
 import { PDFViewerBacklinkVisualizer } from 'backlink-visualizer';
 import { PDFBacklinkCache } from 'lib/pdf-backlink-index';
+import { getTextLayerInfo } from 'utils';
 import { addProductMenuItems, getSelectedItemsRecursive, fixOpenSubmenu, registerVimKeybindsToMenu } from 'utils/menu';
 import { DEFAULT_SETTINGS, NamedTemplate } from 'settings';
 import { ColorPalette } from 'color-palette';
@@ -449,6 +450,73 @@ export class PDFPlusContextMenu extends PDFPlusMenu {
         return super.addItem(cb);
     }
 
+    getOutlineTitle(text: string | null | undefined, fallback: string) {
+        const title = this.lib.toSingleLine(text ?? '').trim();
+        if (!title) return fallback;
+        return title.length > 80 ? title.slice(0, 77).trimEnd() + '...' : title;
+    }
+
+    getSelectionOutlineDestArray(pageNumber: number, selection: { beginIndex: number }): DestArray {
+        const textLayer = this.child.getPage(pageNumber).textLayer;
+        const textLayerInfo = textLayer && getTextLayerInfo(textLayer);
+        const item = textLayerInfo?.textContentItems[selection.beginIndex];
+
+        if (item) {
+            const left = item.transform[4];
+            const top = item.transform[5] + item.height;
+            if (typeof left === 'number' && typeof top === 'number') {
+                return [pageNumber - 1, 'XYZ', left, top, null];
+            }
+        }
+
+        return [pageNumber - 1, 'XYZ', null, null, null];
+    }
+
+    getAnnotationOutlineDestArray(pageNumber: number, annot: AnnotationElement): DestArray {
+        const rect = annot.data.rect;
+        const left = rect[0];
+        const top = rect[3];
+
+        if (typeof left === 'number' && typeof top === 'number') {
+            return [pageNumber - 1, 'XYZ', left, top, null];
+        }
+
+        return [pageNumber - 1, 'XYZ', null, null, null];
+    }
+
+    addOutlineMenuItem(menuTitle: string, modalTitle: string, defaultTitle: string, destArray: DestArray) {
+        const { child, plugin, lib } = this;
+        const file = child.file;
+
+        if (!file || !lib.isEditable(child)) return;
+
+        this.addItem((item) => {
+            return item
+                .setSection('link')
+                .setTitle(menuTitle)
+                .setIcon('lucide-plus')
+                .onClick(() => {
+                    new PDFOutlineTitleModal(plugin, modalTitle)
+                        .presetTitle(defaultTitle)
+                        .ask()
+                        .then(async ({ title }) => {
+                            try {
+                                await PDFOutlines.processOutlineRoot((root) => {
+                                    root.createChild(title, destArray)
+                                        .updateCountForAllAncestors();
+                                    root.sortChildren();
+                                }, file, plugin);
+
+                                new Notice(`${plugin.manifest.name}: Added to PDF outline.`);
+                            } catch (error) {
+                                console.error(`${plugin.manifest.name}: Failed to add to PDF outline.`, error);
+                                new Notice(`${plugin.manifest.name}: Could not add to PDF outline. Check the developer console for details.`);
+                            }
+                        });
+                });
+        });
+    }
+
     // TODO: divide into smaller methods
     async addItems(evt?: MouseEvent) {
         const { child, plugin, lib, app } = this;
@@ -509,6 +577,15 @@ export class PDFPlusContextMenu extends PDFPlusMenu {
                         });
                 }
             }
+
+            if (selection && lib.isEditable(child) && isVisible('link')) {
+                this.addOutlineMenuItem(
+                    'Add selection to PDF outline',
+                    'Add selection to outline',
+                    this.getOutlineTitle(selectedText, `Page ${pageNumber}`),
+                    this.getSelectionOutlineDestArray(pageNumber, selection)
+                );
+            }
         }
 
         // Get annotation & annotated text
@@ -531,6 +608,15 @@ export class PDFPlusContextMenu extends PDFPlusMenu {
                         .onItemClick(({ copyFormat, displayTextFormat }) => {
                             lib.copyLink.copyLinkToAnnotation(child, false, { copyFormat, displayTextFormat }, pageNumber, id, false, true);
                         });
+                }
+
+                if (lib.isEditable(child) && isVisible('link')) {
+                    this.addOutlineMenuItem(
+                        'Add annotation to PDF outline',
+                        'Add annotation to outline',
+                        this.getOutlineTitle(annotatedText ?? child.getTextByRect(pageView, annot.data.rect), `Page ${pageNumber}`),
+                        this.getAnnotationOutlineDestArray(pageNumber, annot)
+                    );
                 }
 
                 // // Createa a Canvas card

@@ -1,6 +1,6 @@
 {
     "name": "obsidian-pdf-scholia-scribe",
-    "version": "0.40.44",
+    "version": "0.40.45",
     "description": "Citation-focused PDF annotation and note-linking.",
     "repository": {
         "type": "git",
