@@ -51,6 +51,26 @@ export async function showContextMenuAtSelection(plugin: PDFPlus, child: PDFView
     menu.showAtPosition({ x, y }, doc);
 }
 
+function isPermissionDeniedError(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null || !('code' in error)) {
+        return false;
+    }
+
+    const code = (error as { code?: unknown }).code;
+    return code === 'EACCES' || code === 'EPERM';
+}
+
+function showPDFOutlineAddError(plugin: PDFPlus, file: TFile, error: unknown): void {
+    console.error(`${plugin.manifest.name}: Failed to add to PDF outline.`, error);
+
+    if (isPermissionDeniedError(error)) {
+        new Notice(`${plugin.manifest.name}: Could not add to PDF outline because "${file.name}" is read-only or locked. Change the file permissions to allow writing, then try again.`, 12000);
+        return;
+    }
+
+    new Notice(`${plugin.manifest.name}: Could not add to PDF outline. Check the developer console for details.`);
+}
+
 export const onThumbnailContextMenu = (plugin: PDFPlus, child: PDFViewerChild, evt: MouseEvent): void => {
     const { lib } = plugin;
 
@@ -514,8 +534,7 @@ export class PDFPlusContextMenu extends PDFPlusMenu {
 
                                 new Notice(`${plugin.manifest.name}: Added to PDF outline.`);
                             } catch (error) {
-                                console.error(`${plugin.manifest.name}: Failed to add to PDF outline.`, error);
-                                new Notice(`${plugin.manifest.name}: Could not add to PDF outline. Check the developer console for details.`);
+                                showPDFOutlineAddError(plugin, file, error);
                             }
                         });
                 });
