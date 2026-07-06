@@ -138,6 +138,12 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
      * @param file Must be a PDF file.
      */
     getExistingLeafForPDFFile(file: TFile): WorkspaceLeaf | null {
+        const activeLeaf = this.app.workspace.getMostRecentLeaf();
+        if (activeLeaf?.view.getViewType() === 'pdf'
+            && this.getFilePathFromView(activeLeaf.view) === file.path) {
+            return activeLeaf;
+        }
+
         return this.getExistingLeafForFile(file);
     }
 

@@ -1,11 +1,11 @@
 {
-    "id": "pdf-scholia-scribe",
-    "name": "PDF Scholia Scribe",
-    "version": "0.40.50",
-    "minAppVersion": "1.12.7",
-    "description": "Citation-focused PDF annotation and note-linking.",
-    "author": "Michelle G Dyason",
-    "authorUrl": "https://github.com/MichelleGDyason",
-    "fundingUrl": "https://github.com/sponsors/MichelleGDyason",
-    "isDesktopOnly": false
+	"id": "pdf-scholia-scribe",
+	"name": "PDF Scholia Scribe",
+	"version": "0.40.51",
+	"minAppVersion": "1.12.7",
+	"description": "Citation-focused PDF annotation and note-linking.",
+	"author": "Michelle G Dyason",
+	"authorUrl": "https://github.com/MichelleGDyason",
+	"fundingUrl": "https://github.com/sponsors/MichelleGDyason",
+	"isDesktopOnly": false
 }

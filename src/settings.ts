@@ -419,7 +419,7 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 	noSidebarInEmbed: true,
 	noSpreadModeInEmbed: true,
 	embedUnscrollable: false,
-	singleTabForSinglePDF: true,
+	singleTabForSinglePDF: false,
 	highlightExistingTab: false,
 	existingTabHighlightOpacity: 0.5,
 	existingTabHighlightDuration: 0.75,
@@ -565,7 +565,7 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 	autoFocusIconName: 'zap',
 	autoPasteToggleRibbonIcon: false,
 	autoPasteIconName: 'clipboard-paste',
-	viewSyncFollowPageNumber: true,
+	viewSyncFollowPageNumber: false,
 	viewSyncPageDebounceInterval: 0.3,
 	openAfterExtractPages: true,
 	howToOpenExtractedPDF: 'tab',
@@ -3008,9 +3008,9 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			.setName('Always record to history when opening PDF links')
 			.setDesc('By default, the history is recorded only when you open a link to a different PDF file. If enabled, the history will be recorded even when you open a link to the same PDF file as the current one, and you will be able to go back and forth the history by clicking the left/right arrow buttons even within a single PDF file.');
 		this.addToggleSetting('singleTabForSinglePDF', () => this.redisplay())
-			.setName('Don\'t open a single PDF file in multiple tabs')
+			.setName('Reuse an already open tab for the same PDF')
 			.then((setting) => this.renderMarkdown(
-				`When opening a link to a PDF file without pressing any [modifier keys](https://help.obsidian.md/User+interface/Use+tabs+in+Obsidian#Open+a+link), a new tab will not be opened if the same file has already been already opened in another tab. Useful for annotating PDFs using a side-by-side view ("Split right"), displaying a PDF in one side and a markdown file in another.`,
+				`When opening a PDF link without pressing any [modifier keys](https://help.obsidian.md/User+interface/Use+tabs+in+Obsidian#Open+a+link), reuse an existing tab for that PDF instead of opening another copy. Leave this off if you want two independent panes of the same PDF, for example one pane for the main text and another for endnotes.`,
 				setting.descEl
 			));
 		if (this.plugin.settings.singleTabForSinglePDF) {

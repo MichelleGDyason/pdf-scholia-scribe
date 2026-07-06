@@ -539,7 +539,7 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                 }
 
                 // For https://github.com/RyotaUshio/obsidian-view-sync
-                if (isNonEmbedLike(this.pdfViewer)) {
+                if (isNonEmbedLike(this.pdfViewer) && app.plugins.plugins['obsidian-view-sync']) {
                     lib.registerPDFEvent(
                         'pagechanging',
                         this.pdfViewer.eventBus,
