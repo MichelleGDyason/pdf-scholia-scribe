@@ -458,7 +458,7 @@ export class PDFPlusLib {
     }
 
     registerGlobalDomEvent<K extends keyof DocumentEventMap>(component: Component, type: K, callback: (this: HTMLElement, ev: DocumentEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void {
-        component.registerDomEvent(document, type, callback, options);
+        component.registerDomEvent(activeDocument, type, callback, options);
 
         this.app.workspace.onLayoutReady(() => {
             // For the currently opened windows
@@ -1016,8 +1016,8 @@ export class PDFPlusLib {
     getOptionalRenderParameters(): OptionalRenderParameters {
         return this.plugin.settings.rectFollowAdaptToTheme && this.app.loadLocalStorage('pdfjs-is-themed')
             ? {
-                background: document.body.getCssPropertyValue('--pdf-page-background'),
-                invert: document.body.hasClass('theme-dark'),
+                background: activeDocument.body.getCssPropertyValue('--pdf-page-background'),
+                invert: activeDocument.body.hasClass('theme-dark'),
             } : {};
     }
 
@@ -1054,7 +1054,11 @@ export class PDFPlusLib {
 
     onDocumentReady(pdfViewer: ObsidianViewer, callback: (doc: PDFDocumentProxy) => any) {
         if (pdfViewer.pdfLoadingTask) {
-            pdfViewer.pdfLoadingTask.promise.then((doc) => callback(doc));
+            void pdfViewer.pdfLoadingTask.promise
+                .then((doc) => {
+                    void Promise.resolve(callback(doc)).catch(console.error);
+                })
+                .catch(console.error);
             return;
         }
 

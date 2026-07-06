@@ -33,17 +33,17 @@ export class PDFCroppedEmbed extends Component implements Embed {
         if (this.shouldUpdateOnModify()) {
             this.registerEvent(this.app.vault.on('modify', (file) => {
                 if (file === this.file) {
-                    this.loadFile();
+                    void this.loadFile().catch(console.error);
                 }
             }));
         }
 
         if (this.plugin.settings.rectFollowAdaptToTheme) {
             this.registerEvent(this.app.workspace.on('css-change', () => {
-                this.loadFile();
+                void this.loadFile().catch(console.error);
             }));
             this.registerEvent(this.plugin.on('adapt-to-theme-change', () => {
-                this.loadFile();
+                void this.loadFile().catch(console.error);
             }));
         }
     }
@@ -59,14 +59,14 @@ export class PDFCroppedEmbed extends Component implements Embed {
             this.containerEl.empty();
             this.containerEl.createEl('img', { attr: { src: dataUrl } }, (imgEl) => {
                 imgEl.addEventListener('load', () => resolve());
-                imgEl.addEventListener('error', (err) => reject(err));
+                imgEl.addEventListener('error', () => reject(new Error('Failed to load cropped PDF embed image.')));
 
                 const width = this.containerEl.getAttribute('width');
                 const height = this.containerEl.getAttribute('height');
                 if (width) imgEl.setAttribute('width', width);
                 if (height) imgEl.setAttribute('height', height);
             });
-            window.setTimeout(() => reject(), 5000);
+            window.setTimeout(() => reject(new Error('Timed out loading cropped PDF embed image.')), 5000);
         });
     }
 

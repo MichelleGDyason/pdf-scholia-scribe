@@ -19,7 +19,7 @@ export class RestoreDefaultModal extends PDFPlusModal {
         this.contentEl.createDiv('modal-button-container', (el) => {
             new ButtonComponent(el)
                 .setButtonText('I understand, restore default settings')
-                .setDestructive()
+                .setWarning()
                 .onClick(async () => {
                     await this.plugin.restoreDefaultSettings();
                     this.close();

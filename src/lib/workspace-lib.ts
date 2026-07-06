@@ -98,24 +98,21 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
     }
 
     getActivePDFView(): PDFView | null {
-        if (this.plugin.classes.PDFView) {
-            return this.app.workspace.getActiveViewOfType(this.plugin.classes.PDFView);
-        }
-        // I believe using `activeLeaf` is inevitable here.
-        const view = this.app.workspace.activeLeaf?.view;
+        const view = this.plugin.classes.PDFView
+            ? this.app.workspace.getActiveViewOfType(this.plugin.classes.PDFView)
+            : this.app.workspace.getMostRecentLeaf()?.view;
         if (view && this.lib.isPDFView(view)) return view;
         return null;
     }
 
     getActiveCanvasView(): CanvasView | null {
-        // I believe using `activeLeaf` is inevitable here.
-        const view = this.app.workspace.activeLeaf?.view;
+        const view = this.app.workspace.getMostRecentLeaf()?.view;
         if (view && this.lib.isCanvasView(view)) return view;
         return null;
     }
 
     getActiveExcalidrawView(): ExcalidrawView | null {
-        const view = this.app.workspace.activeLeaf?.view;
+        const view = this.app.workspace.getMostRecentLeaf()?.view;
         if (view && this.lib.isExcalidrawView(view)) return view;
         return null;
     }
@@ -133,8 +130,7 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
     }
 
     getActiveGroupLeaves() {
-        // I belive using `activeLeaf` is inevitable here.
-        const activeGroup = this.app.workspace.activeLeaf?.group;
+        const activeGroup = this.app.workspace.getMostRecentLeaf()?.group;
         if (!activeGroup) return null;
 
         return this.app.workspace.getGroupLeaves(activeGroup);
@@ -175,10 +171,10 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
             openViewState.eState.scroll = openViewState.eState.line;
             openViewState.eState.focus = !this.settings.dontActivateAfterOpenMD;
         }
-        // Ignore the "dontActivateAfterOpenMD" option when opening a link in a tab in the same split as the current tab
-        // I believe using activeLeaf (which is deprecated) is inevitable here
+        // Ignore the "dontActivateAfterOpenMD" option when opening a link in a tab in the same split as the current tab.
+        const activeLeaf = this.app.workspace.getMostRecentLeaf();
         if (!(markdownLeaf.parentSplit instanceof WorkspaceTabs
-            && markdownLeaf.parentSplit === this.app.workspace.activeLeaf?.parentSplit)) {
+            && markdownLeaf.parentSplit === activeLeaf?.parentSplit)) {
             openViewState.active = !this.plugin.settings.dontActivateAfterOpenMD;
         }
 
@@ -287,7 +283,7 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
             return this.app.workspace.getLeaf(paneType as PaneType | boolean);
         }
         if (isFineGrainedSplitDirection(paneType)) {
-            return this.getLeafBySplit(paneType as FineGrainedSplitDirection);
+            return this.getLeafBySplit(paneType);
         }
         return this.getLeafInSidebar(paneType as SidebarType);
     }
@@ -354,7 +350,7 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
 
         if (!Platform.isDesktopApp) {
             // on mobile, we don't need to care about new windows so just use the original method
-            this.app.workspace.revealLeaf(leaf);
+            await this.app.workspace.revealLeaf(leaf);
             return;
         }
 
@@ -415,9 +411,9 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
         if (!sameFileLeaf) return { exists: false, promise: Promise.resolve() };
 
 
-        // Ignore the "dontActivateAfterOpenPDF" option when opening a link in a tab in the same split as the current tab
-        // I believe using activeLeaf (which is deprecated) is inevitable here
-        if (!(sameFileLeaf.parentSplit instanceof WorkspaceTabs && sameFileLeaf.parentSplit === this.app.workspace.activeLeaf?.parentSplit)) {
+        // Ignore the "dontActivateAfterOpenPDF" option when opening a link in a tab in the same split as the current tab.
+        const activeLeaf = this.app.workspace.getMostRecentLeaf();
+        if (!(sameFileLeaf.parentSplit instanceof WorkspaceTabs && sameFileLeaf.parentSplit === activeLeaf?.parentSplit)) {
             openViewState = openViewState ?? {};
             openViewState.active = !this.settings.dontActivateAfterOpenPDF;
         }
@@ -531,8 +527,7 @@ class HoverEditorLib extends PDFPlusLibSubmodule {
     }
 
     get waitTime() {
-        // @ts-ignore
-        return this.hoverEditorPlugin?.settings.triggerDelay;
+        return this.hoverEditorPlugin?.settings?.triggerDelay;
     }
 
     isHoverEditorLeaf(leaf: WorkspaceLeaf): boolean {

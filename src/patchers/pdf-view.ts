@@ -72,7 +72,7 @@ export const patchPDFView = (plugin: PDFPlus): boolean => {
         plugin.classes.PDFView = pdfView.constructor;
     }
 
-    if (!plugin.patchStatus.pdfInternals) patchPDFInternals(plugin, pdfView.viewer);
+    if (!plugin.patchStatus.pdfInternals) void patchPDFInternals(plugin, pdfView.viewer).catch(console.error);
 
     // don't return true here; if patchPDFInternals is successful, plugin.patchStatus.pdfInternals
     // will be set to true when this function is called next time, and then this function will

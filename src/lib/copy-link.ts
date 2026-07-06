@@ -422,7 +422,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
             }
 
             if (!checking) {
-                (async () => {
+                void (async () => {
                     const evaluated = this.getTextToCopy(child, templates.copyFormat, templates.displayTextFormat, file, page, subpath, text, colorName?.toLowerCase() ?? '', undefined, undefined, variables.textMarkdown);
                     // Without await, the focus can move to a different document before `writeText` is completed
                     // if auto-focus is on and the PDF is opened in a secondary window, which causes the copy to fail.
@@ -459,7 +459,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
                             }
                         }
                     }
-                })();
+                })().catch(console.error);
             }
 
             return true;
@@ -474,7 +474,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
 
         if (!checking) {
             const pageView = child.getPage(page);
-            child.getAnnotatedText(pageView, id)
+            void child.getAnnotatedText(pageView, id)
                 .then(async (text) => {
                     const annotData = pageView.annotationLayer?.annotationLayer?.getAnnotation(id)?.data ?? (await pageView.pdfPage.getAnnotations()).find((annot) => annot.id === id);
                     const color = annotData?.color ? `${annotData.color[0]}, ${annotData.color[1]}, ${annotData.color[2]}` : '';
@@ -505,7 +505,8 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
                     if (typeof left === 'number' && typeof top === 'number') {
                         this.plugin.lastCopiedDestInfo = { file, destArray: [page - 1, 'XYZ', left, top, null] };
                     }
-                });
+                })
+                .catch(console.error);
         }
 
         return true;
@@ -513,7 +514,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
 
     copyLinkToAnnotationWithGivenTextAndFile(text: string, file: TFile, child: PDFViewerChild, checking: boolean, templates: { copyFormat: string, displayTextFormat?: string }, page: number, id: string, colorName: string, autoPaste?: boolean) {
         if (!checking) {
-            (async () => {
+            void (async () => {
                 const evaluated = this.getTextToCopy(child, templates.copyFormat, templates.displayTextFormat, file, page, `#page=${page}&annotation=${id}`, text, colorName);
                 await navigator.clipboard.writeText(evaluated);
                 this.onCopyFinish(evaluated, () => this.refreshBacklinkHighlightsForPDF(file));
@@ -527,7 +528,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
                         }
                     })
                     .catch(console.error);
-            })();
+            })().catch(console.error);
         }
 
         return true;
@@ -610,7 +611,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
             if (colorName) subpath += `&color=${colorName}`;
             const embedLink = this.lib.generateMarkdownLink(file, sourcePath ?? '', subpath, display);
 
-            (async () => {
+            void (async () => {
                 let text = embedLink;
                 let page = child.getPage(pageNumber).pdfPage;
                 const extension = this.settings.rectImageExtension;
@@ -669,7 +670,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
                 if (success && (autoPaste || this.settings.autoPaste)) {
                     this.refreshBacklinkHighlightsForPDF(file);
                 }
-            })();
+            })().catch(console.error);
         }
 
         return true;
@@ -685,7 +686,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
             const display = this.lib.copyLink.getDisplayText(child, undefined, file, pageNumber, query);
             const link = this.lib.generateMarkdownLink(file, '', `#search=${query}`, display).slice(1);
 
-            (async () => {
+            void (async () => {
                 await navigator.clipboard.writeText(link);
                 this.onCopyFinish(link, () => this.refreshBacklinkHighlightsForPDF(file));
                 palette?.setStatus('Link copied', this.statusDurationMs);
@@ -693,7 +694,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
                 if (success && (autoPaste || this.settings.autoPaste)) {
                     this.refreshBacklinkHighlightsForPDF(file);
                 }
-            })();
+            })().catch(console.error);
         }
 
         return true;
@@ -728,7 +729,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
 
         if (!checking) {
             const pageView = child.getPage(page);
-            child.getAnnotatedText(pageView, id)
+            void child.getAnnotatedText(pageView, id)
                 .then((text) => {
                     const evaluated = this.getTextToCopy(child, template, undefined, file, page, `#page=${page}&annotation=${id}`, text ?? '', '');
                     canvas.createTextNode({
@@ -736,7 +737,8 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
                         position: 'center',
                         text: evaluated
                     });
-                });
+                })
+                .catch(console.error);
         }
 
         return true;

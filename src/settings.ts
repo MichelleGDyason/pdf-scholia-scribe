@@ -701,21 +701,23 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 					.addItem((item) => {
 						item.setTitle('Restore default value of this setting')
 							.setIcon('lucide-undo-2')
-							.onClick(async () => {
-								// @ts-ignore
-								this.plugin.settings[settingName] = this.plugin.getDefaultSettings()[settingName];
-								await this.plugin.saveSettings();
+								.onClick(() => {
+									void (async () => {
+										// @ts-ignore
+										this.plugin.settings[settingName] = this.plugin.getDefaultSettings()[settingName];
+										await this.plugin.saveSettings();
 
-								this.redisplay();
+										this.redisplay();
 
-								new Notice(`${this.plugin.manifest.name}: Default setting restored. Note that some options require a restart to take effect.`, 6000);
-							});
+										new Notice(`${this.plugin.manifest.name}: Default setting restored. Note that some options require a restart to take effect.`, 6000);
+									})().catch(console.error);
+								});
 					})
 					.addItem((item) => {
 						item.setTitle('Copy link to this setting')
 							.setIcon('lucide-link')
 							.onClick(() => {
-								navigator.clipboard.writeText(`obsidian://pdf-scholia-scribe?setting=${settingName}`);
+									void navigator.clipboard.writeText(`obsidian://pdf-scholia-scribe?setting=${settingName}`);
 							});
 					})
 					.showAtMouseEvent(evt);
@@ -751,7 +753,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 					item.setTitle('Copy link to this heading')
 						.setIcon('lucide-link')
 						.onClick(() => {
-							navigator.clipboard.writeText(`obsidian://pdf-scholia-scribe?setting=heading:${id}`);
+								void navigator.clipboard.writeText(`obsidian://pdf-scholia-scribe?setting=heading:${id}`);
 						});
 				})
 				.showAtMouseEvent(evt);
@@ -1185,10 +1187,10 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			});
 	}
 
-	async renderMarkdown(lines: string[] | string, el: HTMLElement) {
-		this.promises.push(this._renderMarkdown(lines, el));
-		el.addClass('markdown-rendered');
-	}
+		renderMarkdown(lines: string[] | string, el: HTMLElement) {
+			this.promises.push(this._renderMarkdown(lines, el));
+			el.addClass('markdown-rendered');
+		}
 
 	async _renderMarkdown(lines: string[] | string, el: HTMLElement) {
 		await MarkdownRenderer.render(this.app, Array.isArray(lines) ? lines.join('\n') : lines, el, '', this.component);
@@ -1628,7 +1630,11 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		this.events.trigger('update');
 	}
 
-	async display(): Promise<void> {
+	display(): void {
+		void this.displayAsync().catch(console.error);
+	}
+
+	private async displayAsync(): Promise<void> {
 		// First of all, re-display the installer version modal that was shown in plugin.onload again if necessary,
 		// in case the user has accidentally closed it.
 		InstallerVersionModal.openIfNecessary(this.plugin);
@@ -1655,15 +1661,15 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		}
 
 
-		this.contentEl.createDiv('top-note', async (el) => {
-			await this.renderMarkdown([
+		this.contentEl.createDiv('top-note', (el) => {
+			this.renderMarkdown([
 				'> [!TIP]',
 				'> - You can easily navigate through the settings by clicking the icons in the header above.',
 				'> - Some settings below require reopening tabs or reloading the plugin to take effect.',
 				'> - [Visit the docs](https://ryotaushio.github.io/obsidian-pdf-plus/)',
 				'> - <a id="pdf-plus-funding-link-placeholder"></a>',
 			], el);
-			const linkEl = document.getElementById('pdf-plus-funding-link-placeholder');
+			const linkEl = el.ownerDocument.getElementById('pdf-plus-funding-link-placeholder');
 			if (linkEl) {
 				linkEl.textContent = 'Help me keep PDF Scholia Scribe alive!';
 				linkEl.onclick = (evt) => {
@@ -2475,7 +2481,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				toggle
 					.setValue(this.plugin.settings.autoFocus)
 					.onChange((value) => {
-						this.plugin.toggleAutoFocus(value);
+						void this.plugin.toggleAutoFocus(value);
 						this.redisplay(); // Reflect the change to the auto-paste toggle (we cannot activate both of them at the same time)
 					});
 			});
@@ -2501,7 +2507,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				toggle
 					.setValue(this.plugin.settings.autoPaste)
 					.onChange((value) => {
-						this.plugin.toggleAutoPaste(value);
+						void this.plugin.toggleAutoPaste(value);
 						this.redisplay(); // Reflect the change to the auto-focus toggle (you canot activate both of them at the same time)
 					});
 			});
@@ -2616,7 +2622,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		this.addTextSetting('newFileNameFormat', 'Leave blank not to specify')
 			.setName(`New note title format`)
 			.then(async (setting) => {
-				await this.renderMarkdown([
+				this.renderMarkdown([
 					'If this option is left blank or the active file is not a PDF, "Untitled \\*" will be used (if the language is set to English). You can use the following variables: `file`, `folder`, `app`, and other global variables such as `moment`.',
 				], setting.descEl);
 				setting.descEl.createSpan({ text: 'See ' });
@@ -2626,14 +2632,14 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		this.addTextSetting('newFileTemplatePath', 'Leave blank not to use a template')
 			.setName('Template file path')
 			.then(async (setting) => {
-				await this.renderMarkdown([
+				this.renderMarkdown([
 					'You can leave this blank if you don\'t want to use a template.',
 					'You can use `file`, `folder`, `app`, and other global variables such as `moment`.',
 				], setting.descEl);
 				setting.descEl.createSpan({ text: 'See ' });
 				setting.descEl.appendChild(this.createLinkToHeading('template', 'above'));
 				setting.descEl.createSpan({ text: ' for the details about these variables.' });
-				await this.renderMarkdown([
+				this.renderMarkdown([
 					'You can also include [Templater](obsidian://show-plugin?id=templater-obsidian) syntaxes in the template.',
 					'In that case, make sure the "Trigger templater on new file creation" option is enabled in the Templater settings.',
 					'',
@@ -3315,7 +3321,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			this.addTextSetting('vimrcPath', undefined, () => this.plugin.vimrc = null)
 				.setName('Vimrc file path (optional)')
 				.then(async (setting) => {
-					await this.renderMarkdown([
+					this.renderMarkdown([
 						'Only the [Ex commands supported by PDF Scholia Scribe](https://github.com/RyotaUshio/obsidian-pdf-plus/blob/main/src/vim/ex-commands.ts) are allowed.',
 						'',
 						'Example (not necessarily recommendations):',
@@ -3438,7 +3444,9 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 
 
 		this.addHeading('Misc', 'misc', 'lucide-more-horizontal');
-		this.addToggleSetting('autoCheckForUpdates', () => this.plugin.checkForUpdatesIfNeeded())
+		this.addToggleSetting('autoCheckForUpdates', () => {
+			void this.plugin.checkForUpdatesIfNeeded();
+		})
 			.setName('Automatically check for updates')
 			.setDesc('If enabled, PDF Scholia Scribe will automatically check for updates every 24 hours and notify you if a new version is available.');
 		this.addToggleSetting('fixObsidianTextSelectionBug')
@@ -3504,7 +3512,11 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		await Promise.all(this.promises);
 	}
 
-	async hide() {
+	hide(): void {
+		void this.hideAsync().catch(console.error);
+	}
+
+	private async hideAsync(): Promise<void> {
 		this.plugin.settings.colors = Object.fromEntries(
 			Object.entries(this.plugin.settings.colors).filter(([name, color]) => name && isHexString(color))
 		);

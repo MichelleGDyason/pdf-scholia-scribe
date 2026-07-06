@@ -83,7 +83,9 @@ export class VimBindings extends PDFPlusComponent {
                     }
                 }
             },
-            'f': () => this.commandLineMode.executeCommand('hint'),
+            'f': () => {
+                void this.commandLineMode.executeCommand('hint');
+            },
         });
 
         // TODO: rewrite some using Ex commands
@@ -214,7 +216,9 @@ export class VimBindings extends PDFPlusComponent {
     private mapOrNoremap(modes: string[], from: string, to: string, noremap: boolean) {
         if (to.startsWith(':')) {
             this.vimScope.registerKeymaps(modes, {
-                [from]: () => this.commandLineMode.executeCommand(to.slice(1))
+                [from]: () => {
+                    void this.commandLineMode.executeCommand(to.slice(1));
+                }
             });
         } else if (to === '<Nop>') {
             this.vimScope.registerKeymaps(modes, { [from]: () => { } });

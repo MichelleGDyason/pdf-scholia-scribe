@@ -86,7 +86,7 @@ export const patchBacklink = (plugin: PDFPlus): boolean => {
     lib.workspace.iterateBacklinkViews((view) => {
         // reflect the patch to existing backlink views
         if (view.file?.extension === 'pdf') {
-            view.onLoadFile(view.file);
+            void Promise.resolve(view.onLoadFile(view.file)).catch(console.error);
         }
     });
 

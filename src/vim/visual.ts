@@ -119,13 +119,13 @@ export class VimVisualMode extends VimBindingsMode {
                         if (this.settings.copyAsSingleLine) {
                             text = this.lib.toSingleLine(text);
                         }
-                        navigator.clipboard.writeText(text);
+                            void navigator.clipboard.writeText(text);
                     }
                     selection.empty();
                 }
             },
             'c': () => {
-                this.lib.commands.copyLink(false);
+                void this.lib.commands.copyLink(false);
                 this.doc.getSelection()?.empty();
             },
             'C': () => {
@@ -134,7 +134,7 @@ export class VimVisualMode extends VimBindingsMode {
                     // Use window.setTimeout to avoid the menu hiden by this.enterNormalMode()
                     window.setTimeout(() => {
                         this.viewer.then((child) => {
-                            showContextMenuAtSelection(this.plugin, child, selection);
+                            void showContextMenuAtSelection(this.plugin, child, selection);
                         });
                     });
                 }
@@ -202,7 +202,7 @@ export class VimVisualMode extends VimBindingsMode {
             }
             if (prevDiv && isNodeNonemptyTextDiv(prevDiv) && prevDiv.dataset.idx !== undefined) {
                 index = +prevDiv.dataset.idx;
-                offset = prevDiv.textContent!.length - 1;
+                offset = (prevDiv.textContent ?? '').length - 1;
             }
         } else if (textDiv.textContent && offset >= textDiv.textContent.length) {
             let nextDiv = textDiv.nextSibling;

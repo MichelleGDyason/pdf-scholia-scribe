@@ -131,7 +131,7 @@ export default class PDFPlus extends Plugin {
 		this.registerStyleSettings();
 
 		this.checkDeprecatedSettings();
-		this.checkDataviewInlineFields();
+			void this.checkDataviewInlineFields();
 
 		this.registerAutoCheckForUpdates();
 	}
@@ -142,8 +142,8 @@ export default class PDFPlus extends Plugin {
 		this.registerObsidianProtocolHandler(this.obsidianProtocolAction, this.obsidianProtocolHandler.bind(this));
 	}
 
-	async onunload() {
-		await this.cleanUpResources();
+	onunload() {
+		void this.cleanUpResources().catch(console.error);
 	}
 
 	/** Perform clean-ups not registered explicitly. */
@@ -415,7 +415,7 @@ export default class PDFPlus extends Plugin {
 	}
 
 	checkDeprecatedSettings() {
-		if (document.querySelectorAll('.pdf-plus-deprecated-setting-notice').length > 0) {
+		if (activeDocument.querySelectorAll('.pdf-plus-deprecated-setting-notice').length > 0) {
 			return;
 		}
 
@@ -580,7 +580,7 @@ export default class PDFPlus extends Plugin {
 			let menuShown = false;
 
 			this.autoFocusToggleIconEl = this.addRibbonIcon(this.settings.autoFocusIconName, `${this.manifest.name}: Toggle auto-focus`, () => {
-				if (!menuShown) this.toggleAutoFocus();
+					if (!menuShown) void this.toggleAutoFocus();
 			});
 			this.autoFocusToggleIconEl.toggleClass('is-active', this.settings.autoFocus);
 
@@ -605,7 +605,7 @@ export default class PDFPlus extends Plugin {
 			let menuShown = false;
 
 			this.autoPasteToggleIconEl = this.addRibbonIcon(this.settings.autoPasteIconName, `${this.manifest.name}: Toggle auto-paste`, () => {
-				if (!menuShown) this.toggleAutoPaste();
+					if (!menuShown) void this.toggleAutoPaste();
 			});
 			this.autoPasteToggleIconEl.toggleClass('is-active', this.settings.autoPaste);
 			this.registerDomEvent(this.autoPasteToggleIconEl, 'contextmenu', (evt) => {
@@ -648,7 +648,7 @@ export default class PDFPlus extends Plugin {
 		this.settings.autoFocus = enable;
 
 		if (this.settings.autoFocus && this.settings.autoPaste) {
-			this.toggleAutoPaste(false, false);
+			await this.toggleAutoPaste(false, false);
 		}
 
 		if (save ?? true) {
@@ -662,7 +662,7 @@ export default class PDFPlus extends Plugin {
 		this.settings.autoPaste = enable;
 
 		if (this.settings.autoPaste && this.settings.autoFocus) {
-			this.toggleAutoFocus(false, false);
+			await this.toggleAutoFocus(false, false);
 		}
 
 		if (save ?? true) {
@@ -741,7 +741,7 @@ export default class PDFPlus extends Plugin {
 				// @ts-ignore
 				if (!this.classes.PDFEmbed) this.classes.PDFEmbed = embed.constructor;
 				if (!this.patchStatus.pdfInternals) {
-					patchPDFInternals(this, embed.viewer);
+						void patchPDFInternals(this, embed.viewer).catch(console.error);
 				}
 			}
 
@@ -753,7 +753,7 @@ export default class PDFPlus extends Plugin {
 					&& (evt.target.closest('.pdf-embed[src] > .pdf-container') || evt.target.closest('.pdf-cropped-embed'))) {
 					const linktext = file.path + subpath;
 					// we don't need sourcePath because linktext is the full path
-					this.app.workspace.openLinkText(linktext, '', Keymap.isModEvent(evt));
+						void this.app.workspace.openLinkText(linktext, '', Keymap.isModEvent(evt));
 					evt.preventDefault();
 				}
 			});
@@ -821,7 +821,7 @@ export default class PDFPlus extends Plugin {
 				if (this.settings.syncWithDefaultApp && leaf && this.lib.isPDFView(leaf.view)) {
 					const file = leaf.view.file;
 					if (file) {
-						this.app.openWithDefaultApp(file.path);
+							void this.app.openWithDefaultApp(file.path);
 						if (this.settings.focusObsidianAfterOpenPDFWithDefaultApp) {
 							focusObsidian();
 						}
@@ -899,8 +899,10 @@ export default class PDFPlus extends Plugin {
 	}
 
 	private registerAutoCheckForUpdates() {
-		this.checkForUpdatesIfNeeded();
-		this.registerInterval(window.setInterval(() => this.checkForUpdatesIfNeeded(), 1000 * 60 * 60 * 24));
+		void this.checkForUpdatesIfNeeded();
+		this.registerInterval(window.setInterval(() => {
+			void this.checkForUpdatesIfNeeded();
+		}, 1000 * 60 * 60 * 24));
 	}
 
 	private registerHoverLinkSources() {

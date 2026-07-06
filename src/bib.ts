@@ -35,7 +35,7 @@ export class BibliographyManager extends PDFPlusComponent {
         this.destIdToParsedBib = new Map();
         this.events = new Events();
         this.initialized = false;
-        this.init();
+        void this.init();
     }
 
     isEnabled() {
@@ -58,7 +58,7 @@ export class BibliographyManager extends PDFPlusComponent {
     }
 
     private async extractBibText() {
-        return new Promise<void>((resolve) => {
+        return new Promise<void>((resolve, reject) => {
             this.lib.onDocumentReady(this.child.pdfViewer, (doc) => {
                 new BibliographyTextExtractor(this.plugin, doc)
                     .onExtracted((destId, bibText) => {
@@ -66,7 +66,8 @@ export class BibliographyManager extends PDFPlusComponent {
                         this.events.trigger('extracted', destId, bibText);
                     })
                     .extract()
-                    .then(resolve);
+                    .then(resolve)
+                    .catch(reject);
             });
         });
     }
@@ -303,8 +304,8 @@ export class BibliographyDom extends PDFPlusComponent {
         return false;
     }
 
-    async onload() {
-        await this.render();
+    onload() {
+        void this.render().catch(console.error);
     }
 
     async render() {
@@ -354,7 +355,7 @@ export class BibliographyDom extends PDFPlusComponent {
         // @ts-ignore
         const eventRef = this.bib.on(eventName, (destId) => {
             if (destId === this.destId) {
-                this.render();
+                void this.render().catch(console.error);
                 this.bib.events.offref(eventRef);
             }
         });

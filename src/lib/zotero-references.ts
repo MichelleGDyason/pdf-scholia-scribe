@@ -25,7 +25,7 @@ export interface ScholiaReferenceRecord {
 	pages: string;
 	doi: string;
 	url: string;
-	properties?: Record<string, any>;
+	properties?: Record<string, unknown>;
 }
 
 type CitationRequest = Partial<Pick<ScholiaReferenceRecord, 'citekey' | 'zoteroKey' | 'vaultPath'>> & {
@@ -80,7 +80,38 @@ function emptyRecord(source: ScholiaReferenceSource): ScholiaReferenceRecord {
 	};
 }
 
-function findProperty(properties: Record<string, any>, keys: string[]) {
+type UnknownRecord = Record<string, unknown>;
+
+type NodeHttpResponse = {
+	statusCode?: number;
+	setEncoding(encoding: BufferEncoding): void;
+	on(event: 'data', callback: (chunk: string) => void): void;
+	on(event: 'end', callback: () => void): void;
+};
+
+type NodeHttpRequest = {
+	setTimeout(timeout: number, callback: () => void): void;
+	destroy(): void;
+	on(event: 'error', callback: () => void): void;
+};
+
+type NodeHttpModule = {
+	get(url: string, options: { headers: Record<string, string> }, callback: (response: NodeHttpResponse) => void): NodeHttpRequest;
+};
+
+type WindowWithRequire = Window & {
+	require?: (moduleName: 'http' | 'https') => NodeHttpModule;
+};
+
+function isRecord(value: unknown): value is UnknownRecord {
+	return value !== null && typeof value === 'object';
+}
+
+function stringValue(value: unknown): string {
+	return typeof value === 'string' ? value : '';
+}
+
+function findProperty(properties: Record<string, unknown>, keys: string[]) {
 	const normalized = keys.map((key) => key.toLowerCase());
 	for (const [key, value] of Object.entries(properties)) {
 		if (normalized.includes(key.toLowerCase())) return value;
@@ -112,7 +143,7 @@ function flattenPropertyValue(value: unknown): string[] {
 	return [String(value)];
 }
 
-function firstValue(properties: Record<string, any>, keys: string[]) {
+function firstValue(properties: Record<string, unknown>, keys: string[]) {
 	return flattenPropertyValue(findProperty(properties, keys))
 		.map((value) => cleanText(value))
 		.filter(Boolean)[0] ?? '';
@@ -137,7 +168,7 @@ function extractYear(value: string) {
 	return value.match(/(?:18|19|20|21)\d{2}/)?.[0] ?? '';
 }
 
-function getYear(properties: Record<string, any>) {
+function getYear(properties: Record<string, unknown>) {
 	for (const value of flattenPropertyValue(findProperty(properties, YEAR_KEYS))) {
 		const year = extractYear(value);
 		if (year) return year;
@@ -477,7 +508,7 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 	async searchZotero(query: string) {
 		if (!query.trim()) return [];
 		const encoded = encodeURIComponent(query.trim());
-		const items = await this.requestZoteroJson(`/api/users/0/items/top?format=json&include=data&limit=20&q=${encoded}`);
+			const items: unknown = await this.requestZoteroJson(`/api/users/0/items/top?format=json&include=data&limit=20&q=${encoded}`);
 		if (!Array.isArray(items)) return [];
 		return items
 			.map((item) => this.recordFromZoteroItem(item))
@@ -489,7 +520,7 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 		if (!itemKey) return null;
 		const encoded = encodeURIComponent(itemKey);
 		const style = encodeURIComponent(this.settings.zoteroBibliographyStyle || 'apa');
-		const item = await this.requestZoteroJson(`/api/users/0/items/${encoded}?format=json&include=data,bib&style=${style}`);
+			const item: unknown = await this.requestZoteroJson(`/api/users/0/items/${encoded}?format=json&include=data,bib&style=${style}`);
 		return this.recordFromZoteroItem(item);
 	}
 
@@ -514,7 +545,7 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 				throw: false,
 			});
 			if (response.status >= 400) return null;
-			return response.json;
+				return response.json as unknown;
 		} catch (err) {
 			requestUrlError = err;
 		}
@@ -528,21 +559,21 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 
 	async requestZoteroJsonWithNode(url: string) {
 		if (!Platform.isDesktopApp) return null;
-		const nodeRequire = (window as any).require as ((moduleName: string) => any) | undefined;
+			const nodeRequire = (window as WindowWithRequire).require;
 		if (!nodeRequire) return null;
 
-		return await new Promise<unknown | null>((resolve) => {
-			let settled = false;
-			const finish = (value: unknown | null) => {
-				if (settled) return;
-				settled = true;
-				resolve(value);
-			};
+			return await new Promise<unknown>((resolve) => {
+				let settled = false;
+				const finish = (value: unknown) => {
+					if (settled) return;
+					settled = true;
+					resolve(value);
+				};
 
 			try {
 				const parsed = new URL(url);
-				const client = nodeRequire(parsed.protocol === 'https:' ? 'https' : 'http');
-				const request = client.get(url, { headers: { Accept: 'application/json' } }, (response: any) => {
+					const client = nodeRequire(parsed.protocol === 'https:' ? 'https' : 'http');
+					const request = client.get(url, { headers: { Accept: 'application/json' } }, (response) => {
 					let body = '';
 					response.setEncoding('utf8');
 					response.on('data', (chunk: string) => {
@@ -571,36 +602,36 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 		});
 	}
 
-	recordFromZoteroItem(item: any): ScholiaReferenceRecord | null {
-		const data = item?.data ?? item;
-		if (!data || typeof data !== 'object') return null;
+		recordFromZoteroItem(item: unknown): ScholiaReferenceRecord | null {
+			if (!isRecord(item)) return null;
+			const data = isRecord(item.data) ? item.data : item;
 
-		const creators = Array.isArray(data.creators) ? data.creators : [];
-		const authorCreators = creators.filter((creator: any) => !creator.creatorType || ['author', 'bookAuthor'].includes(creator.creatorType));
-		const fallbackCreators = authorCreators.length ? authorCreators : creators.filter((creator: any) => creator.creatorType === 'editor');
-		const authors = fallbackCreators
-			.map((creator: any) => {
-				if (creator.name) return creator.name;
-				return `${creator.firstName ?? ''} ${creator.lastName ?? ''}`.trim();
-			})
-			.filter(Boolean);
+			const creators = Array.isArray(data.creators) ? data.creators.filter(isRecord) : [];
+			const authorCreators = creators.filter((creator) => !creator.creatorType || ['author', 'bookAuthor'].includes(stringValue(creator.creatorType)));
+			const fallbackCreators = authorCreators.length ? authorCreators : creators.filter((creator) => creator.creatorType === 'editor');
+			const authors = fallbackCreators
+				.map((creator) => {
+					if (typeof creator.name === 'string') return creator.name;
+					return `${stringValue(creator.firstName)} ${stringValue(creator.lastName)}`.trim();
+				})
+				.filter(Boolean);
 
 		const record = {
 			...emptyRecord('zotero'),
-			citekey: data.citationKey || this.parseCitationKeyFromExtra(data.extra ?? ''),
-			zoteroKey: data.key || item?.key || '',
-			title: cleanText(data.title ?? ''),
-			authors,
-			year: extractYear(data.date ?? ''),
-			reference: item?.bib ? normalizeReference(item.bib) : '',
-			itemType: data.itemType ?? '',
-			publisher: cleanText(data.publisher ?? ''),
-			containerTitle: cleanText(data.publicationTitle ?? data.bookTitle ?? data.proceedingsTitle ?? ''),
-			place: cleanText(data.place ?? ''),
-			pages: cleanText(data.pages ?? ''),
-			doi: cleanText(data.DOI ?? data.doi ?? ''),
-			url: cleanText(data.url ?? ''),
-		};
+				citekey: stringValue(data.citationKey) || this.parseCitationKeyFromExtra(stringValue(data.extra)),
+				zoteroKey: stringValue(data.key) || stringValue(item.key),
+				title: cleanText(stringValue(data.title)),
+				authors,
+				year: extractYear(stringValue(data.date)),
+				reference: typeof item.bib === 'string' ? normalizeReference(item.bib) : '',
+				itemType: stringValue(data.itemType),
+				publisher: cleanText(stringValue(data.publisher)),
+				containerTitle: cleanText(stringValue(data.publicationTitle) || stringValue(data.bookTitle) || stringValue(data.proceedingsTitle)),
+				place: cleanText(stringValue(data.place)),
+				pages: cleanText(stringValue(data.pages)),
+				doi: cleanText(stringValue(data.DOI) || stringValue(data.doi)),
+				url: cleanText(stringValue(data.url)),
+			};
 
 		if (!record.title && !record.citekey && !record.zoteroKey) return null;
 		return record;

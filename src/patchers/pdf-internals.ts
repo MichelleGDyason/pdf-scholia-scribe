@@ -90,7 +90,7 @@ const reloadPDFViewerComponent = (viewer: PDFViewerComponent, file: TFile | null
     // but it seems that it works fine without it.
     // So I'm leaving it as it is for now following the spirit of "if it ain't broke, don't fix it".
     viewer.load();
-    if (file) viewer.loadFile(file, subpath);
+    if (file) void Promise.resolve(viewer.loadFile(file, subpath)).catch(console.error);
 };
 
 const patchPDFViewerComponent = (plugin: PDFPlus, pdfViewerComponent: PDFViewerComponent) => {
@@ -397,7 +397,7 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
 
                 // Register post-processors
 
-                lib.registerPDFEvent('annotationlayerrendered', this.pdfViewer.eventBus, this.component!, (data) => {
+                lib.registerPDFEvent('annotationlayerrendered', this.pdfViewer.eventBus, this.component, (data) => {
                     const { source: pageView } = data;
 
                     pageView.annotationLayer?.div
@@ -711,7 +711,9 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
 
                     const pdfLoadingTask = pdfViewer.pdfLoadingTask;
                     if (pdfLoadingTask) {
-                        pdfLoadingTask.promise.then(() => pdfViewer.applySubpath(dest));
+                        void pdfLoadingTask.promise
+                            .then(() => pdfViewer.applySubpath(dest))
+                            .catch(console.error);
                     } else {
                         pdfViewer.subpath = dest;
                     }
@@ -891,7 +893,7 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                     if (contentEl) {
                         contentEl.textContent = '';
                         // we can use contentEl.textContent, but it has backslashes escaped
-                        lib.highlight.writeFile.getAnnotationContents(this.file, page, id)
+                        void lib.highlight.writeFile.getAnnotationContents(this.file, page, id)
                             .then(async (markdown) => {
                                 if (!markdown) return;
                                 contentEl.addClass('markdown-rendered');
@@ -900,7 +902,8 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                                 }
                                 await MarkdownRenderer.render(app, markdown, contentEl, '', this.component);
                                 hookInternalLinkMouseEventHandlers(app, contentEl, this.file?.path ?? '');
-                            });
+                            })
+                            .catch(console.error);
                     }
                 }
 
@@ -914,7 +917,7 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                             iconContainerEl.createDiv('clickable-icon pdf-plus-copy-annotation-link', (iconEl) => {
                                 setIcon(iconEl, 'lucide-copy');
                                 setTooltip(iconEl, 'Copy link');
-                                iconEl.addEventListener('click', async () => {
+                                iconEl.addEventListener('click', () => {
                                     const palette = lib.getColorPaletteAssociatedWithNode(popupMetaEl);
                                     if (!palette) return;
                                     const template = plugin.settings.copyCommands[palette.actionIndex].template;
@@ -934,7 +937,7 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                             iconContainerEl.createDiv('clickable-icon pdf-plus-edit-annotation', (editButtonEl) => {
                                 setIcon(editButtonEl, 'lucide-pencil');
                                 setTooltip(editButtonEl, 'Edit');
-                                editButtonEl.addEventListener('click', async () => {
+                                editButtonEl.addEventListener('click', () => {
                                     if (this.file) {
                                         PDFAnnotationEditModal
                                             .forSubtype(subtype, plugin, this.file, page, id)
@@ -949,7 +952,7 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                             iconContainerEl.createDiv('clickable-icon pdf-plus-delete-annotation', (deleteButtonEl) => {
                                 setIcon(deleteButtonEl, 'lucide-trash');
                                 setTooltip(deleteButtonEl, 'Delete');
-                                deleteButtonEl.addEventListener('click', async () => {
+                                deleteButtonEl.addEventListener('click', () => {
                                     if (this.file) {
                                         new PDFAnnotationDeleteModal(plugin, this.file, page, id)
                                             .openIfNeccessary();
@@ -1022,7 +1025,7 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                     return await old.call(this, evt);
                 }
 
-                onContextMenu(plugin, this, evt);
+                await onContextMenu(plugin, this, evt);
             };
         },
         onMobileCopy(old) {

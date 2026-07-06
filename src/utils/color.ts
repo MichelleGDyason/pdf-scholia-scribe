@@ -31,7 +31,7 @@ export function rgbStringToObject(rgbString: string): RGB {
 }
 
 export function getObsidianDefaultHighlightColorRGB(): RGB {
-    const [r, g, b] = getComputedStyle(document.body)
+    const [r, g, b] = getComputedStyle(activeDocument.body)
         .getPropertyValue('--text-highlight-bg-rgb') // "R, G, B"
         .split(',')
         .map((s) => parseInt(s.trim())); // [R, G, B];
@@ -39,7 +39,7 @@ export function getObsidianDefaultHighlightColorRGB(): RGB {
 }
 
 export function getBorderRadius() {
-    const cssValue = getComputedStyle(document.body).getPropertyValue('--radius-s');
+    const cssValue = getComputedStyle(activeDocument.body).getPropertyValue('--radius-s');
     if (cssValue.endsWith('px')) {
         const px = parseInt(cssValue.slice(0, -2));
         if (!isNaN(px)) return px;

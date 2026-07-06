@@ -19,7 +19,7 @@ export const patchPagePreview = (plugin: PDFPlus): boolean => {
                 const file = app.metadataCache.getFirstLinkpathDest(linkpath, sourcePath);
 
                 if ((!sourcePath || sourcePath.endsWith('.pdf')) && plugin.settings.hoverHighlightAction === 'open' && state?.isTriggeredFromBacklinkVisualizer) {
-                    lib.workspace.openMarkdownLinkFromPDF(linktext, sourcePath, false, { line: state.scroll });
+                    void lib.workspace.openMarkdownLinkFromPDF(linktext, sourcePath, false, { line: state.scroll });
                     return;
                 }
 

@@ -13,7 +13,7 @@ export class DomManager extends PDFPlusComponent {
 	constructor(plugin: PDFPlus) {
 		super(plugin);
 		this.styleEl = plugin.registerEl(createEl('style', { attr: { id: 'pdf-plus-style' } }));
-		document.head.append(this.styleEl);
+		activeDocument.head.append(this.styleEl);
 	}
 
 	update() {
@@ -41,8 +41,8 @@ export class DomManager extends PDFPlusComponent {
 	}
 
 	updateClass(className: string, condition: boolean) {
-		document.body.toggleClass(className, condition);
-		this.register(() => document.body.removeClass(className));
+		activeDocument.body.toggleClass(className, condition);
+		this.register(() => activeDocument.body.removeClass(className));
 	}
 
 	updateStyleEl() {
@@ -221,7 +221,7 @@ export class DomManager extends PDFPlusComponent {
 				colorVarName = specificColorVarName;
 			}
 		}
-		const rgbString = getComputedStyle(document.body).getPropertyValue(colorVarName); // "R, G, B"
+		const rgbString = getComputedStyle(activeDocument.body).getPropertyValue(colorVarName); // "R, G, B"
 		const rgbColor = rgbStringToObject(rgbString);
 		return rgbColor;
 	}

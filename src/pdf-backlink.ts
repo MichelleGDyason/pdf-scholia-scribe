@@ -229,7 +229,11 @@ export class BacklinkPanePDFPageTracker extends PDFPlusComponent {
         );
     }
 
-    async onload() {
+    onload() {
+        void this.loadTracker().catch(console.error);
+    }
+
+    private async loadTracker() {
         this.renderer.backlinkDom.filter = undefined;
 
         const leaf = this.lib.workspace.getExistingLeafForPDFFile(this.file);
@@ -247,7 +251,7 @@ export class BacklinkPanePDFPageTracker extends PDFPlusComponent {
                     this.updateBacklinkDom();
 
                     this.lib.registerPDFEvent('pagechanging', child.pdfViewer.eventBus, this, (data) => {
-                        const page = typeof data.pageNumber === 'number' ? (data.pageNumber as number) : child.pdfViewer.pdfViewer?.currentPageNumber;
+                        const page = typeof data.pageNumber === 'number' ? data.pageNumber : child.pdfViewer.pdfViewer?.currentPageNumber;
                         if (page) this.renderer.backlinkDom.filter = (file, linkCache) => this.filter(page, linkCache);
 
                         this.updateBacklinkDom();

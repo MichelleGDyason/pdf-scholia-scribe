@@ -121,11 +121,11 @@ export class VimOutlineMode extends VimBindingsMode {
     }
 
     collapse(item: PDFOutlineTreeNode) {
-        item.setCollapsed(true, this.settings.vimSmoothOutlineMode);
+        void item.setCollapsed(true, this.settings.vimSmoothOutlineMode);
     }
 
     expand(item: PDFOutlineTreeNode) {
-        item.setCollapsed(false, this.settings.vimSmoothOutlineMode);
+        void item.setCollapsed(false, this.settings.vimSmoothOutlineMode);
     }
 
     navigateOutline(outline: PDFOutlineViewer, forward: boolean, n?: number) {
@@ -151,7 +151,7 @@ export class VimOutlineMode extends VimBindingsMode {
                         return visited[newActiveItemIndex];
                     }
 
-                    const isLeaf = !node.children.length || (node as PDFOutlineTreeNode).collapsed;
+                    const isLeaf = !node.children.length || node.collapsed;
                     if (!isLeaf) {
                         stack.push(...node.children.slice().reverse());
                     }

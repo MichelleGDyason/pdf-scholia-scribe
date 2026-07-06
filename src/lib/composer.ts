@@ -442,7 +442,7 @@ export class PDFLinkUpdater extends PDFPlusLibSubmodule {
             await this.app.vault.process(file, (data) => {
                 data = data.slice(0, position.start.offset) + newLink + data.slice(position.end.offset);
 
-                if (options!.callout) {
+                if (options.callout) {
                     // Check if this link is inside a PDF++ callout
                     const sections = this.app.metadataCache.getFileCache(file)?.sections ?? [];
                     const section = sections.find((sec) => sec.position.start.offset <= position.start.offset && position.end.offset <= sec.position.end.offset);

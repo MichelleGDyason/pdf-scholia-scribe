@@ -324,7 +324,7 @@ export async function getObsidianDebugInfo(app: App) {
         'Use [[Wikilinks]]': app.vault.getConfig('useMarkdownLinks'),
         // This entry is not in Obsidian's built-in "Show debug info" command.
         // It replaces the "Base theme" entry for identifying the color scheme even if it's set to be "adapt to system"
-        'Base color scheme': document.body.hasClass('theme-dark') ? 'dark' : 'light',
+        'Base color scheme': activeDocument.body.hasClass('theme-dark') ? 'dark' : 'light',
         // This entry is not in Obsidian's built-in "Show debug info" command
         'PDF "Adapt to theme"': !!app.loadLocalStorage('pdfjs-is-themed'),
         'Community theme': themeName ? `${themeName} v${themeManifest.version}` : 'none',
@@ -631,7 +631,7 @@ export function walkDescendantComponents(component: Component, callback: (compon
 export async function loadComponentAsync(component: Component) {
     if (!component._loaded) {
         component._loaded = true;
-        await component.onload();
+        await Promise.resolve((component.onload as () => unknown)());
         const promises = component._children.map(loadComponentAsync);
         await Promise.all(promises);
     }

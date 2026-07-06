@@ -48,11 +48,11 @@ export const withFilesWithInlineFields = (plugin: PDFPlus, callback: (files: TFi
 
         // @ts-ignore
         if (dvPlugin.index.initialized) {
-            onDataviewReady();
+            void onDataviewReady().catch(console.error);
         } else {
             // @ts-ignore
             const ref = app.metadataCache.on('dataview:index-ready', () => {
-                onDataviewReady();
+                void onDataviewReady().catch(console.error);
                 app.metadataCache.offref(ref);
             });
             plugin.registerEvent(ref);

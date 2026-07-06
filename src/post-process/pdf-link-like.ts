@@ -99,7 +99,7 @@ abstract class PDFLinkLikePostProcessor implements HoverParent {
             const linktext = await this.getLinkText(event);
             if (linktext === null) return;
 
-            app.workspace.openLinkText(linktext, this.sourcePath, newLeaf);
+            await app.workspace.openLinkText(linktext, this.sourcePath, newLeaf);
         }, { capture: true }); // capture to ensure it's called before the default click handler
     }
 

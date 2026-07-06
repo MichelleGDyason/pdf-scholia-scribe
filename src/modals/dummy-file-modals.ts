@@ -25,7 +25,7 @@ export class DummyFileModal extends PDFPlusModal {
         super.onOpen();
 
         const lastUsedSource = this.plugin.loadLocalStorage(DummyFileModal.LOCAL_STORAGE_KEY);
-        if (['file', 'web'].includes(lastUsedSource)) {
+        if (lastUsedSource === 'file' || lastUsedSource === 'web') {
             this.source = lastUsedSource;
         }
         this.folderPath = this.lib.dummyFileManager.getFolderPathForDummyFiles(this.app.workspace.getActiveFile());
@@ -239,7 +239,7 @@ export class DummyFileModal extends PDFPlusModal {
 
         this.plugin.saveLocalStorage(DummyFileModal.LOCAL_STORAGE_KEY, this.source);
 
-        this.createDummyFiles();
+        void this.createDummyFiles().catch(console.error);
         this.close();
     }
 

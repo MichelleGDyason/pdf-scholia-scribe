@@ -75,7 +75,7 @@ export class PDFOutlineTitleModal extends PDFPlusModal {
 
     then(callback: (answer: OutlineInfo) => any) {
         if (this.submitted && this.title !== null) {
-            callback({ title: this.title });
+            void Promise.resolve(callback({ title: this.title })).catch(console.error);
         } else {
             this.next.push(callback);
         }
@@ -93,7 +93,10 @@ export class PDFOutlineTitleModal extends PDFPlusModal {
 
     onClose() {
         if (this.submitted && this.title !== null) {
-            this.next.forEach((callback) => callback({ title: this.title! }));
+            const title = this.title;
+            this.next.forEach((callback) => {
+                void Promise.resolve(callback({ title })).catch(console.error);
+            });
         }
     }
 }
@@ -139,6 +142,8 @@ export class PDFOutlineMoveModal extends FuzzySuggestModal<PDFOutlineItem> {
     }
 
     onChooseItem(item: PDFOutlineItem): void {
-        this.next.forEach((callback) => callback(item));
+        this.next.forEach((callback) => {
+            void Promise.resolve(callback(item)).catch(console.error);
+        });
     }
 }

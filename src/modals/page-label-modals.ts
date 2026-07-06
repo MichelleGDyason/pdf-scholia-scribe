@@ -103,13 +103,16 @@ class PDFPageLabelSettingsForRange {
 export class PDFPageLabelEditModal extends PDFPageLabelModal {
     buttonSetting: Setting | null = null;
 
-    async onOpen() {
+    onOpen() {
         super.onOpen();
+        void this.openAsync().catch(console.error);
+    }
 
+    private async openAsync() {
         this.titleEl.setText(`${this.plugin.manifest.name}: edit page labels`);
         new Setting(this.contentEl)
             .then((setting) => {
-                MarkdownRenderer.render(
+                void MarkdownRenderer.render(
                     this.app,
                     [
                         'Each page in a PDF document can be assigned a ***page label***, which can be different from the page index.',
@@ -118,7 +121,7 @@ export class PDFPageLabelEditModal extends PDFPageLabelModal {
                     setting.descEl,
                     '',
                     this.component
-                );
+                ).catch(console.error);
             })
             .then((setting) => this.contentEl.prepend(setting.settingEl));
 

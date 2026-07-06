@@ -50,7 +50,7 @@ export const registerOutlineDrag = async (plugin: PDFPlus, pdfOutlineViewer: PDF
                     && draggedItem.parent !== item
                     && item.owner === draggedItem.owner) {
                     if (!dragging) {
-                        (async () => {
+                        void (async () => {
                             const outlines = await PDFOutlines.fromFile(file, plugin);
                             const [destItem, itemToMove] = await Promise.all([
                                 outlines.findPDFjsOutlineTreeNode(item),
@@ -63,10 +63,10 @@ export const registerOutlineDrag = async (plugin: PDFPlus, pdfOutlineViewer: PDF
                             }
 
                             destItem.appendChild(itemToMove);
-                            destItem.sortChildren();
+                            await destItem.sortChildren();
                             const buffer = await outlines.doc.save();
                             await app.vault.modifyBinary(file, buffer);
-                        })();
+                        })().catch(console.error);
                     }
 
                     return {
@@ -94,7 +94,7 @@ export const registerOutlineDrag = async (plugin: PDFPlus, pdfOutlineViewer: PDF
 
         if (draggedItem && draggedItem.parent && pdfOutlineViewer === draggedItem.owner) {
             if (!dragging) {
-                (async () => {
+                void (async () => {
                     const outlines = await PDFOutlines.fromFile(file, plugin);
                     const itemToMove = await outlines?.findPDFjsOutlineTreeNode(draggedItem);
 
@@ -105,10 +105,10 @@ export const registerOutlineDrag = async (plugin: PDFPlus, pdfOutlineViewer: PDF
 
                     const root = outlines.ensureRoot();
                     root.appendChild(itemToMove);
-                    root.sortChildren();
+                    await root.sortChildren();
                     const buffer = await outlines.doc.save();
                     await app.vault.modifyBinary(file, buffer);
-                })();
+                })().catch(console.error);
             }
 
             return {
@@ -161,7 +161,7 @@ export const registerAnnotationPopupDrag = (plugin: PDFPlus, popupEl: HTMLElemen
 
     const pageView = child.getPage(page);
 
-    child.getAnnotatedText(pageView, id)
+    void child.getAnnotatedText(pageView, id)
         .then((text): void => {
             app.dragManager.handleDrag(popupEl, (evt) => {
                 app.dragManager.updateSource([popupEl], 'is-being-dragged');
@@ -179,5 +179,6 @@ export const registerAnnotationPopupDrag = (plugin: PDFPlus, popupEl: HTMLElemen
                     }
                 };
             });
-        });
+        })
+        .catch(console.error);
 };

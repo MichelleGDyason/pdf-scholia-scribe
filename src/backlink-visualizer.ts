@@ -138,7 +138,7 @@ export class BacklinkDomManager extends PDFPlusComponent {
         this.registerDomEventForCache(cache, el, 'dblclick', (event) => {
             if (this.plugin.settings.doubleClickHighlightToOpenBacklink) {
                 const paneType = Keymap.isModEvent(event);
-                this.lib.workspace.openMarkdownLinkFromPDF(cache.sourcePath, this.file.path, paneType, pos ? { pos } : undefined);
+                void this.lib.workspace.openMarkdownLinkFromPDF(cache.sourcePath, this.file.path, paneType, pos ? { pos } : undefined);
             }
         });
     }

@@ -21,9 +21,11 @@ export class PDFPageDeleteModal extends PDFPlusModal {
     }
 
     then(callback: () => any) {
-        this.#promise.then((value) => {
-            if (value) callback();
-        });
+        void this.#promise
+            .then((value) => {
+                if (value) return callback();
+            })
+            .catch(console.error);
         return this;
     }
 
@@ -40,7 +42,7 @@ export class PDFPageDeleteModal extends PDFPlusModal {
             .addButton((button) => {
                 button
                     .setButtonText('Delete')
-                    .setDestructive()
+                    .setWarning()
                     .onClick(() => {
                         this.#resolve(true);
                         this.close();
@@ -118,13 +120,15 @@ export class PDFComposerModal extends PDFPlusModal {
     }
 
     then(callback: (keepLabels: boolean, inPlace: boolean) => any) {
-        this.#promise.then((options) => {
-            if (options) {
-                const { pageLabelUpdateMethod, inPlace } = options;
-                const keepLabels = pageLabelUpdateMethod === 'keep';
-                callback(keepLabels, inPlace);
-            }
-        });
+        void this.#promise
+            .then((options) => {
+                if (options) {
+                    const { pageLabelUpdateMethod, inPlace } = options;
+                    const keepLabels = pageLabelUpdateMethod === 'keep';
+                    return callback(keepLabels, inPlace);
+                }
+            })
+            .catch(console.error);
     }
 
     onOpen() {
@@ -213,7 +217,9 @@ export class PDFCreateModal extends PDFPlusModal {
             .setName('Page size')
             .addDropdown((dropdown) => {
                 Object.keys(PageSizes)
-                    .forEach((key) => dropdown.addOption(key, key));
+                    .forEach((key) => {
+                        dropdown.addOption(key, key);
+                    });
 
                 dropdown
                     .setValue(this.pageSize)
@@ -246,10 +252,14 @@ export class PDFCreateModal extends PDFPlusModal {
                     .then((button) => {
                         window.setTimeout(() => button.buttonEl.focus());
                     })
-                    .onClick(async () => {
-                        this.close();
-                        const doc = await this.createPDFDocument();
-                        this.next.forEach((callback) => callback(doc));
+                    .onClick(() => {
+                        void (async () => {
+                            this.close();
+                            const doc = await this.createPDFDocument();
+                            for (const callback of this.next) {
+                                await Promise.resolve(callback(doc));
+                            }
+                        })().catch(console.error);
                     });
             })
             .addButton((button) => {

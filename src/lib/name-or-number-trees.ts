@@ -312,8 +312,8 @@ abstract class NameOrNumberTreeNode<Key extends string | number> {
             if (key < limits[0] || limits[1] < key) return null;
         }
 
-        let node: any = this; // I hate TypeScript
-        let kids = this.kids;
+        let node: typeof this | null = null;
+        let kids: (typeof this)[] | null = this.kids;
         // PDF.js (https://github.com/mozilla/pdf.js/blob/70015ffe6ba32f58ba0424ab20cabee5f28b9d9d/src/core/name_number_tree.js#L83)
         // uses a binary search to find the leaf node, but according to the PDF spec, kids are not necessarily sorted.
         // So we just use a linear search here.
@@ -322,14 +322,14 @@ abstract class NameOrNumberTreeNode<Key extends string | number> {
                 const limits = kid.limits;
                 if (!limits) throw new Error('Kid has no limits');
                 return limits[0] <= key && key <= limits[1];
-            });
+            }) ?? null;
 
             if (!node) return null;
 
             kids = node.kids;
         }
 
-        return node;
+        return node ?? this;
     }
 
     _dictHas(dictKey: string): boolean {

@@ -31,7 +31,7 @@ export class ZoteroCitationModal extends PDFPlusModal {
 				text.setPlaceholder('Deleuze Nietzsche 1983');
 				text.inputEl.size = 34;
 				this.component.registerDomEvent(text.inputEl, 'keydown', (evt) => {
-					if (evt.key === 'Enter') this.search();
+					if (evt.key === 'Enter') void this.search().catch(console.error);
 				});
 					window.setTimeout(() => text.inputEl.focus());
 			})

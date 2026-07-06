@@ -82,8 +82,9 @@ export class VimCommandLineMode extends VimBindingsMode {
                     eventBus.on('pagesloaded', () => window.setTimeout(() => {
                         if (this.plugin.vimrc === null) {
                             const vimrcPath = normalizePath(this.settings.vimrcPath);
-                            this.app.vault.adapter.read(vimrcPath)
-                                .then((script) => this.runScript(this.plugin.vimrc = script));
+                            void this.app.vault.adapter.read(vimrcPath)
+                                .then((script) => this.runScript(this.plugin.vimrc = script))
+                                .catch(console.error);
                         } else {
                             this.runScript(this.plugin.vimrc);
                         }
@@ -137,7 +138,7 @@ export class VimCommandLineMode extends VimBindingsMode {
             if (selectedHistoryItem === cmd) this.history.splice(this.historyIndex, 1);
 
             try {
-                this.executeCommand(cmd);
+                void this.executeCommand(cmd);
             } catch (err) {
                 new Notice(`${this.plugin.manifest.name} (Vim mode): Error occurred while executing the command : ${err}`);
                 console.error(err);
@@ -148,7 +149,9 @@ export class VimCommandLineMode extends VimBindingsMode {
 
     runScript(script: string) {
         const cmds = this.parseScript(script);
-        cmds.forEach((cmd) => this.executeCommand(cmd, { error: ['console.warn'], history: false }));
+        cmds.forEach((cmd) => {
+            void this.executeCommand(cmd, { error: ['console.warn'], history: false });
+        });
     }
 
     parseScript(script: string): string[] {

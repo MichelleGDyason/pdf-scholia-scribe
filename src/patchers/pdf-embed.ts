@@ -8,7 +8,7 @@ export const patchPDFInternalFromPDFEmbed = (plugin: PDFPlus): boolean => {
     const { lib } = plugin;
 
     const pdfEmbed = lib.getPDFEmbed();
-    if (pdfEmbed) patchPDFInternals(plugin, pdfEmbed.viewer);
+    if (pdfEmbed) void patchPDFInternals(plugin, pdfEmbed.viewer).catch(console.error);
 
     // don't return true here; if the patch is successful, plugin.patchStatus.pdfInternals
     // will be set to true when this function is called next time

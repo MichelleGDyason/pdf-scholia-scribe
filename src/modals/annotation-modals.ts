@@ -129,17 +129,18 @@ export class PDFAnnotationEditModal extends PDFAnnotationModal {
                         writers.push((annot: PDFDict) => {
                             pdflibAPI.setColorToAnnotation(annot, rgb);
 
-                            this.lib.getLatestBacklinksForAnnotation(this.file, this.page, this.id)
-                                .then((caches) => {
-                                    caches.forEach((cache) => {
+                            void this.lib.getLatestBacklinksForAnnotation(this.file, this.page, this.id)
+                                .then(async (caches) => {
+                                    await Promise.all(Array.from(caches, (cache) => {
                                         return this.lib.composer.linkUpdater.updateLinkColor(
                                             cache.refCache,
                                             cache.sourcePath,
                                             { type: 'rgb', rgb },
                                             { linktext: false }
                                         );
-                                    });
-                                });
+                                    }));
+                                })
+                                .catch(console.error);
                         });
                     }
                     break;
@@ -341,12 +342,16 @@ export class PDFAnnotationEditModal extends PDFAnnotationModal {
     }
 
     onSaveButtonClick() {
-        this.writeNewValues();
+        void this.writeNewValues().catch(console.error);
         this.close();
     }
 
-    async onOpen() {
+    onOpen() {
         super.onOpen();
+        void this.openAsync().catch(console.error);
+    }
+
+    private async openAsync() {
         this.titleEl.setText(`${this.plugin.manifest.name}: edit annotation contents`);
         await this.readOldValues();
 
@@ -374,7 +379,7 @@ export class PDFAnnotationEditModal extends PDFAnnotationModal {
         this.addButtons();
     }
 
-    async showEditor() {
+    showEditor() {
         this.editorEl?.show();
         this.previewEl?.hide();
     }
@@ -415,9 +420,9 @@ export class PDFAnnotationDeleteModal extends PDFAnnotationModal {
             .addButton((button) => {
                 button
                     .setButtonText('Delete')
-                    .setDestructive()
+                    .setWarning()
                     .onClick(() => {
-                        this.deleteAnnotation();
+                        void this.deleteAnnotation();
                         this.close();
                     });
             })
@@ -431,9 +436,10 @@ export class PDFAnnotationDeleteModal extends PDFAnnotationModal {
 
     openIfNeccessary() {
         if (this.shouldOpen()) {
-            return this.open();
+            this.open();
+            return;
         }
-        return this.deleteAnnotation();
+        void this.deleteAnnotation().catch(console.error);
     }
 
     shouldOpen() {
@@ -445,6 +451,6 @@ export class PDFAnnotationDeleteModal extends PDFAnnotationModal {
     }
 
     deleteAnnotation() {
-        this.lib.highlight.writeFile.deleteAnnotation(this.file, this.page, this.id);
+        return this.lib.highlight.writeFile.deleteAnnotation(this.file, this.page, this.id);
     }
 }

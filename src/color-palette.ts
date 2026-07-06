@@ -403,7 +403,7 @@ export class ColorPalette extends PDFPlusComponent {
             setIcon(el, 'lucide-import');
             setTooltip(el, `Import external PDF into vault`);
             el.addEventListener('click', () => {
-                this.importFile();
+                void this.importFile();
             });
         });
 

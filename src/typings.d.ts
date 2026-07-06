@@ -730,7 +730,7 @@ interface SearchResultDom {
 }
 
 interface SearchResultFileDom {
-    onMatchRender: (...args: any[]) => any | null;
+    onMatchRender: (...args: unknown[]) => unknown;
     collapsible: boolean;
     collapsed: boolean;
     extraContext: boolean;
@@ -786,7 +786,7 @@ interface SearchResultItemDom {
         hidden: boolean;
         next: boolean;
     };
-    onMatchRender: (...args: any[]) => any | null;
+    onMatchRender: (...args: unknown[]) => unknown;
     parent?: SearchResultFileDom; // same as parentDom
 
     onResultClick(evt: Event): void;
@@ -1103,6 +1103,9 @@ declare module 'obsidian' {
                     api: any;
                 };
                 ['obsidian-hover-editor']?: Plugin & {
+                    settings?: {
+                        triggerDelay?: number;
+                    };
                     activePopovers: (HoverPopover & { toggleMinimized(): void, togglePin(value?: boolean): void })[];
                     spawnPopover(initiatingEl?: HTMLElement, onShowCallback?: () => unknown): WorkspaceLeaf;
                 };
@@ -1143,7 +1146,7 @@ declare module 'obsidian' {
         embedRegistry: EmbedRegistry;
         openWithDefaultApp(path: string): Promise<void>;
         getObsidianUrl(file: TFile): string;
-        loadLocalStorage(key: string): NonNullable<any> | null;
+        loadLocalStorage(key: string): unknown;
         /**
          * @param key 
          * @param value It can be anything that can be serialized to JSON, 
@@ -1320,7 +1323,7 @@ declare module 'obsidian' {
         // and as a result, the keymap may not work for some non-US keyboards (e.g. JIS).
         // Setting `modifiers` to `null` is undocumented but makes this keymap work regardless of modifiers, thereby fixing the issue.
         register(modifiers: Modifier[] | null, key: string | null, func: KeymapEventListener): KeymapEventHandler;
-        handleKey(evt: KeyboardEvent, info: KeymapInfo): false | any;
+        handleKey(evt: KeyboardEvent, info: KeymapInfo): unknown;
     }
 
     interface KeymapEventHandler {

@@ -159,19 +159,19 @@ export class PDFOutlines {
         return found;
     }
 
-    static async processOutlineRoot(process: (root: PDFOutlineItem) => void, file: TFile, plugin: PDFPlus) {
+    static async processOutlineRoot(process: (root: PDFOutlineItem) => void | Promise<void>, file: TFile, plugin: PDFPlus) {
         const { app } = plugin;
 
         const outlines = await PDFOutlines.fromFile(file, plugin);
 
-        process(outlines.ensureRoot());
+        await process(outlines.ensureRoot());
 
         // Save the modified PDF document
         const buffer = await outlines.doc.save();
         await app.vault.modifyBinary(file, buffer);
     }
 
-    static async findAndProcessOutlineItem(item: PDFOutlineTreeNode, processor: (item: PDFOutlineItem) => void, file: TFile, plugin: PDFPlus) {
+    static async findAndProcessOutlineItem(item: PDFOutlineTreeNode, processor: (item: PDFOutlineItem) => void | Promise<void>, file: TFile, plugin: PDFPlus) {
         const { app } = plugin;
 
         const outlines = await PDFOutlines.fromFile(file, plugin);
@@ -182,7 +182,7 @@ export class PDFOutlines {
             return;
         }
 
-        processor(found);
+        await processor(found);
 
         // Save the modified PDF document
         const buffer = await outlines.doc.save();

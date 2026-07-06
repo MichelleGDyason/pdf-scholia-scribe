@@ -8,7 +8,7 @@ export function hookInternalLinkMouseEventHandlers(app: App, containerEl: HTMLEl
             evt.preventDefault();
             const linktext = el.getAttribute('href');
             if (linktext) {
-                app.workspace.openLinkText(linktext, sourcePath, Keymap.isModEvent(evt));
+                void app.workspace.openLinkText(linktext, sourcePath, Keymap.isModEvent(evt));
             }
         });
 
@@ -229,9 +229,7 @@ export function selectDoubleClickedWord(evt: MouseEvent) {
 
     let range = null;
 
-    if (doc.caretRangeFromPoint) {
-        range = doc.caretRangeFromPoint(evt.clientX, evt.clientY);
-    } else if (doc.caretPositionFromPoint) {
+    if (doc.caretPositionFromPoint) {
         const pos = doc.caretPositionFromPoint(evt.clientX, evt.clientY);
         if (!pos) return;
         range = doc.createRange();

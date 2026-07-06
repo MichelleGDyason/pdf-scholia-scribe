@@ -52,7 +52,7 @@ export const exCommands = (vim: VimBindings): ExCommand[] => {
                 const selection = vim.doc.getSelection();
                 if (selection) {
                     const text = selection.toString();
-                    if (text) navigator.clipboard.writeText(text);
+                    if (text) void navigator.clipboard.writeText(text);
                     vim.enterNormalMode();
                 }
             }

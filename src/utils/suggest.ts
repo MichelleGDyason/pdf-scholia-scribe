@@ -23,7 +23,7 @@ export abstract class FuzzyInputSuggest<T> extends AbstractInputSuggest<FuzzyMat
 	constructor(app: App, inputEl: HTMLInputElement, options?: Partial<FuzzyInputSuggestOptions>) {
 		super(app, inputEl);
 		this.inputEl = inputEl;
-        this.options = Object.assign(DEFAULT_FUZZY_INPUT_SUGGEST_OPTIONS, options);
+        this.options = { ...DEFAULT_FUZZY_INPUT_SUGGEST_OPTIONS, ...options };
 	}
 
 	abstract getItems(): T[];
@@ -129,7 +129,7 @@ export class CommandSuggest extends AbstractInputSuggest<Command> {
 		this.plugin.settings.commandToExecuteWhenTargetNotIdentified = command.id;
 		this.inputEl.value = command.name;
 		this.close();
-		this.plugin.saveSettings();
+			void this.plugin.saveSettings();
 		this.tab.redisplay();
 	}
 }
