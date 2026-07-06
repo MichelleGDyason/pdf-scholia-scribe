@@ -528,6 +528,16 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                     }
                 });
 
+                if (isNonEmbedLike(this.pdfViewer) && this.component) {
+                    const requestSavePDFViewState = debounce(() => {
+                        app.workspace.requestSaveLayout();
+                    }, 1000);
+
+                    lib.registerPDFEvent('pagechanging', this.pdfViewer.eventBus, this.component, requestSavePDFViewState);
+                    lib.registerPDFEvent('scalechanging', this.pdfViewer.eventBus, this.component, requestSavePDFViewState);
+                    lib.registerPDFEvent('pagesloaded', this.pdfViewer.eventBus, this.component, requestSavePDFViewState);
+                }
+
                 // For https://github.com/RyotaUshio/obsidian-view-sync
                 if (isNonEmbedLike(this.pdfViewer)) {
                     lib.registerPDFEvent(
