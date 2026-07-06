@@ -29,6 +29,18 @@ export function isExtendedPaneType(arg: string): arg is ExtendedPaneType {
     return ['', 'tab', 'window'].contains(arg) || isFineGrainedSplitDirection(arg) || isSidebarType(arg);
 }
 
+type HoverEditorPlugin = {
+    settings?: {
+        triggerDelay?: number;
+    };
+    activePopovers?: HoverEditorPopover[];
+};
+
+type HoverEditorPopover = {
+    hoverEl: HTMLElement;
+    toggleMinimized(): void;
+    hide(): void;
+};
 
 export class WorkspaceLib extends PDFPlusLibSubmodule {
     hoverEditor: HoverEditorLib;
@@ -522,12 +534,13 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
  */
 class HoverEditorLib extends PDFPlusLibSubmodule {
 
-    get hoverEditorPlugin() {
-        return this.app.plugins.plugins['obsidian-hover-editor'] ?? null;
+    get hoverEditorPlugin(): HoverEditorPlugin | null {
+        return (this.app.plugins.plugins['obsidian-hover-editor'] as unknown as HoverEditorPlugin | undefined) ?? null;
     }
 
-    get waitTime() {
-        return this.hoverEditorPlugin?.settings?.triggerDelay;
+    get waitTime(): number | undefined {
+        const triggerDelay = this.hoverEditorPlugin?.settings?.triggerDelay;
+        return typeof triggerDelay === 'number' ? triggerDelay : undefined;
     }
 
     isHoverEditorLeaf(leaf: WorkspaceLeaf): boolean {
@@ -560,9 +573,9 @@ class HoverEditorLib extends PDFPlusLibSubmodule {
         });
     }
 
-    getHoverEditorForLeaf(leaf: WorkspaceLeaf) {
+    getHoverEditorForLeaf(leaf: WorkspaceLeaf): HoverEditorPopover | null {
         return this.hoverEditorPlugin?.activePopovers
-            .find((popover) => popover.hoverEl.contains(leaf.containerEl)) ?? null;
+            ?.find((popover) => popover.hoverEl.contains(leaf.containerEl)) ?? null;
     }
 
     postProcessHoverEditorLeaf(leaf: WorkspaceLeaf): void {

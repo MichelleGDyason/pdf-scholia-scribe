@@ -1779,7 +1779,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 						});
 				})
 				.then((setting) => {
-					setting.controlEl.prepend(createEl('span', { text: displayName }));
+					setting.controlEl.prepend(createSpan({ text: displayName }));
 					setting.settingEl.addClasses(['no-border', 'ignore-split-setting']);
 				});
 		}

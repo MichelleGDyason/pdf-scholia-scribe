@@ -33,6 +33,18 @@ Scholia is the broader research-library project around this plugin. Where PDF Sc
 
 PDF Scholia Scribe is maintained by [Michelle G Dyason](https://github.com/MichelleGDyason). It is a fork of [PDF++](https://github.com/RyotaUshio/obsidian-pdf-plus), with extra tools for quieter scholarly notes, citation-like PDF links, Zotero-backed citations, date-only citations, labelled callouts, and reference-list generation.
 
+## Review and safety disclosures
+
+PDF Scholia Scribe is a maintained fork of PDF++, and a large part of the inherited PDF viewer integration is still based on PDF++ compatibility code. The compatibility layer lives mainly in `src/patchers/` and `src/typings.d.ts`; it touches Obsidian PDF viewer and PDF.js surfaces that are not all covered by stable public APIs. Those paths are guarded defensively, but PDF viewer internals can change between Obsidian releases.
+
+Zotero support is local-first. When you use Zotero citation search or reference-list generation, the plugin may query the Zotero local API at the configured base URL, which defaults to `http://127.0.0.1:23119`. It uses Obsidian's `requestUrl` first, and on desktop can fall back to a local Node HTTP request to the same localhost endpoint if the browser-style request path cannot reach Zotero. It does not contact Zotero cloud by default.
+
+The citation workflow also reads vault Markdown notes to match source metadata, citation keys, Zotero item keys, and PDF quote links. Copy, paste, outline-copy, citation, debug export, and debug import commands can write to or read from the system clipboard when the user explicitly invokes those actions.
+
+PDF editing features are optional. If enabled, commands such as writing highlights or links into a PDF, changing annotation colors, deleting annotations, inserting pages, deleting pages, or extracting pages can modify PDF files in the vault. Keep backups of important PDFs before using direct PDF-writing features, especially with heavily annotated files from other PDF apps.
+
+The manifest is not marked desktop-only because the core PDF link, highlight, and copy workflows are intended to run on mobile too. Desktop-only behavior is guarded in code: opening PDFs with the operating-system default app, Electron file dialogs or file-path access, direct filesystem adapter cleanup, and the Zotero local Node fallback are disabled or skipped outside the desktop app.
+
 ## About PDF Scholia Scribe
 
 PDF Scholia Scribe starts from the central PDF++ idea: a Markdown link to a PDF selection can become a highlight in the PDF viewer. That is useful because the note remains ordinary Markdown, while the PDF still shows where the quoted passage came from.
@@ -86,11 +98,10 @@ PDF++ stands out among other PDF annotation tools for the following reasons:
 
 > [!note]
 > - Some features require the [Style Settings](https://github.com/mgmeyers/obsidian-style-settings) plugin enabled.
-> - In the near future, you will need Obsidian v1.6.5 or higher to receive updates from PDF++. Otherwise, you will be stuck at the last PDF++ version that supported older versions of Obsidian.
 > - If you're an Android user and have trouble with PDF++, first try updating [Android System WebView](https://play.google.com/store/apps/details?id=com.google.android.webview&hl=en) (if you are on Android 7-9, update [Chrome](https://play.google.com/store/apps/details?id=com.android.chrome&hl=en) instead).
 
 > [!warning]
-> This plugin relies on many private APIs of Obsidian, so **there is a relatively high risk that this plugin may break when Obsidian is updated** ([learn more](https://github.com/RyotaUshio/obsidian-pdf-plus/discussions/48)). For this reason, I hope this plugin's functionalities will be natively supported by Obsidian itself so that we won't need this plugin anymore.
+> This plugin retains PDF++'s private PDF viewer compatibility layer, so there is still a risk that some PDF-viewer features may break when Obsidian changes its built-in PDF internals ([background](https://github.com/RyotaUshio/obsidian-pdf-plus/discussions/48)).
 
 ## Getting started
 
@@ -458,7 +469,7 @@ Fortunately, it seems to be compatible with PDF++, meaning you can use features 
 
 When approved, you will be able to install this plugin from within Obsidian's community plugin browser.
 
-Alternatively, you can try the cutting-edge, latest beta release using [BRAT](https://github.com/TfTHacker/obsidian42-brat).
+Alternatively, you can install the current GitHub release directly from this repository using [BRAT](https://github.com/TfTHacker/obsidian42-brat).
 
 1. Install the latest version of BRAT and enable it.
 2. _(Optional but highly recommended)_ In the BRAT settings, turn on `Auto-update plugins at startup` at the top of the page.
