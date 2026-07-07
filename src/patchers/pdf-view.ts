@@ -2,9 +2,60 @@ import { TFile, ViewStateResult } from 'obsidian';
 import { around } from 'monkey-around';
 
 import PDFPlus from 'main';
-import { PDFView } from 'typings';
+import { PDFView, PDFViewState } from 'typings';
 import { patchPDFInternals } from './pdf-internals';
 
+const RESTORE_PDF_VIEW_STATE_DELAYS = [0, 250, 1000] as const;
+
+const clonePDFViewState = (state: PDFViewState): PDFViewState => ({ ...state });
+
+const capturePDFViewStatesForInternalsPatch = (plugin: PDFPlus) => {
+    if (plugin.patchStatus.pdfInternals) return;
+
+    plugin.lib.workspace.iteratePDFViews((view) => {
+        const state = view.getState();
+        if (
+            typeof state.file === 'string'
+            && typeof state.page === 'number'
+            && !plugin.pdfViewStatesWhenPatched.has(view.leaf)
+        ) {
+            plugin.pdfViewStatesWhenPatched.set(view.leaf, clonePDFViewState(state));
+        }
+    });
+};
+
+const restorePDFViewState = (plugin: PDFPlus, view: PDFView, state: PDFViewState) => {
+    if (typeof state.page !== 'number') return;
+
+    const applyState = () => {
+        const pdfViewer = view.viewer.child?.pdfViewer?.pdfViewer;
+        if (pdfViewer) {
+            plugin.lib.applyPDFViewStateToViewer(pdfViewer, state);
+        }
+    };
+
+    view.viewer.then((child) => {
+        const pdfViewer = child.pdfViewer?.pdfViewer;
+        if (!pdfViewer) return;
+
+        plugin.lib.applyPDFViewStateToViewer(pdfViewer, state);
+
+        if (!pdfViewer.pagesCount) {
+            plugin.lib.registerPDFEvent('pagesloaded', pdfViewer.eventBus, null, () => {
+                const currentPDFViewer = child.pdfViewer?.pdfViewer;
+                if (currentPDFViewer) {
+                    plugin.lib.applyPDFViewStateToViewer(currentPDFViewer, state);
+                }
+            });
+        }
+
+        RESTORE_PDF_VIEW_STATE_DELAYS.forEach((delay) => {
+            activeWindow.setTimeout(applyState, delay);
+        });
+    });
+
+    applyState();
+};
 
 export const patchPDFView = (plugin: PDFPlus): boolean => {
     if (plugin.patchStatus.pdfView && plugin.patchStatus.pdfInternals) return true;
@@ -13,6 +64,8 @@ export const patchPDFView = (plugin: PDFPlus): boolean => {
 
     const pdfView = lib.getPDFView();
     if (!pdfView) return false;
+
+    capturePDFViewStatesForInternalsPatch(plugin);
 
     if (!plugin.patchStatus.pdfView) {
         plugin.register(around(pdfView.constructor.prototype, {
@@ -36,19 +89,17 @@ export const patchPDFView = (plugin: PDFPlus): boolean => {
                 };
             },
             setState(old) {
-                return function (state: any, result: ViewStateResult): Promise<void> {
+                return function (state: PDFViewState, result: ViewStateResult): Promise<void> {
+                    const self = this as PDFView;
+                    const stateToRestore = clonePDFViewState(state);
+                    if (!plugin.patchStatus.pdfInternals) {
+                        plugin.pdfViewStatesWhenPatched.set(self.leaf, stateToRestore);
+                    }
                     if (plugin.settings.alwaysRecordHistory) {
                         result.history = true;
                     }
                     return old.call(this, state, result).then(() => {
-                        const self = this as PDFView;
-                        const child = self.viewer.child;
-                        const pdfViewer = child?.pdfViewer?.pdfViewer;
-                        if (typeof state.page === 'number') {
-                            if (pdfViewer) {
-                                lib.applyPDFViewStateToViewer(pdfViewer, state);
-                            }
-                        }
+                        restorePDFViewState(plugin, self, stateToRestore);
                     });
                 };
             },

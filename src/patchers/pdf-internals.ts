@@ -71,6 +71,12 @@ const getSubpathForPDFViewReload = (plugin: PDFPlus, view: PDFView): string | un
         return pendingSubpath;
     }
 
+    const pendingState = plugin.pdfViewStatesWhenPatched.get(view.leaf);
+    if (pendingState) {
+        plugin.pdfViewStatesWhenPatched.delete(view.leaf);
+        return plugin.lib.viewStateToSubpath(pendingState) ?? `#page=${pendingState.page}`;
+    }
+
     const state = view.getState();
     return plugin.lib.viewStateToSubpath(state) ?? (typeof state.page === 'number' ? `#page=${state.page}` : plugin.subpathWhenPatched);
 };
@@ -545,12 +551,14 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                         this.pdfViewer.eventBus,
                         this.component,
                         debounce(({ pageNumber }) => {
-                            if (plugin.settings.viewSyncFollowPageNumber) {
-                                const view = lib.workspace.getActivePDFView();
-                                if (view && view.viewer.child === this) {
-                                    const override = { state: { file: this.file!.path, page: pageNumber } };
-                                    app.workspace.trigger('view-sync:state-change', view, override);
-                                }
+                            if (!plugin.settings.viewSyncFollowPageNumber || !app.plugins.plugins['obsidian-view-sync']) {
+                                return;
+                            }
+
+                            const view = lib.workspace.getActivePDFView();
+                            if (view && view.viewer.child === this) {
+                                const override = { state: { file: this.file!.path, page: pageNumber } };
+                                app.workspace.trigger('view-sync:state-change', view, override);
                             }
                         }, plugin.settings.viewSyncPageDebounceInterval * 1000)
                     );

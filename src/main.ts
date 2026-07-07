@@ -1,4 +1,4 @@
-import { Constructor, EventRef, Events, FileSystemAdapter, Keymap, Menu, Notice, ObsidianProtocolData, PaneType, Platform, Plugin, SettingTab, TFile, Workspace, WorkspaceLeaf, addIcon, apiVersion, loadPdfJs, requireApiVersion } from 'obsidian';
+import { Constructor, EventRef, Events, FileSystemAdapter, Keymap, Menu, Notice, ObsidianProtocolData, PaneType, Platform, Plugin, SettingTab, TFile, Workspace, WorkspaceLeaf, addIcon, apiVersion, loadPdfJs, normalizePath, requireApiVersion } from 'obsidian';
 import * as pdflib from '@cantoo/pdf-lib';
 
 import { patchPDFView, patchPDFInternals, patchBacklink, patchWorkspace, patchPagePreview, patchPDFInternalFromPDFEmbed, patchMenu } from 'patchers';
@@ -9,7 +9,7 @@ import { DomManager } from 'dom-manager';
 import { PDFCroppedEmbed } from 'pdf-cropped-embed';
 import { DEFAULT_SETTINGS, NamedTemplate, PDFPlusSettings, PDFPlusSettingTab } from 'settings';
 import { subpathToParams, OverloadParameters, focusObsidian, isTargetHTMLElement, KeysOfType } from 'utils';
-import { DestArray, PDFEmbed, PDFView, PDFViewerChild, PDFViewerComponent, Rect } from 'typings';
+import { DestArray, PDFEmbed, PDFView, PDFViewerChild, PDFViewerComponent, PDFViewState, Rect } from 'typings';
 import { InstallerVersionModal } from 'modals';
 import { PDFExternalLinkPostProcessor, PDFInternalLinkPostProcessor, PDFOutlineItemPostProcessor, PDFThumbnailItemPostProcessor } from 'post-process';
 import { BibliographyManager } from 'bib';
@@ -18,6 +18,28 @@ import { DataviewInlineFieldsModal, withFilesWithInlineFields } from 'lib/datavi
 
 type WorkspaceWithProtocolUnregister = Workspace & {
 	unregisterObsidianProtocolHandler?: (action: string) => void;
+};
+
+type WorkspaceLayoutNode = {
+	state?: {
+		type?: string;
+		state?: Partial<PDFViewState>;
+	};
+	children?: WorkspaceLayoutNode[];
+};
+
+const isSavedPDFViewState = (state: Partial<PDFViewState> | undefined): state is PDFViewState => {
+	return typeof state?.file === 'string' && typeof state.page === 'number';
+};
+
+const collectPDFViewStates = (node: WorkspaceLayoutNode | undefined, states: PDFViewState[]) => {
+	if (!node) return;
+
+	if (node.state?.type === 'pdf' && isSavedPDFViewState(node.state.state)) {
+		states.push({ ...node.state.state });
+	}
+
+	node.children?.forEach((child) => collectPDFViewStates(child, states));
 };
 
 export default class PDFPlus extends Plugin {
@@ -59,6 +81,9 @@ export default class PDFPlus extends Plugin {
 	subpathWhenPatched?: string;
 	/** Same as `subpathWhenPatched`, but scoped to the leaf that triggered delayed PDF internals patching. */
 	subpathsWhenPatched: WeakMap<WorkspaceLeaf, string> = new WeakMap();
+	/** Per-leaf PDF view states captured before the PDF internals patch reloads existing viewers. */
+	pdfViewStatesWhenPatched: WeakMap<WorkspaceLeaf, PDFViewState> = new WeakMap();
+	private savedPDFViewStatesByFilePath: Map<string, PDFViewState[]> = new Map();
 	classes: {
 		PDFView?: Constructor<PDFView>;
 		PDFViewerComponent?: Constructor<PDFViewerComponent>;
@@ -104,6 +129,7 @@ export default class PDFPlus extends Plugin {
 
 		await this.loadSettings();
 		await this.saveSettings();
+		await this.captureSavedWorkspacePDFViewStates();
 
 		this.domManager = this.addChild(new DomManager(this));
 		this.domManager.registerCalloutRenderer();
@@ -228,6 +254,8 @@ export default class PDFPlus extends Plugin {
 
 		/** migration from legacy settings */
 
+		this.migrateIndependentSplitPDFPaneSettings();
+
 		if (this.settings.paneTypeForFirstMDLeaf as PaneType | '' === 'split') {
 			this.settings.paneTypeForFirstMDLeaf = 'right';
 		}
@@ -280,6 +308,14 @@ export default class PDFPlus extends Plugin {
 		this.renameSetting('removeWhitespaceBetweenCJKChars', 'removeWhitespaceBetweenCJChars');
 
 		this.loadContextMenuConfig();
+	}
+
+	private migrateIndependentSplitPDFPaneSettings() {
+		if (!this.settings.migratedIndependentSplitPDFPanesV2) {
+			this.settings.singleTabForSinglePDF = false;
+			this.settings.viewSyncFollowPageNumber = false;
+			this.settings.migratedIndependentSplitPDFPanesV2 = true;
+		}
 	}
 
 	private renameSetting(oldId: string, newId: keyof PDFPlusSettings) {
@@ -546,6 +582,52 @@ export default class PDFPlus extends Plugin {
 		await this.saveData(settings);
 	}
 
+	private async captureSavedWorkspacePDFViewStates() {
+		const workspacePath = normalizePath(`${this.app.vault.configDir}/workspace.json`);
+
+		try {
+			const workspaceJSON = await this.app.vault.adapter.read(workspacePath);
+			const workspace = JSON.parse(workspaceJSON) as {
+				main?: WorkspaceLayoutNode;
+				left?: WorkspaceLayoutNode;
+				right?: WorkspaceLayoutNode;
+				floating?: WorkspaceLayoutNode[];
+			};
+
+			const states: PDFViewState[] = [];
+			collectPDFViewStates(workspace.main, states);
+			collectPDFViewStates(workspace.left, states);
+			collectPDFViewStates(workspace.right, states);
+			workspace.floating?.forEach((node) => collectPDFViewStates(node, states));
+
+			const statesByFilePath = new Map<string, PDFViewState[]>();
+			states.forEach((state) => {
+				const fileStates = statesByFilePath.get(state.file) ?? [];
+				fileStates.push(state);
+				statesByFilePath.set(state.file, fileStates);
+			});
+
+			this.savedPDFViewStatesByFilePath = statesByFilePath;
+		} catch (err) {
+			console.warn(`${this.manifest.name}: Failed to read saved PDF workspace state.`, err);
+		}
+	}
+
+	private seedSavedWorkspacePDFViewStates() {
+		if (this.savedPDFViewStatesByFilePath.size === 0) return;
+
+		this.app.workspace.iterateAllLeaves((leaf) => {
+			if (leaf.view.getViewType() !== 'pdf') return;
+
+			const filePath = this.lib.workspace.getFilePathFromView(leaf.view);
+			const states = filePath ? this.savedPDFViewStatesByFilePath.get(filePath) : undefined;
+			const state = states?.shift();
+			if (state) {
+				this.pdfViewStatesWhenPatched.set(leaf, { ...state });
+			}
+		});
+	}
+
 	loadLocalStorage(key: string) {
 		return this.app.loadLocalStorage(this.manifest.id + '-' + key);
 	}
@@ -671,6 +753,9 @@ export default class PDFPlus extends Plugin {
 	}
 
 	private patchObsidian() {
+		this.app.workspace.onLayoutReady(() => {
+			this.seedSavedWorkspacePDFViewStates();
+		});
 		this.app.workspace.onLayoutReady(() => {
 			patchWorkspace(this);
 			patchPagePreview(this);

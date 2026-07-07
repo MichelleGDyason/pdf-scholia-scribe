@@ -4,6 +4,12 @@ import { around } from 'monkey-around';
 import PDFPlus from 'main';
 import { focusObsidian } from 'utils';
 
+const isPDFPageInputActive = () => {
+    const activeEl = activeDocument.activeElement;
+    return activeEl instanceof HTMLInputElement
+        && activeEl.hasClass('pdf-page-input')
+        && activeEl.closest('.pdf-toolbar') !== null;
+};
 
 export const patchWorkspace = (plugin: PDFPlus) => {
     const app = plugin.app;
@@ -12,6 +18,10 @@ export const patchWorkspace = (plugin: PDFPlus) => {
     plugin.register(around(Workspace.prototype, {
         openLinkText(old) {
             return function (linktext: string, sourcePath: string, newLeaf?: PaneType | boolean, openViewState?: OpenViewState) {
+                if (isPDFPageInputActive()) {
+                    return old.call(this, linktext, sourcePath, newLeaf, openViewState);
+                }
+
                 if ((plugin.settings.openPDFWithDefaultApp || plugin.settings.singleTabForSinglePDF || plugin.settings.openLinkNextToExistingPDFTab || plugin.settings.paneTypeForFirstPDFLeaf) && !newLeaf) { // respect `newLeaf` when it's not `false`
                     const { path } = parseLinktext(linktext);
                     const file = app.metadataCache.getFirstLinkpathDest(path, sourcePath);

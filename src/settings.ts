@@ -243,6 +243,7 @@ export interface PDFPlusSettings {
 	autoPasteIconName: string;
 	viewSyncFollowPageNumber: boolean;
 	viewSyncPageDebounceInterval: number;
+	migratedIndependentSplitPDFPanesV2: boolean;
 	openAfterExtractPages: boolean;
 	howToOpenExtractedPDF: ExtendedPaneType;
 	warnEveryPageDelete: boolean;
@@ -567,6 +568,7 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 	autoPasteIconName: 'clipboard-paste',
 	viewSyncFollowPageNumber: false,
 	viewSyncPageDebounceInterval: 0.3,
+	migratedIndependentSplitPDFPanesV2: false,
 	openAfterExtractPages: true,
 	howToOpenExtractedPDF: 'tab',
 	warnEveryPageDelete: false,
