@@ -6,6 +6,13 @@ import PDFPlus from 'main';
 import { DestArray, PDFOutlineTreeNode } from 'typings';
 import { PDFNamedDestinations } from './destinations';
 
+const normalizeOutlineTitle = (title: string) => title.trim().replace(/\s+/g, ' ');
+
+const stringifyDestination = (dest: string | DestArray | null) => {
+    if (typeof dest === 'string') return `named:${dest}`;
+    if (dest) return `explicit:${JSON.stringify(dest)}`;
+    return 'none';
+};
 
 export class PDFOutlines {
     plugin: PDFPlus;
@@ -112,8 +119,9 @@ export class PDFOutlines {
             // this operatation must be done in the "leave" phase, not in the "enter" phase
             leave: async (item) => {
                 if (await item.destNotExistInDoc()) {
+                    const parent = item.parent;
                     item.removeAndLiftUpChildren();
-                    item.updateCountForAllAncestors();
+                    parent?.updateCountForAllAncestors(true);
                 }
             }
         });
@@ -133,30 +141,97 @@ export class PDFOutlines {
 
     /** Iterate over the outline items and find the matching one from the tree. */
     async findPDFjsOutlineTreeNode(node: PDFOutlineTreeNode): Promise<PDFOutlineItem | null> {
-        let found: PDFOutlineItem | null = null;
+        const itemFromPath = await this.findPDFjsOutlineTreeNodeByPath(node);
+        if (itemFromPath && await this.matchesPDFjsOutlineTreeNode(itemFromPath, node)) {
+            return itemFromPath;
+        }
 
+        const matches = await this.findMatchingPDFjsOutlineTreeNodes(node);
+        return matches[0] ?? null;
+    }
+
+    async findPDFjsOutlineTreeNodeByPath(node: PDFOutlineTreeNode): Promise<PDFOutlineItem | null> {
+        const path = this.getPDFjsOutlineTreeNodePath(node);
+        if (!path) return null;
+
+        let item = this.root;
+        for (const index of path) {
+            if (!item) return null;
+            item = item.getChildAtIndex(index);
+        }
+
+        return item;
+    }
+
+    getPDFjsOutlineTreeNodePath(node: PDFOutlineTreeNode): number[] | null {
+        const path: number[] = [];
+        let current: PDFOutlineTreeNode | null = node;
+
+        while (current) {
+            const siblings = current.parent?.children ?? current.owner.children;
+            const index = siblings.indexOf(current);
+            if (index < 0) return null;
+            path.unshift(index);
+            current = current.parent;
+        }
+
+        return path;
+    }
+
+    async findMatchingPDFjsOutlineTreeNodes(node: PDFOutlineTreeNode): Promise<PDFOutlineItem[]> {
+        const matches: PDFOutlineItem[] = [];
         await this.iterAsync({
             enter: async (outlineItem) => {
-                if (found || outlineItem.isRoot()) return;
-
-                if (node.item.title === outlineItem.title) {
-                    const dest = node.item.dest;
-                    const outlineDest = outlineItem.getNormalizedDestination();
-                    if (typeof dest === 'string') {
-                        if (typeof outlineDest === 'string' && dest === outlineDest) {
-                            found = outlineItem;
-                        }
-                    } else {
-                        const pageNumber = await node.getPageNumber();
-                        if (JSON.stringify(this.lib.normalizePDFJsDestArray(dest, pageNumber)) === JSON.stringify(outlineDest)) {
-                            found = outlineItem;
-                        }
-                    }
+                if (await this.matchesPDFjsOutlineTreeNode(outlineItem, node)) {
+                    matches.push(outlineItem);
                 }
             }
         });
 
-        return found;
+        return matches;
+    }
+
+    async matchesPDFjsOutlineTreeNode(outlineItem: PDFOutlineItem, node: PDFOutlineTreeNode): Promise<boolean> {
+        if (outlineItem.isRoot()) return false;
+        if (normalizeOutlineTitle(node.item.title) !== normalizeOutlineTitle(outlineItem.title)) return false;
+
+        const dest = node.item.dest;
+        const outlineDest = outlineItem.getNormalizedDestination();
+        if (typeof dest === 'string') {
+            return typeof outlineDest === 'string' && dest === outlineDest;
+        }
+
+        const pageNumber = await node.getPageNumber();
+        const normalizedPDFjsDest = this.lib.normalizePDFJsDestArray(dest, pageNumber);
+        const normalizedOutlineDest = outlineItem.getExplicitDestination() ?? outlineDest;
+        return JSON.stringify(normalizedPDFjsDest) === JSON.stringify(normalizedOutlineDest);
+    }
+
+    removeDuplicateOutlineEntries(): number {
+        const seen = new Set<string>();
+        const duplicates: PDFOutlineItem[] = [];
+
+        this.iter({
+            enter: (item) => {
+                const key = item.getDuplicateKey();
+                if (!key) return;
+
+                if (seen.has(key)) {
+                    duplicates.push(item);
+                    return;
+                }
+
+                seen.add(key);
+            }
+        });
+
+        for (const item of duplicates) {
+            const parent = item.parent;
+            item.remove();
+            parent?.updateCountForAllAncestors(true);
+        }
+
+        return duplicates.length;
     }
 
     static async processOutlineRoot(process: (root: PDFOutlineItem) => void | Promise<void>, file: TFile, plugin: PDFPlus) {
@@ -187,6 +262,20 @@ export class PDFOutlines {
         // Save the modified PDF document
         const buffer = await outlines.doc.save();
         await app.vault.modifyBinary(file, buffer);
+    }
+
+    static async removeDuplicateOutlineEntries(file: TFile, plugin: PDFPlus): Promise<number> {
+        const { app } = plugin;
+
+        const outlines = await PDFOutlines.fromFile(file, plugin);
+        const removedCount = outlines.removeDuplicateOutlineEntries();
+
+        if (removedCount > 0) {
+            const buffer = await outlines.doc.save();
+            await app.vault.modifyBinary(file, buffer);
+        }
+
+        return removedCount;
     }
 }
 
@@ -394,8 +483,9 @@ export class PDFOutlineItem {
     appendChild(child: PDFOutlineItem) {
         if (child.isAncestorOf(this, true)) throw new Error('Cannot append an ancestor as a child');
 
+        const oldParent = child.parent;
         child.remove();
-        child.updateCountForAllAncestors();
+        oldParent?.updateCountForAllAncestors(true);
 
         child.parent = this;
         if (this.lastChild) {
@@ -414,52 +504,74 @@ export class PDFOutlineItem {
     }
 
     remove() {
-        if (this.prevSibling) {
-            this.prevSibling.nextSibling = this.nextSibling;
+        const parent = this.parent;
+        const prevSibling = this.prevSibling;
+        const nextSibling = this.nextSibling;
+
+        if (prevSibling) {
+            prevSibling.nextSibling = nextSibling;
         }
-        if (this.nextSibling) {
-            this.nextSibling.prevSibling = this.prevSibling;
+        if (nextSibling) {
+            nextSibling.prevSibling = prevSibling;
         }
-        if (this.parent) {
-            if (this.is(this.parent.firstChild)) {
-                this.parent.firstChild = this.nextSibling;
+        if (parent) {
+            if (this.is(parent.firstChild)) {
+                parent.firstChild = nextSibling;
             }
-            if (this.is(this.parent.lastChild)) {
-                this.parent.lastChild = this.prevSibling;
+            if (this.is(parent.lastChild)) {
+                parent.lastChild = prevSibling;
             }
         }
+
+        this.parent = null;
+        this.prevSibling = null;
+        this.nextSibling = null;
 
         return this;
     }
 
     removeAndLiftUpChildren() {
+        const parent = this.parent;
+        const prevSibling = this.prevSibling;
+        const nextSibling = this.nextSibling;
+        const firstChild = this.firstChild;
+        const lastChild = this.lastChild;
+
         this.remove();
 
-        if (this.firstChild) {
-            if (!this.lastChild) {
+        if (firstChild) {
+            if (!lastChild) {
                 throw new Error('Last child is not set despite having children');
             }
 
             this.iterChildren((child) => {
-                child.parent = this.parent;
+                child.parent = parent;
             });
 
-            if (this.prevSibling) {
-                this.prevSibling.nextSibling = this.firstChild;
-                this.firstChild.prevSibling = this.prevSibling;
-            } else if (this.parent) {
-                this.parent.firstChild = this.firstChild;
-                this.firstChild.prevSibling = null;
+            if (prevSibling) {
+                prevSibling.nextSibling = firstChild;
+                firstChild.prevSibling = prevSibling;
+            } else if (parent) {
+                parent.firstChild = firstChild;
+                firstChild.prevSibling = null;
             }
 
-            if (this.nextSibling) {
-                this.nextSibling.prevSibling = this.lastChild;
-                this.lastChild.nextSibling = this.nextSibling;
-            } else if (this.parent) {
-                this.parent.lastChild = this.lastChild;
-                this.lastChild.nextSibling = null;
+            if (nextSibling) {
+                nextSibling.prevSibling = lastChild;
+                lastChild.nextSibling = nextSibling;
+            } else if (parent) {
+                parent.lastChild = lastChild;
+                lastChild.nextSibling = null;
             }
         }
+    }
+
+    getChildAtIndex(index: number): PDFOutlineItem | null {
+        let current = this.firstChild;
+        for (let i = 0; i < index; i++) {
+            current = current?.nextSibling ?? null;
+        }
+        return current;
     }
 
     iterChildren(fn: (item: PDFOutlineItem) => any) {
@@ -645,5 +757,12 @@ export class PDFOutlineItem {
             return null;
         }
         return dest;
+    }
+
+    getDuplicateKey(): string | null {
+        if (this.isRoot()) return null;
+
+        const destination = this.getExplicitDestination() ?? this.getNormalizedDestination();
+        return `${normalizeOutlineTitle(this.title)}\u0000${stringifyDestination(destination)}`;
     }
 }

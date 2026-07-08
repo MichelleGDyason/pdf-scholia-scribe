@@ -166,6 +166,10 @@ export class PDFPlusCommands extends PDFPlusLibSubmodule {
                 name: 'Add to outline (bookmark)',
                 checkCallback: (checking) => this.addOutlineItem(checking)
             }, {
+                id: 'remove-duplicate-outline-entries',
+                name: 'Remove duplicate outline entries',
+                checkCallback: (checking) => this.removeDuplicateOutlineEntries(checking)
+            }, {
                 id: 'create-new-note',
                 name: 'Create new note for auto-focus or auto-paste',
                 callback: () => this.createNewNote()
@@ -879,6 +883,32 @@ export class PDFPlusCommands extends PDFPlusLibSubmodule {
 
                     await this.app.vault.modifyBinary(file, await doc.save());
                 });
+        }
+
+        return true;
+    }
+
+    removeDuplicateOutlineEntries(checking: boolean) {
+        const view = this.lib.workspace.getActivePDFView();
+        const file = view?.file;
+        const child = view?.viewer.child;
+        if (!view || !file || !child) return false;
+        if (!this.lib.isEditable(child)) return false;
+
+        if (!checking) {
+            void (async () => {
+                try {
+                    const removedCount = await PDFOutlines.removeDuplicateOutlineEntries(file, this.plugin);
+                    if (removedCount > 0) {
+                        new Notice(`${this.plugin.manifest.name}: Removed ${removedCount} duplicate outline ${removedCount === 1 ? 'entry' : 'entries'}.`);
+                    } else {
+                        new Notice(`${this.plugin.manifest.name}: No duplicate outline entries found.`);
+                    }
+                } catch (error) {
+                    console.error(`${this.plugin.manifest.name}: Failed to remove duplicate outline entries.`, error);
+                    new Notice(`${this.plugin.manifest.name}: Could not remove duplicate outline entries. Check the developer console for details.`);
+                }
+            })().catch(console.error);
         }
 
         return true;

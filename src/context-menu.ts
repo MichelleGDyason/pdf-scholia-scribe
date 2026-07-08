@@ -71,6 +71,21 @@ function showPDFOutlineAddError(plugin: PDFPlus, file: TFile, error: unknown): v
     new Notice(`${plugin.manifest.name}: Could not add to PDF outline. Check the developer console for details.`);
 }
 
+async function removeDuplicateOutlineEntries(plugin: PDFPlus, file: TFile): Promise<void> {
+    try {
+        const removedCount = await PDFOutlines.removeDuplicateOutlineEntries(file, plugin);
+        if (removedCount > 0) {
+            new Notice(`${plugin.manifest.name}: Removed ${removedCount} duplicate outline ${removedCount === 1 ? 'entry' : 'entries'}.`);
+            return;
+        }
+
+        new Notice(`${plugin.manifest.name}: No duplicate outline entries found.`);
+    } catch (error) {
+        console.error(`${plugin.manifest.name}: Failed to remove duplicate outline entries.`, error);
+        new Notice(`${plugin.manifest.name}: Could not remove duplicate outline entries. Check the developer console for details.`);
+    }
+}
+
 export const onThumbnailContextMenu = (plugin: PDFPlus, child: PDFViewerChild, evt: MouseEvent): void => {
     const { lib } = plugin;
 
@@ -279,12 +294,21 @@ export const onOutlineItemContextMenu = (plugin: PDFPlus, child: PDFViewerChild,
                     .setIcon('lucide-trash')
                     .onClick(() => {
                         void PDFOutlines.findAndProcessOutlineItem(item, (outlineItem) => {
+                            const parent = outlineItem.parent;
                             // Remove the found outline item from the tree
                             outlineItem.remove();
-                            outlineItem.updateCountForAllAncestors();
+                            parent?.updateCountForAllAncestors(true);
                         }, file, plugin).catch(console.error);
                     });
 
+            })
+            .addItem((menuItem) => {
+                menuItem
+                    .setTitle('Remove duplicate outline entries')
+                    .setIcon('lucide-list-x')
+                    .onClick(() => {
+                        void removeDuplicateOutlineEntries(plugin, file);
+                    });
             })
             .addItem((menuItem) => {
                 menuItem
