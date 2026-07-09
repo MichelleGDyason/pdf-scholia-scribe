@@ -2,8 +2,56 @@ import { MarkdownView, Platform } from 'obsidian';
 import { around } from 'monkey-around';
 
 import PDFPlus from 'main';
-import { ClipboardManager, DropEffect } from 'typings';
+import { asPatchedMethod, callPatchedMethod, type PatchedMethod } from 'lib/patch-utils';
+import { ClipboardManager, Draggable, DropEffect } from 'typings';
 
+/**
+ * Local shape for Obsidian's private `ClipboardManager.handleDragOver` method.
+ *
+ * Obsidian does not export this method contract directly, so the patcher keeps
+ * the assumed signature beside the prototype patch that depends on it. The
+ * current implementation receives a single drag event and returns nothing. If
+ * Obsidian changes the method arguments or return value, this alias and the
+ * forwarding call below should be updated together.
+ */
+type ClipboardDragOverMethod = PatchedMethod<ClipboardManager, [DragEvent], void>;
+
+/**
+ * Local shape for Obsidian's private `ClipboardManager.handleDrop` method.
+ *
+ * The public API does not expose this ClipboardManager internals contract, but
+ * the plugin must forward the original method for non-PDF drops. The current
+ * implementation receives one drag event and returns whether the drop was
+ * handled. If Obsidian changes that return convention, update this alias before
+ * changing the wrapper behavior.
+ */
+type ClipboardDropMethod = PatchedMethod<ClipboardManager, [DragEvent], boolean>;
+
+/**
+ * Plugin-specific drag payload that can render itself as Markdown text.
+ *
+ * Obsidian's base `Draggable` type cannot include this property because
+ * `getText` is attached by this plugin's PDF drag registration code. Keeping
+ * the interface local documents that this is PDF Scholia Scribe behavior layered
+ * on top of Obsidian's private drag manager contract.
+ */
+interface PDFPlusTextDraggable extends Draggable {
+    source: 'pdf-plus';
+    getText(sourcePath: string): unknown;
+}
+
+/**
+ * Narrows Obsidian's private drag payload to the plugin text-producing shape.
+ *
+ * The runtime check prevents a malformed or future PDF drag payload from
+ * reaching `draggable.getText(...)` when that method is absent. It replaces the
+ * previous `@ts-ignore` with an explicit guard and assumes valid plugin PDF
+ * drags continue to expose `source: "pdf-plus"` plus a `getText` function.
+ */
+const isPDFPlusTextDraggable = (draggable: Draggable): draggable is PDFPlusTextDraggable => {
+    const candidate: Draggable & { getText?: unknown } = draggable;
+    return candidate.source === 'pdf-plus' && typeof candidate.getText === 'function';
+};
 
 export const patchClipboardManager = (plugin: PDFPlus) => {
     const app = plugin.app;
@@ -29,10 +77,11 @@ export const patchClipboardManager = (plugin: PDFPlus) => {
          * > and no other handlers or built-in behavior will be activated for it.
          */
         handleDragOver(old) {
+            const original: ClipboardDragOverMethod = asPatchedMethod(old);
             return function (this: ClipboardManager, evt: DragEvent): void {
                 const draggable = app.dragManager.draggable;
                 if (!draggable || draggable.source !== 'pdf-plus') {
-                    return old.call(this, evt);
+                    return callPatchedMethod(original, this, [evt]);
                 }
 
                 if (Platform.isMacOS ? evt.shiftKey : evt.altKey) return;
@@ -45,11 +94,12 @@ export const patchClipboardManager = (plugin: PDFPlus) => {
             };
         },
         handleDrop(old) {
-            return function (this: ClipboardManager, evt: DragEvent): boolean | undefined {
+            const original: ClipboardDropMethod = asPatchedMethod(old);
+            return function (this: ClipboardManager, evt: DragEvent): boolean {
                 const draggable = app.dragManager.draggable;
 
                 if (!draggable || draggable.source !== 'pdf-plus') {
-                    return old.call(this, evt);
+                    return callPatchedMethod(original, this, [evt]);
                 }
 
                 // the instanceof check ensures that this.info has the handleDrop method
@@ -63,7 +113,8 @@ export const patchClipboardManager = (plugin: PDFPlus) => {
                 const editor = this.info.editor;
                 if (!editor) return false;
 
-                // @ts-ignore
+                if (!isPDFPlusTextDraggable(draggable)) return false;
+
                 const textToInsert = draggable.getText(this.getPath());
 
                 const offset = editor.cm.posAtCoords({ x: evt.clientX, y: evt.clientY }, false);
