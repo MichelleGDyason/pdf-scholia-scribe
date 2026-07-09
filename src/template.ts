@@ -24,12 +24,23 @@ type CitationInfo = {
     inText: (style?: string) => string;
 };
 
+type TemplateVariables = Record<string, unknown>;
+
 const IDENTIFIER_PATTERN = /^[A-Za-z_$][\w$]*$/;
+
+function stringifyScalar(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (typeof value !== 'object') return String(value);
+    if (value && typeof (value as { toString?: unknown }).toString === 'function') {
+        return (value as { toString(): string }).toString();
+    }
+    return Object.prototype.toString.call(value);
+}
 
 function stringifyTemplateValue(value: unknown): string {
     if (value === null || value === undefined) return '';
     if (Array.isArray(value)) return value.map((item): string => stringifyTemplateValue(item)).join(', ');
-    return String(value);
+    return stringifyScalar(value);
 }
 
 function splitTopLevel(expr: string, delimiter: string) {
@@ -144,7 +155,7 @@ function parseStringLiteral(expr: string) {
     });
 }
 
-function resolveTemplatePath(path: string, variables: Record<string, any>) {
+function resolveTemplatePath(path: string, variables: TemplateVariables) {
     const parts = path.split('.');
     if (!parts.every((part) => IDENTIFIER_PATTERN.test(part))) {
         throw new Error(`Unsupported template expression: ${path}`);
@@ -162,7 +173,11 @@ function isAllowedTemplateCall(path: string) {
     return /^(citation|cite)\.(format|inText)$/.test(path);
 }
 
-function evaluateTemplateExpression(expr: string, variables: Record<string, any>): unknown {
+function isTemplateFunction(value: unknown): value is (...args: unknown[]) => unknown {
+    return typeof value === 'function';
+}
+
+function evaluateTemplateExpression(expr: string, variables: TemplateVariables): unknown {
     expr = stripOuterParens(expr);
     if (!expr) return '';
 
@@ -196,7 +211,7 @@ function evaluateTemplateExpression(expr: string, variables: Record<string, any>
             throw new Error(`Unsupported template function: ${path}`);
         }
         const fn = resolveTemplatePath(path, variables);
-        if (typeof fn !== 'function') return '';
+        if (!isTemplateFunction(fn)) return '';
         const args = argSource.trim()
             ? splitTopLevel(argSource, ',').map((arg) => evaluateTemplateExpression(arg, variables))
             : [];
@@ -216,7 +231,7 @@ const FIRST_PRINTED_PAGE_KEYS = ['firstPrintedPage', 'first_printed_page', 'firs
 const FIRST_PRINTED_PDF_PAGE_KEYS = ['firstPrintedPdfPage', 'first_printed_pdf_page', 'pdfPageForFirstPrintedPage', 'pdf_page_for_first_printed_page', 'pdfPageStart', 'pdf_page_start'];
 const PAGE_ADJUSTMENT_KEYS = [...PAGE_OFFSET_KEYS, ...FIRST_PRINTED_PAGE_KEYS, ...FIRST_PRINTED_PDF_PAGE_KEYS];
 
-function findProperty(properties: Record<string, any>, keys: string[]) {
+function findProperty(properties: TemplateVariables, keys: string[]) {
     const normalizedKeys = keys.map((key) => key.toLowerCase());
     for (const [key, value] of Object.entries(properties)) {
         if (normalizedKeys.includes(key.toLowerCase())) return value;
@@ -224,7 +239,7 @@ function findProperty(properties: Record<string, any>, keys: string[]) {
     return undefined;
 }
 
-function findPropertyInSources(sources: Record<string, any>[], keys: string[]) {
+function findPropertyInSources(sources: TemplateVariables[], keys: string[]) {
     for (const properties of sources) {
         const value = findProperty(properties, keys);
         if (value !== undefined) return value;
@@ -242,7 +257,7 @@ function flattenPropertyValue(value: unknown): string[] {
     if (typeof value === 'object') {
         const record = value as Record<string, unknown>;
         if (typeof record.family === 'string' || typeof record.given === 'string') {
-            return [`${record.given ?? ''} ${record.family ?? ''}`.trim()].filter(Boolean);
+            return [`${stringifyTemplateValue(record.given)} ${stringifyTemplateValue(record.family)}`.trim()].filter(Boolean);
         }
         if (typeof record.display === 'string') return [record.display];
         if (typeof record.path === 'string') return [record.path];
@@ -250,7 +265,7 @@ function flattenPropertyValue(value: unknown): string[] {
         return Object.values(record).flatMap((item) => flattenPropertyValue(item));
     }
 
-    return [String(value)];
+    return [stringifyScalar(value)];
 }
 
 function stripLinkSyntax(value: string) {
@@ -306,7 +321,7 @@ function formatAuthorList(names: string[]) {
     return `${families[0]} et al.`;
 }
 
-function firstCleanProperty(sources: Record<string, any>[], keys: string[]) {
+function firstCleanProperty(sources: TemplateVariables[], keys: string[]) {
     const values = flattenPropertyValue(findPropertyInSources(sources, keys))
         .map((value) => cleanCitationText(value))
         .filter(Boolean);
@@ -318,7 +333,7 @@ function extractYearFromText(value: string) {
     return match?.[0] ?? '';
 }
 
-function extractYear(sources: Record<string, any>[]) {
+function extractYear(sources: TemplateVariables[]) {
     const values = flattenPropertyValue(findPropertyInSources(sources, YEAR_KEYS));
     for (const value of values) {
         const year = extractYearFromText(value);
@@ -327,7 +342,7 @@ function extractYear(sources: Record<string, any>[]) {
     return '';
 }
 
-function extractNumber(sources: Record<string, any>[]) {
+function extractNumber(sources: TemplateVariables[]) {
     const values = flattenPropertyValue(findPropertyInSources(sources, NUMBER_KEYS));
     for (const value of values) {
         const match = value.match(/\d+/);
@@ -341,7 +356,7 @@ function extractSignedInteger(value: string) {
     return match ? Number(match[0]) : null;
 }
 
-function firstIntegerProperty(sources: Record<string, any>[], keys: string[]) {
+function firstIntegerProperty(sources: TemplateVariables[], keys: string[]) {
     const values = flattenPropertyValue(findPropertyInSources(sources, keys));
     for (const value of values) {
         const integer = extractSignedInteger(value);
@@ -350,7 +365,7 @@ function firstIntegerProperty(sources: Record<string, any>[], keys: string[]) {
     return null;
 }
 
-function pickProperties(properties: Record<string, any>, keys: string[]) {
+function pickProperties(properties: TemplateVariables, keys: string[]) {
     const normalizedKeys = keys.map((key) => key.toLowerCase());
     return Object.fromEntries(
         Object.entries(properties).filter(([key]) => normalizedKeys.includes(key.toLowerCase()))
@@ -381,7 +396,7 @@ function extractAuthorFromCitationText(value: string) {
     return wordCount > 0 && wordCount <= 4 ? candidate : '';
 }
 
-function getCitationPage(sources: Record<string, any>[], pageLabel: string, rawPage: number) {
+function getCitationPage(sources: TemplateVariables[], pageLabel: string, rawPage: number) {
     const explicitOffset = firstIntegerProperty(sources, PAGE_OFFSET_KEYS);
     let offset = explicitOffset;
 
@@ -400,7 +415,7 @@ function getCitationPage(sources: Record<string, any>[], pageLabel: string, rawP
     return pageLabel;
 }
 
-function buildCitationInfo(sources: Record<string, any>[], file: TFile, pageLabel: string, rawPage: number): CitationInfo {
+function buildCitationInfo(sources: TemplateVariables[], file: TFile, pageLabel: string, rawPage: number): CitationInfo {
     const explicitShortCitation = firstCleanProperty(sources, SHORT_CITATION_KEYS);
     const fallbackCitationText = cleanCitationText(file.basename);
     const authors = flattenPropertyValue(findPropertyInSources(sources, AUTHOR_KEYS))
@@ -462,9 +477,9 @@ function buildCitationInfo(sources: Record<string, any>[], file: TFile, pageLabe
 
 
 export class TemplateProcessor {
-    constructor(public plugin: PDFPlus, public variables: Record<string, any>) { }
+    constructor(public plugin: PDFPlus, public variables: TemplateVariables) { }
 
-    setVariable(name: string, value: any) {
+    setVariable(name: string, value: unknown) {
         this.variables[name] = value;
     }
 
@@ -487,7 +502,7 @@ export class PDFPlusTemplateProcessor extends TemplateProcessor {
         pageLabel: string,
         pageCount: number,
         text: string,
-        [key: string]: any,
+        [key: string]: unknown,
     }) {
         const { app } = plugin;
 
@@ -559,7 +574,7 @@ export class PDFPlusTemplateProcessor extends TemplateProcessor {
     }
 
     getOpenMarkdownViewProperties(file: TFile) {
-        let properties: Record<string, any> = {};
+        let properties: TemplateVariables = {};
         this.app.workspace.iterateAllLeaves((leaf) => {
             const view = leaf.view;
             if (!(view instanceof MarkdownView) || view.file !== file) return;
@@ -576,7 +591,7 @@ export class PDFPlusTemplateProcessor extends TemplateProcessor {
         return properties;
     }
 
-    findPageAdjustmentProperties(pdf: TFile, sourceFiles: (TFile | null)[], sourceProperties: Record<string, any>[]) {
+    findPageAdjustmentProperties(pdf: TFile, sourceFiles: (TFile | null)[], sourceProperties: TemplateVariables[]) {
         const candidates = new Set<TFile>();
         const addCandidate = (file: TFile | null) => {
             if (file?.extension === 'md') candidates.add(file);
@@ -608,7 +623,7 @@ export class PDFPlusTemplateProcessor extends TemplateProcessor {
         return {};
     }
 
-    getCitationIdentity(sourceProperties: Record<string, any>[]) {
+    getCitationIdentity(sourceProperties: TemplateVariables[]) {
         return {
             shortCitation: firstCleanProperty(sourceProperties, SHORT_CITATION_KEYS).toLowerCase(),
             title: firstCleanProperty(sourceProperties, TITLE_KEYS).toLowerCase(),
@@ -616,7 +631,7 @@ export class PDFPlusTemplateProcessor extends TemplateProcessor {
         };
     }
 
-    propertiesMatchCitationIdentity(properties: Record<string, any>, identity: { shortCitation: string, title: string, year: string }) {
+    propertiesMatchCitationIdentity(properties: TemplateVariables, identity: { shortCitation: string, title: string, year: string }) {
         const shortCitation = firstCleanProperty([properties], SHORT_CITATION_KEYS).toLowerCase();
         if (identity.shortCitation && shortCitation && identity.shortCitation === shortCitation) return true;
 
@@ -625,7 +640,7 @@ export class PDFPlusTemplateProcessor extends TemplateProcessor {
         return !!identity.title && !!title && identity.title === title && (!identity.year || !year || identity.year === year);
     }
 
-    propertiesPointToPDF(properties: Record<string, any>, pdf: TFile, sourcePath: string) {
+    propertiesPointToPDF(properties: TemplateVariables, pdf: TFile, sourcePath: string) {
         const values = flattenPropertyValue(findProperty(properties, [this.plugin.settings.proxyMDProperty]));
         return values.some((value) => {
             const linkpath = getLinkpath(stripLinkSyntax(value));
@@ -644,7 +659,7 @@ export class PDFPlusTemplateProcessor extends TemplateProcessor {
         // @ts-ignore
         const dv = app.plugins.plugins.dataview?.api;
         if (dv) {
-            const proxyMDPages: any[] = dv.pages().where((page: any) => dv.array(page[this.plugin.settings.proxyMDProperty] ?? []).path.includes(pdf.path));
+            const proxyMDPages = dv.pages().where((page) => dv.array(page[this.plugin.settings.proxyMDProperty] ?? []).path.includes(pdf.path));
             proxyMDs = proxyMDPages.map((page) => app.vault.getAbstractFileByPath(page.file.path)).filter((file): file is TFile => file instanceof TFile);
         } else {
             const backlinks = app.metadataCache.getBacklinksForFile(pdf);
@@ -718,7 +733,7 @@ export class PDFPlusTemplateProcessor extends TemplateProcessor {
         return files;
     }
 
-    mergePropertiesForCitation(...sources: Record<string, any>[]) {
+    mergePropertiesForCitation(...sources: TemplateVariables[]) {
         return sources.reduceRight((merged, properties) => {
             return { ...merged, ...properties };
         }, {});

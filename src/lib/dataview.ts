@@ -13,7 +13,8 @@ const listItemContainsInlineFields = (item: ListItem, app: App, propertyName: st
 
     let values = Array.isArray(item.value) ? item.value : [item.value];
     values = values.filter((value): value is Link => (
-        value
+        value !== null
+        && typeof value === 'object'
         && Object.prototype.hasOwnProperty.call(value, 'path')
         && Object.prototype.hasOwnProperty.call(value, 'subpath')
     ));

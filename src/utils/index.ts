@@ -389,7 +389,9 @@ export function parsePDFSubpath(subpath: string): { type: 'page', page: number }
     return { type: 'page', page };
 }
 
-export function paramsToSubpath(params: Record<string, any>) {
+type SubpathParamValue = string | number | boolean | null | undefined;
+
+export function paramsToSubpath(params: Record<string, SubpathParamValue>) {
     return '#' + Object.entries(params)
         .filter(([k, v]) => k && (v || v === 0))
         .map(([k, v]) => `${k}=${v}`)

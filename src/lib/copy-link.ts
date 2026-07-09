@@ -3,7 +3,7 @@ import { Editor, EditorRange, MarkdownFileInfo, MarkdownView, Notice, TFile } fr
 import { PDFPlusLibSubmodule } from './submodule';
 import { PDFPlusTemplateProcessor } from 'template';
 import { encodeLinktext, getOffsetInTextLayerNode, getTextLayerInfo, getTextLayerNode, paramsToSubpath, parsePDFSubpath, subpathToParams } from 'utils';
-import { Canvas, PDFOutlineTreeNode, PDFViewerChild, Rect, TextContentItem } from 'typings';
+import { AnnotationElement, Canvas, PDFOutlineTreeNode, PDFViewerChild, Rect, TextContentItem } from 'typings';
 import { ColorPalette } from 'color-palette';
 
 
@@ -14,6 +14,13 @@ export type AutoFocusTarget =
     | 'last-paste-then-last-active'
     | 'last-paste-then-last-active-and-open'
     | 'last-active-and-open-then-last-paste';
+
+type SubpathParamValue = string | number | boolean | null | undefined;
+type CopyableAnnotationData = AnnotationElement['data'];
+
+function getErrorMessage(err: unknown): string {
+    return err instanceof Error ? err.message : String(err);
+}
 
 export class copyLinkLib extends PDFPlusLibSubmodule {
     statusDurationMs = 2000;
@@ -60,7 +67,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
         return null;
     }
 
-    getTemplateVariables(subpathParams: Record<string, any>) {
+    getTemplateVariables(subpathParams: Record<string, SubpathParamValue>) {
         const selection = activeWindow.getSelection();
         if (!selection) return null;
         const pageEl = this.lib.getPageElFromSelection(selection);
@@ -289,7 +296,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
                 .trim();
         } catch (err) {
             console.error(err);
-            new Notice(`${this.plugin.manifest.name}: Display text format is invalid. Error: ${err.message}`, 3000);
+            new Notice(`${this.plugin.manifest.name}: Display text format is invalid. Error: ${getErrorMessage(err)}`, 3000);
         }
     }
 
@@ -343,7 +350,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
             return evaluated;
         } catch (err) {
             console.error(err);
-            new Notice(`${this.plugin.manifest.name}: Copy template is invalid. Copying a plain PDF link instead. Error: ${err.message}`, 6000);
+            new Notice(`${this.plugin.manifest.name}: Copy template is invalid. Copying a plain PDF link instead. Error: ${getErrorMessage(err)}`, 6000);
             return linkVariables.linkWithDisplay;
         }
     }
@@ -476,7 +483,8 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
             const pageView = child.getPage(page);
             void child.getAnnotatedText(pageView, id)
                 .then(async (text) => {
-                    const annotData = pageView.annotationLayer?.annotationLayer?.getAnnotation(id)?.data ?? (await pageView.pdfPage.getAnnotations()).find((annot) => annot.id === id);
+                    const annotData = pageView.annotationLayer?.annotationLayer?.getAnnotation(id)?.data
+                        ?? ((await pageView.pdfPage.getAnnotations()) as CopyableAnnotationData[]).find((annot) => annot.id === id)!;
                     const color = annotData?.color ? `${annotData.color[0]}, ${annotData.color[1]}, ${annotData.color[2]}` : '';
                     let subpath = `#page=${page}&annotation=${id}`;
                     if (annotData.subtype === 'Square') {
@@ -1037,7 +1045,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
         }
     }
 
-    watchPaste(text: string, onPaste?: () => any) {
+    watchPaste(text: string, onPaste?: () => unknown) {
         // watch for a manual paste for updating this.lastPasteFile
         this.plugin.registerOneTimeEvent(this.app.workspace, 'editor-paste', (evt: ClipboardEvent, editor: Editor, info: MarkdownView | MarkdownFileInfo) => {
             if (info.file?.extension !== 'md') return;
@@ -1066,7 +1074,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
         });
     }
 
-    onCopyFinish(text: string, onPaste?: () => any) {
+    onCopyFinish(text: string, onPaste?: () => unknown) {
         this.watchPaste(text, onPaste);
         // update this.lastCopiedDestArray
         this.plugin.lastCopiedDestInfo = null;

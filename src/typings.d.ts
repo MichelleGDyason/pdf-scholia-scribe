@@ -1148,6 +1148,9 @@ declare module 'obsidian' {
             plugins: {
                 dataview?: Plugin & {
                     api: DataviewApi;
+                    index: {
+                        initialized: boolean;
+                    };
                 };
                 quickadd?: Plugin & {
                     api: unknown;

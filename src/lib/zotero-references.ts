@@ -111,6 +111,19 @@ function stringValue(value: unknown): string {
 	return typeof value === 'string' ? value : '';
 }
 
+function stringifyScalar(value: unknown): string {
+	if (typeof value === 'string') return value;
+	if (typeof value !== 'object') return String(value);
+	if (value && typeof (value as { toString?: unknown }).toString === 'function') {
+		return (value as { toString(): string }).toString();
+	}
+	return Object.prototype.toString.call(value);
+}
+
+function stringifyPropertyValue(value: unknown): string {
+	return value === null || value === undefined ? '' : stringifyScalar(value);
+}
+
 function findProperty(properties: Record<string, unknown>, keys: string[]) {
 	const normalized = keys.map((key) => key.toLowerCase());
 	for (const [key, value] of Object.entries(properties)) {
@@ -129,10 +142,10 @@ function flattenPropertyValue(value: unknown): string[] {
 	if (typeof value === 'object') {
 		const record = value as Record<string, unknown>;
 		if (typeof record.family === 'string' || typeof record.given === 'string') {
-			return [`${record.given ?? ''} ${record.family ?? ''}`.trim()].filter(Boolean);
+			return [`${stringifyPropertyValue(record.given)} ${stringifyPropertyValue(record.family)}`.trim()].filter(Boolean);
 		}
 		if (typeof record.lastName === 'string' || typeof record.firstName === 'string') {
-			return [`${record.firstName ?? ''} ${record.lastName ?? ''}`.trim()].filter(Boolean);
+			return [`${stringifyPropertyValue(record.firstName)} ${stringifyPropertyValue(record.lastName)}`.trim()].filter(Boolean);
 		}
 		if (typeof record.name === 'string') return [record.name];
 		if (typeof record.display === 'string') return [record.display];
@@ -140,7 +153,7 @@ function flattenPropertyValue(value: unknown): string[] {
 		return Object.values(record).flatMap((item) => flattenPropertyValue(item));
 	}
 
-	return [String(value)];
+	return [stringifyScalar(value)];
 }
 
 function firstValue(properties: Record<string, unknown>, keys: string[]) {

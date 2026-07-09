@@ -50,7 +50,7 @@ const restorePDFViewState = (plugin: PDFPlus, view: PDFView, state: PDFViewState
         }
 
         RESTORE_PDF_VIEW_STATE_DELAYS.forEach((delay) => {
-            activeWindow.setTimeout(applyState, delay);
+            window.setTimeout(applyState, delay);
         });
     });
 

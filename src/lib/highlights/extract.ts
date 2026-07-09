@@ -9,6 +9,13 @@ import { pdfJsQuadPointsToArrayOfRects } from 'utils';
 type AnnotatedTextsInPage = Map<string, { text: string, rgb: RGB | null, comment?: string }>;
 type AnnotatedTextsInDocument = Map<number, AnnotatedTextsInPage>;
 type PDFTextRange = { text: string, from: { index: number, offset: number }, to: { index: number, offset: number } };
+type ExtractableAnnotation = {
+    subtype: string;
+    quadPoints: Parameters<typeof pdfJsQuadPointsToArrayOfRects>[0];
+    color?: [number, number, number] | Uint8ClampedArray;
+    contentsObj?: { str?: string };
+    id: string;
+};
 
 export class HighlightExtractor extends PDFPlusLibSubmodule {
 
@@ -28,7 +35,7 @@ export class HighlightExtractor extends PDFPlusLibSubmodule {
         const [{ items }, annots] = await Promise.all([
             // @ts-ignore
             page.getTextContent({ includeChars: true }), // includeChars is specific to the Obsidian version of PDF.js
-            page.getAnnotations()
+            page.getAnnotations() as Promise<ExtractableAnnotation[]>
         ]);
 
         const results: { id: string, textRanges: PDFTextRange[], rgb: RGB | null, comment?: string, left: number, top: number }[] = [];
