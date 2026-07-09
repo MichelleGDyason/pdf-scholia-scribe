@@ -18,6 +18,51 @@ export type AnystyleJson = Partial<{
     type: string,
 }>;
 
+/**
+ * Typed event payloads emitted by `BibliographyManager`.
+ *
+ * Obsidian's `Events` class is intentionally dynamic and does not expose a
+ * typed event map, so this local map documents the bibliography subsystem's
+ * private event contract. It replaces broad `any` callback signatures with
+ * narrow tuples while preserving the same runtime event names and payloads.
+ * Update this map if the manager starts emitting different payloads for
+ * extracted text or parsed Anystyle records.
+ */
+interface BibliographyEventMap {
+    extracted: [destId: string, bibText: string];
+    parsed: [destId: string, parsedBib: AnystyleJson];
+}
+
+/**
+ * Event names supported by the bibliography subsystem's internal event bus.
+ *
+ * This alias exists so callers can refer to the local typed contract instead
+ * of passing arbitrary strings through Obsidian's untyped `Events` API. If a
+ * new bibliography event is added, it should be added to `BibliographyEventMap`
+ * first so its payload is documented beside the name.
+ */
+type BibliographyEventName = keyof BibliographyEventMap;
+
+/**
+ * Callback shape for one bibliography event.
+ *
+ * The generic tuple keeps callback parameters aligned with the event name and
+ * avoids `(...args: any[])`. This assumes Obsidian's `Events` continues to
+ * forward payload arguments without transformation; if that behavior changes,
+ * this wrapper and `BibliographyManager.on()` should be revisited together.
+ */
+type BibliographyEventCallback<Name extends BibliographyEventName> = (...args: BibliographyEventMap[Name]) => unknown;
+
+/**
+ * Callback used by the PDF.js destination text extractor.
+ *
+ * The extractor reports one citation destination id and its raw bibliography
+ * text. Keeping this callback typed avoids the previous broad `any` return
+ * while documenting that PDF.js destination ids are represented as strings in
+ * this subsystem.
+ */
+type BibliographyTextExtractedCallback = (destId: string, bibText: string) => unknown;
+
 
 export class BibliographyManager extends PDFPlusComponent {
     static readonly HOVER_LINK_SOURCE_ID = 'pdf-plus-citation-link';
@@ -128,9 +173,7 @@ export class BibliographyManager extends PDFPlusComponent {
     }
 
 
-    on(name: 'extracted', callback: (destId: string, bibText: string) => any, ctx?: any): ReturnType<Events['on']>;
-    on(name: 'parsed', callback: (destId: string, parsedBib: string) => any, ctx?: any): ReturnType<Events['on']>;
-    on(name: string, callback: (...args: any[]) => any, ctx?: any) {
+    on<Name extends BibliographyEventName>(name: Name, callback: BibliographyEventCallback<Name>, ctx?: unknown): ReturnType<Events['on']> {
         return this.events.on(name, callback, ctx);
     }
 }
@@ -140,7 +183,7 @@ class BibliographyTextExtractor {
     plugin: PDFPlus;
     doc: PDFDocumentProxy;
     pageRefToTextContentItemsPromise: Record<string, Promise<TextContentItem[]> | undefined>;
-    onExtractedCallback?: (destId: string, bibText: string) => any;
+    onExtractedCallback?: BibliographyTextExtractedCallback;
 
     constructor(plugin: PDFPlus, doc: PDFDocumentProxy) {
         this.plugin = plugin;
@@ -148,7 +191,7 @@ class BibliographyTextExtractor {
         this.pageRefToTextContentItemsPromise = {};
     }
 
-    onExtracted(callback: BibliographyTextExtractor['onExtractedCallback']) {
+    onExtracted(callback: BibliographyTextExtractedCallback) {
         this.onExtractedCallback = callback;
         return this;
     }
@@ -351,14 +394,16 @@ export class BibliographyDom extends PDFPlusComponent {
         });
     }
 
-    registerRenderOn(eventName: 'parsed' | 'extracted') {
-        // @ts-ignore
-        const eventRef = this.bib.on(eventName, (destId) => {
+    registerRenderOn(eventName: BibliographyEventName) {
+        const rerender = (destId: string) => {
             if (destId === this.destId) {
                 void this.render().catch(console.error);
                 this.bib.events.offref(eventRef);
             }
-        });
+        };
+        const eventRef = eventName === 'parsed'
+            ? this.bib.on('parsed', rerender)
+            : this.bib.on('extracted', rerender);
         this.registerEvent(eventRef);
     }
 
