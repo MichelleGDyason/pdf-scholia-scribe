@@ -801,8 +801,8 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
             window.setTimeout(() => {
                 if (!isResolved) {
                     const { messageEl } = new Notice(`${this.plugin.manifest.name}: Could not find the auto-paste target markdown file within ${this.settings.autoPasteTargetDialogTimeoutSec} seconds.`);
-                    messageEl.appendText(' Click ');
-                    messageEl.createEl('a', { text: 'here' }, (anchorEl) => {
+                    messageEl.appendText(' ');
+                    messageEl.createEl('a', { text: 'Open settings' }, (anchorEl) => {
                         anchorEl.addEventListener('click', () => {
                             this.plugin.openSettingTab()
                                 .scrollTo('autoPasteTargetDialogTimeoutSec');

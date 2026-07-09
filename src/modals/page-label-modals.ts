@@ -53,7 +53,7 @@ class PDFPageLabelSettingsForRange {
 
     addNumberingStyleSetting() {
         this.addSetting()
-            .setName('Numbering Style')
+            .setName('Numbering style')
             .addDropdown((dropdown) => {
                 dropdown
                     .addOptions({ ...PAGE_LABEL_NUMBERING_STYLES, None: 'None' })

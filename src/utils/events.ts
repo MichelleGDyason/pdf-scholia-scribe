@@ -1,6 +1,12 @@
 import { Modifier } from 'obsidian';
 import { App, Component, Keymap, Platform } from 'obsidian';
 
+type WindowConstructorName = 'Node' | 'Element' | 'HTMLElement';
+type WindowWithDomConstructors = Window & {
+    Node: typeof Node,
+    Element: typeof Element,
+    HTMLElement: typeof HTMLElement,
+};
 
 export function hookInternalLinkMouseEventHandlers(app: App, containerEl: HTMLElement, sourcePath: string) {
     containerEl.querySelectorAll('a.internal-link').forEach((el) => {
@@ -50,12 +56,16 @@ export function getEventCoords(evt: MouseEvent | TouchEvent) {
         : { x: evt.touches[0].clientX, y: evt.touches[0].clientY };
 }
 
-function instanceofInWindow(obj: any, win: Window, className: string): boolean {
+function instanceofInWindow(obj: unknown, win: Window, className: WindowConstructorName): boolean {
     // See:
     // - https://obsidian.md/blog/how-to-update-plugins-to-support-pop-out-windows/
     // - https://forum.obsidian.md/t/why-file-in-clipboardevent-is-not-an-instanceof-file-for-notes-opened-in-new-window/76648/3
-    // @ts-ignore
-    const constructor: new () => any = win[className];
+    const domWindow = win as WindowWithDomConstructors;
+    const constructor = className === 'Node'
+        ? domWindow.Node
+        : className === 'Element'
+            ? domWindow.Element
+            : domWindow.HTMLElement;
     return obj instanceof constructor;
 }
 
@@ -90,7 +100,7 @@ export function isTargetHTMLElement(evt: UIEvent, target: EventTarget | null): t
 }
 
 /** Generalizes Obsidian's onHoverLink to arbitrary callback functions. */
-export function onModKeyPress(evt: MouseEvent | TouchEvent | KeyboardEvent, targetEl: HTMLElement, callback: () => any) {
+export function onModKeyPress(evt: MouseEvent | TouchEvent | KeyboardEvent, targetEl: HTMLElement, callback: () => void) {
     if (Keymap.isModifier(evt, 'Mod')) {
         callback();
         return;
@@ -134,7 +144,7 @@ export function onModKeyPress(evt: MouseEvent | TouchEvent | KeyboardEvent, targ
 export function showChildElOnParentElHover(config: {
     parentEl: HTMLElement,
     createChildEl: () => HTMLElement | null,
-    removeChildEl: (childEl: HTMLElement) => any,
+    removeChildEl: (childEl: HTMLElement) => void,
     component?: Component,
     timeout?: number,
 }) {
@@ -149,7 +159,9 @@ export function showChildElOnParentElHover(config: {
 
             const component = new Component();
             parentComponent?.addChild(component);
-            component.register(() => childEl && removeChildEl(childEl));
+            component.register(() => {
+                if (childEl) removeChildEl(childEl);
+            });
             component.load();
 
             const requestCheck = () => window.setTimeout(() => {

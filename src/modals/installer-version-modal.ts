@@ -45,7 +45,7 @@ export class InstallerVersionModal extends PDFPlusModal {
 
             const helpUrl = 'https://help.obsidian.md/Getting+started/Update+Obsidian#Installer%20updates';
             new ButtonComponent(el)
-                .setButtonText('What is "installer update"? (help.obsidian.md)')
+                .setButtonText('About installer updates')
                 .setTooltip(helpUrl)
                 .onClick(() => {
                     window.open(helpUrl);

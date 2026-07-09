@@ -659,11 +659,19 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 
 
 export function isPDFPlusSettingsKey(key: string): key is keyof PDFPlusSettings {
-	return Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, key);
+	return key in DEFAULT_SETTINGS;
 }
 
 
 const modKey = getModifierNameInPlatform('Mod').toLowerCase();
+
+type DropdownSettingArgs =
+	| [readonly string[], ((option: string) => string)?, ((value: string) => void)?]
+	| [Record<string, string>, ((value: string) => void)?];
+
+function isDropdownOptionArrayArgs(args: DropdownSettingArgs): args is [readonly string[], ((option: string) => string)?, ((value: string) => void)?] {
+	return Array.isArray(args[0]);
+}
 
 
 export class PDFPlusSettingTab extends PluginSettingTab {
@@ -672,7 +680,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 	headings: Map<string, Setting>;
 	iconHeadings: Map<string, Setting>;
 	headerEls: Map<string, HTMLElement>;
-	promises: Promise<any>[];
+	promises: Promise<void>[];
 
 	contentEl: HTMLElement;
 	headerContainerEl: HTMLElement;
@@ -852,7 +860,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		return settings;
 	}
 
-	addTextSetting(settingName: KeysOfType<PDFPlusSettings, string>, placeholder?: string, onBlurOrEnter?: (setting: Setting) => any) {
+	addTextSetting(settingName: KeysOfType<PDFPlusSettings, string>, placeholder?: string, onBlurOrEnter?: (setting: Setting) => unknown) {
 		const setting = this.addSetting(settingName)
 			.addText((text) => {
 				text.setValue(this.plugin.settings[settingName])
@@ -879,7 +887,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		return setting;
 	}
 
-	addTextAreaSetting(settingName: KeysOfType<PDFPlusSettings, string>, placeholder?: string, onBlur?: () => any) {
+	addTextAreaSetting(settingName: KeysOfType<PDFPlusSettings, string>, placeholder?: string, onBlur?: () => unknown) {
 		return this.addSetting(settingName)
 			.addTextArea((text) => {
 				text.setValue(this.plugin.settings[settingName])
@@ -935,18 +943,23 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 
 	addDropdownSetting(settingName: KeysOfType<PDFPlusSettings, string>, options: readonly string[], display?: (option: string) => string, extraOnChange?: (value: string) => void): Setting;
 	addDropdownSetting(settingName: KeysOfType<PDFPlusSettings, string>, options: Record<string, string>, extraOnChange?: (value: string) => void): Setting;
-	addDropdownSetting(settingName: KeysOfType<PDFPlusSettings, string>, ...args: any[]) {
+	addDropdownSetting(settingName: KeysOfType<PDFPlusSettings, string>, ...args: DropdownSettingArgs) {
 		let options: string[] = [];
 		let display = (optionValue: string) => optionValue;
 		let extraOnChange = (value: string) => { };
-		if (Array.isArray(args[0])) {
-			options = args[0];
-			if (typeof args[1] === 'function') display = args[1];
-			if (typeof args[2] === 'function') extraOnChange = args[2];
+		if (isDropdownOptionArrayArgs(args)) {
+			const optionSource = args[0];
+			options = [...optionSource];
+			const maybeDisplay = args[1];
+			const maybeOnChange = args[2];
+			if (typeof maybeDisplay === 'function') display = (option) => maybeDisplay(option) ?? option;
+			if (typeof maybeOnChange === 'function') extraOnChange = maybeOnChange;
 		} else {
-			options = Object.keys(args[0]);
-			display = (optionValue: string) => args[0][optionValue];
-			if (typeof args[1] === 'function') extraOnChange = args[1];
+			const optionSource = args[0];
+			options = Object.keys(optionSource);
+			display = (optionValue: string) => optionSource[optionValue] ?? optionValue;
+			const maybeOnChange = args[1];
+			if (typeof maybeOnChange === 'function') extraOnChange = maybeOnChange;
 		}
 		return this.addSetting(settingName)
 			.addDropdown((dropdown) => {
@@ -1024,9 +1037,9 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 
 	addFileLocationSetting(
 		settingName: KeysOfType<PDFPlusSettings, NewFileLocation>,
-		postProcessDropdownSetting: (setting: Setting) => any,
+		postProcessDropdownSetting: (setting: Setting) => unknown,
 		folderPathSettingName: KeysOfType<PDFPlusSettings, string>,
-		postProcessFolderPathSetting: (setting: Setting) => any
+		postProcessFolderPathSetting: (setting: Setting) => unknown
 	) {
 		return [
 			this.addDropdownSetting(settingName, NEW_FILE_LOCATIONS, () => this.redisplay())
@@ -1051,7 +1064,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		];
 	}
 
-	addAttachmentLocationSetting(settingName: KeysOfType<PDFPlusSettings, string>, defaultSubfolder: string, postProcessSettings: (locationSetting: Setting, folderPathSetting: Setting, subfolderPathSetting: Setting) => any) {
+	addAttachmentLocationSetting(settingName: KeysOfType<PDFPlusSettings, string>, defaultSubfolder: string, postProcessSettings: (locationSetting: Setting, folderPathSetting: Setting, subfolderPathSetting: Setting) => unknown) {
 		let locationDropdown: DropdownComponent;
 		let folderPathText: TextComponent;
 		let subfolderPathText: TextComponent;
@@ -1457,7 +1470,8 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 	}
 
 	addRequireModKeyOnHoverSetting(id: string) {
-		const display = this.app.workspace.hoverLinkSources[id].display;
+		const hoverLinkSource = this.app.workspace.hoverLinkSources[id] as { display?: unknown } | undefined;
+		const display = typeof hoverLinkSource?.display === 'string' ? hoverLinkSource.display : id;
 		const required = this.plugin.requireModKeyForLinkHover(id);
 		return this.addSetting()
 			.setName(`Require ${modKey} key while hovering`)
@@ -1965,7 +1979,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			}
 			this.addToggleSetting('displayTextFormatDropdownInToolbar', () => this.redisplay())
 				.setName('Show citation-style dropdown in the PDF toolbar')
-				.setDesc('Off by default. Citation style is usually chosen once in Copy templates > Display text format. Turn this on only if you want to switch between Harvard, APA, ASA, numbered, and other citation labels from the PDF toolbar.');
+				.setDesc('Off by default. Citation style is usually chosen once in copy templates > display text format. Turn this on only if you want a citation-style selector in the PDF toolbar.');
 			this.addToggleSetting('quietColorPaletteTooltip')
 				.setName('Quiet tooltips in color palette')
 				.setDesc(`When disabled${!DEFAULT_SETTINGS.quietColorPaletteTooltip ? ' (default)' : ''}, the tooltip will show the color name as well as the selected copy format and display text format. If enabled, only the color name will be shown.`);
@@ -2022,7 +2036,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			() => this.plugin.settings.scrollModeOnLoad !== ScrollMode.WRAPPED
 		);
 		this.addToggleSetting('usePageUpAndPageDown')
-			.setName('Use PageUp/PageDown key to go to previous/next page')
+			.setName('Use page up/page down keys to go to previous/next page')
 			.setDesc(createFragment((el) => {
 				el.appendText('You need to reopen PDF viewers after changing this option. Note that you can achieve the same thing (and even more advanced stuff) using ');
 				el.appendChild(this.createLinkToHeading('vim', 'Vim keybindings'));
@@ -2527,7 +2541,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			.setName('Target Markdown file to paste links to');
 		this.addToggleSetting('focusEditorAfterAutoPaste', () => this.events.trigger('update'))
 			.setName('Focus editor after auto-pasting')
-			.setDesc('After PDF Scholia Scribe pastes into a note, move keyboard focus back to that note.');
+			.setDesc('After pasting into a note, move keyboard focus back to that note.');
 		this.addToggleSetting('preserveEditorScrollAfterAutoPaste')
 			.setName('Keep the note from jumping after auto-paste')
 			.setDesc('Recommended for editing beside a PDF. PDF Scholia Scribe will paste at the cursor, then restore the note to the same visible position instead of scrolling back to an older cursor position.');
@@ -2571,8 +2585,8 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				});
 			this.showConditionally(
 				this.addToggleSetting('closeHoverEditorWhenLostFocus')
-					.setName('Close Hover Editor when it loses focus')
-					.setDesc('This option will not affect the behavior of Hover Editor outside of PDF Scholia Scribe.'),
+					.setName('Close hover editor when it loses focus')
+					.setDesc('This option only affects hover editor panes opened by this plugin.'),
 				() => this.plugin.settings.howToOpenAutoFocusTargetIfNotOpened === 'hover-editor'
 			);
 			this.addToggleSetting('closeSidebarWhenLostFocus')
@@ -2581,11 +2595,11 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 
 			this.addToggleSetting('openAutoFocusTargetInEditingView')
 				.setName('Always open in editing view')
-				.setDesc('This option can be useful especially when you set the previous option to "Hover Editor".');
+				.setDesc('This option can be useful especially when you set the previous option to "hover editor".');
 		}
 		this.addToggleSetting('executeCommandWhenTargetNotIdentified', () => this.redisplay())
 			.setName('Execute command when target file cannot be determined')
-			.setDesc('When PDF Scholia Scribe cannot determine which Markdown file to focus on or paste to, it will execute the command specified in the next option to let you pick a target file.');
+			.setDesc('When this plugin cannot determine which Markdown file to focus on or paste to, it will execute the command specified in the next option to let you pick a target file.');
 		const commandName = this.app.commands.findCommand(`${this.plugin.manifest.id}:create-new-note`)?.name ?? 'PDF Scholia Scribe: Create new note for auto-focus or auto-paste';
 		if (this.plugin.settings.executeCommandWhenTargetNotIdentified) {
 			this.addSetting('commandToExecuteWhenTargetNotIdentified')
@@ -2813,7 +2827,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			[SidebarView.OUTLINE]: 'Outline',
 		})
 			.setName('Default sidebar view')
-			.setDesc('Reopen PDFs after changing this option.');
+			.setDesc('Reopen PDF files after changing this option.');
 
 		this.addHeading('PDF outline (table of contents)', 'outline', 'lucide-list')
 			.setDesc('Power up the outline view of the built-in PDF viewer: add, rename, or delete items via the right-click menu and the "add to outline" command, drag & drop items to insert a section link, and more.');
@@ -3127,7 +3141,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			));
 		this.addToggleSetting('filterBacklinksByPageDefault')
 			.setName('Filter backlinks by page by default')
-			.setDesc('You can toggle this on and off with the "Show only backlinks in the current page" button at the top right of the backlinks pane.');
+			.setDesc('You can toggle this on and off with the "show only backlinks in the current page" button at the top right of the backlinks pane.');
 		this.addToggleSetting('showBacklinkToPage')
 			.setName('Show backlinks to the entire page')
 			.setDesc('If turned off, only backlinks to specific text selections, annotations or locations will be shown when filtering the backlinks page by page.');
@@ -3185,7 +3199,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		this.addHeading('Integration with external apps (desktop-only)', 'external-app', 'lucide-share');
 		this.addToggleSetting('openPDFWithDefaultApp', () => this.redisplay())
 			.setName('Open PDF links with an external app')
-			.setDesc('Open PDF links with the OS-defined default application for PDF files.');
+			.setDesc('Open PDF links with the system default application for PDF files.');
 		if (this.plugin.settings.openPDFWithDefaultApp) {
 			this.addToggleSetting('openPDFWithDefaultAppAndObsidian')
 				.setName('Open PDF links in Obsidian as well')
@@ -3416,7 +3430,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				.setName('Characters to use in hint mode')
 				.setDesc('They are used preferentially from left to right, so you might want to put the easier-to-reach keys first. This is the same as Tridactyl\'s "hintchars" option.'),
 			this.addTextSetting('vimHintArgs')
-				.setName('Default arguments for the ":hint" Ex command')
+				.setName('Default arguments for the ":hint" command')
 				.setDesc('Space-separated list of "link"/"annot"/"backlink" or "all". Run ":help :hint" for the details.'),
 			this.addHeading('Context menu', 'vim-context-menu'),
 			this.addToggleSetting('enableVimInContextMenu')
@@ -3439,7 +3453,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				.setDesc('If enabled, all matches will be highlighted.'),
 			this.addToggleSetting('vimIncsearch')
 				.setName('incsearch')
-				.setDesc('Incremental search: while typing the search query, update the search results after every keystroke. If disabled, the results will be shown only after pressing Enter.')
+				.setDesc('Incremental search: while typing the search query, update the search results after every keystroke. If disabled, the results will be shown only after pressing enter.')
 		],
 			() => this.plugin.settings.vim
 		);
@@ -3464,11 +3478,11 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			.setDesc('For example, when you copy a link to a text selection in a PDF file, the status "link copied" will be displayed in the PDF toolbar.');
 		this.addFileLocationSetting(
 			'newPDFLocation', (setting) => setting
-				.setName('Default location for new PDFs')
-				.setDesc('The "Create new PDF" command will create a new PDF file in the location specified here.'),
+				.setName('Default location for new PDF files')
+				.setDesc('The "create new PDF" command will create a new PDF file in the location specified here.'),
 			'newPDFFolderPath', (setting) => setting
-				.setName('Folder to create new PDFs in')
-				.setDesc('Newly created PDFs will appear under this folder.')
+				.setName('Folder to create new PDF files in')
+				.setDesc('Newly created PDF files will appear under this folder.')
 		);
 		this.addToggleSetting('hideReplyAnnotation')
 			.setName('Hide reply annotations')

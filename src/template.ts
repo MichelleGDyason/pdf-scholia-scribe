@@ -28,6 +28,10 @@ type TemplateVariables = Record<string, unknown>;
 
 const IDENTIFIER_PATTERN = /^[A-Za-z_$][\w$]*$/;
 
+function isTemplateVariables(value: unknown): value is TemplateVariables {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 function hasCustomToString(value: object): value is object & { toString: () => string } {
     const toString = (value as { toString?: unknown }).toString;
     return typeof toString === 'function' && toString !== Object.prototype.toString;
@@ -496,7 +500,7 @@ export class TemplateProcessor {
     }
 
     evalTemplate(template: string) {
-        return template.replace(/{{(.*?)}}/g, (match, expr) => this.evalPart(expr));
+        return template.replace(/{{(.*?)}}/g, (_match: string, expr: string) => this.evalPart(expr));
     }
 }
 
@@ -591,7 +595,8 @@ export class PDFPlusTemplateProcessor extends TemplateProcessor {
             if (!match) return;
 
             try {
-                properties = parseYaml(match[1]) ?? {};
+                const parsed = parseYaml(match[1]) as unknown;
+                properties = isTemplateVariables(parsed) ? parsed : {};
             } catch (err) {
                 console.error(`${this.plugin.manifest.name}: Failed to parse open note frontmatter for citation metadata.`, err);
             }

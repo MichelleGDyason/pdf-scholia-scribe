@@ -2,6 +2,19 @@ import { PDFPlusModal } from 'modals';
 import { normalizePath, Notice, Platform, Setting } from 'obsidian';
 import { FuzzyFolderSuggest, getModifierNameInPlatform } from 'utils';
 
+type ElectronDialogWindow = Window & {
+    electron?: {
+        remote?: {
+            dialog?: {
+                showOpenDialogSync(options: {
+                    properties: string[],
+                    filters: { name: string, extensions: string[] }[],
+                }): string[] | undefined,
+            },
+        },
+    },
+};
+
 
 export class DummyFileModal extends PDFPlusModal {
     static LOCAL_STORAGE_KEY = 'last-used-dummy-file-source';
@@ -105,7 +118,7 @@ export class DummyFileModal extends PDFPlusModal {
             .setName('Folder to save the dummy files')
             .setDesc(createFragment((el) => {
                 el.appendText('You can specify the default folder in the ');
-                el.createEl('a', { text: 'settings', href: 'obsidian://pdf-scholia-scribe?setting=dummyFileFolderPath' });
+                el.createEl('a', { text: 'Settings', href: 'obsidian://pdf-scholia-scribe?setting=dummyFileFolderPath' });
                 el.appendText('.');
             }))
             .addText((text) => {
@@ -121,14 +134,14 @@ export class DummyFileModal extends PDFPlusModal {
     addLocalFileSetting() {
         this.addSetting()
             .setName('Absolute path to the PDF')
-            .setDesc('Type the path in the input box or click the "Browse" button to select the file.')
+            .setDesc('Type the path in the input box or click the "browse" button to select the file.')
             .addButton((button) => {
                 button
                     .setButtonText('Browse')
                     .setCta()
                     .onClick(() => {
-                        // @ts-ignore
-                        const paths: string[] | undefined = window.electron?.remote.dialog.showOpenDialogSync({
+                        const electronWindow = window as ElectronDialogWindow;
+                        const paths = electronWindow.electron?.remote?.dialog?.showOpenDialogSync({
                             properties: ['openFile', 'multiSelections', 'dontAddToRecent'],
                             filters: [
                                 { name: 'PDF files', extensions: ['pdf'] }
@@ -156,7 +169,7 @@ export class DummyFileModal extends PDFPlusModal {
     addWebFileSetting() {
         this.addSetting()
             .setName('URL of the PDF')
-            .setDesc('Must start with "https://" or "http://".')
+            .setDesc('Must start with "HTTPS://" or "HTTP://".')
             .addExtraButton((button) => {
                 button
                     .setIcon('plus')

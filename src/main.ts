@@ -552,16 +552,16 @@ export default class PDFPlus extends Plugin {
 				createFragment((el) => el.append(
 					`${this.manifest.name}: Please consider moving the "${this.settings.proxyMDProperty}" Dataview inline fields to the properties (YAML frontmatter).`,
 					createEl('br'),
-					'Click ',
+					'',
 					createEl('a', {
-						text: 'here'
+						text: 'Open details'
 					}, (a) => {
 						a.onclick = () => {
 							new DataviewInlineFieldsModal(this, files)
 								.open();
 						};
 					}),
-					' for more details.',
+					' for more information.',
 				)),
 				0
 			);

@@ -285,7 +285,7 @@ export class PDFAnnotationEditModal extends PDFAnnotationModal {
                     } else {
                         setting.setDesc(createFragment((el) => {
                             const anchorEl = createEl('a', {
-                                text: '"Render markdown in annotation popups when the annotation has text contents"',
+                                text: '"render Markdown in annotation popups when the annotation has text contents"',
                              }, (el) => {
                                 el.onclick = (evt) => {
                                     const tab = this.plugin.openSettingTab();

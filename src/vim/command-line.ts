@@ -24,7 +24,7 @@ export class VimCommandLineMode extends VimBindingsMode {
             this.register(() => el.remove());
             el.appendText(':');
             this.inputEl = el.createEl('input', { cls: 'pdf-plus-vim-command-input' }, (inputEl) => {
-                inputEl.placeholder = 'type a command or page number...';
+                inputEl.placeholder = 'Type a command or page number...';
 
                 inputEl.addEventListener('focusout', () => {
                     window.setTimeout(() => {

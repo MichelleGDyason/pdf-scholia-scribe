@@ -5,19 +5,19 @@ import { PDFPlusModal } from 'modals';
 import { hookInternalLinkMouseEventHandlers } from 'utils';
 
 
-type Link = { path: string };
+type Link = { path: string, subpath?: string };
 type ListItem = { key: Link, value: Link | Array<Link> };
+
+function isLink(value: unknown): value is Link {
+    return value !== null
+        && typeof value === 'object'
+        && typeof (value as { path?: unknown }).path === 'string';
+}
 
 const listItemContainsInlineFields = (item: ListItem, app: App, propertyName: string): boolean => {
     const path = item.key.path;
 
-    let values = Array.isArray(item.value) ? item.value : [item.value];
-    values = values.filter((value): value is Link => (
-        value !== null
-        && typeof value === 'object'
-        && Object.prototype.hasOwnProperty.call(value, 'path')
-        && Object.prototype.hasOwnProperty.call(value, 'subpath')
-    ));
+    const values = (Array.isArray(item.value) ? item.value : [item.value]).filter(isLink);
 
     const cache = app.metadataCache.getCache(path);
     if (!cache) {
@@ -132,7 +132,7 @@ export class DataviewInlineFieldsModal extends PDFPlusModal {
             text: createFragment((el) => el.append(
                 'For the ',
                 createEl('a', {
-                    text: '"Property to associate a markdown file to a PDF file"'
+                    text: '"property to associate a Markdown file to a PDF file"'
                 }, (a) => {
                     a.onclick = () => {
                         this.plugin.openSettingTab().scrollTo('proxyMDProperty');
@@ -170,7 +170,7 @@ export class DataviewInlineFieldsModal extends PDFPlusModal {
                 createEl('br'),
                 'Please consider moving these inline fields to the ',
                 createEl('a', {
-                    text: 'properties (YAML frontmatter)',
+                    text: 'Properties (YAML frontmatter)',
                     href: 'https://help.obsidian.md/properties',
                     cls: 'external-link',
                 }, (a) => {
