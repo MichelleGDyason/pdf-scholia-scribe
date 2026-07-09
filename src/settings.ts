@@ -1176,7 +1176,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			'lucide-heart',
 			({ iconEl }) => postProcessIcon(iconEl)
 		)
-			.setDesc('If you find PDF Scholia Scribe helpful, please consider supporting development through GitHub Sponsors.')
+			.setDesc('If this plugin is helpful, please consider supporting development.')
 			.then((setting) => {
 				const infoEl = setting.infoEl;
 				const iconEl = setting.settingEl.firstElementChild;
@@ -1195,7 +1195,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			})
 			.addButton((button) => {
 				button
-					.setButtonText('GitHub Sponsors')
+					.setButtonText('Sponsor on GitHub')
 					.onClick(() => {
 						open(fundingUrl);
 					});
@@ -1687,7 +1687,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			], el);
 			const linkEl = el.ownerDocument.getElementById('pdf-plus-funding-link-placeholder');
 			if (linkEl) {
-				linkEl.textContent = 'Help me keep PDF Scholia Scribe alive!';
+				linkEl.textContent = 'Support ongoing development';
 				linkEl.onclick = (evt) => {
 					this.scrollToHeading('funding', { behavior: 'smooth' });
 					this.updateHeaderElClassOnScroll(evt);
@@ -1772,7 +1772,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		}
 		this.addSetting('ignoreExistingMarkdownTabIn')
 			.setName('Ignore existing Markdown tabs in...')
-			.setDesc('If some notes are opened in the ignored splits, PDF Scholia Scribe will still open the backlink in the way specified in the previous setting. For example, you might want to ignore the left sidebar if you are pinning a certain note (e.g. daily note) in it.');
+			.setDesc('If notes are open in the ignored splits, backlinks still use the behavior from the previous setting. For example, ignore the left sidebar when pinning a note there.');
 		const splits = {
 			'leftSplit': 'Left sidebar',
 			'rightSplit': 'Right sidebar',
@@ -1914,7 +1914,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				);
 			});
 		this.addToggleSetting('useCallout')
-			.setName('Use PDF Scholia Scribe callouts')
+			.setName('Use color-matched callouts')
 			.then((setting) => {
 				this.renderMarkdown([
 					'You can also disable this option and choose to use your own custom [CSS snippets](https://help.obsidian.md/Extending+Obsidian/CSS+snippets). See our [README](https://github.com/RyotaUshio/obsidian-pdf-plus?tab=readme-ov-file#css-customization) for the details.'
@@ -2046,7 +2046,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		this.addHeading('Context menu in PDF viewer', 'context-menu', 'lucide-mouse-pointer-click')
 			.setDesc('(Desktop & tablet only) customize the behavior of the context menu that pops up when you right-click in the PDF viewer. For mobile users, see also the next section.');
 		this.addToggleSetting('replaceContextMenu', () => this.redisplay())
-			.setName('Replace the built-in context menu with PDF Scholia Scribe\'s custom menu');
+			.setName('Replace the built-in context menu with a custom menu');
 		if (!this.plugin.settings.replaceContextMenu) {
 			this.addSetting()
 				.setName('Display text format')
@@ -2120,7 +2120,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 									}));
 								}
 								else if (section.id === 'link') {
-									setting.setDesc('"Search on Google Scholar": Available when right-clicking citation links in PDFs.');
+									setting.setDesc('Citation search is available when right-clicking citation links in PDFs.');
 								}
 								else if (section.id === 'speech') {
 									setting.setDesc(createFragment((el) => {
@@ -2544,7 +2544,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			.setDesc('After pasting into a note, move keyboard focus back to that note.');
 		this.addToggleSetting('preserveEditorScrollAfterAutoPaste')
 			.setName('Keep the note from jumping after auto-paste')
-			.setDesc('Recommended for editing beside a PDF. PDF Scholia Scribe will paste at the cursor, then restore the note to the same visible position instead of scrolling back to an older cursor position.');
+			.setDesc('Recommended for editing beside a PDF. The plugin pastes at the insertion point, then restores the note to the same visible position instead of scrolling back to an older insertion point.');
 		this.showConditionally(
 			this.addToggleSetting('clearSelectionAfterAutoPaste')
 				.setName('Clear text selection after auto-pasting')
@@ -2552,8 +2552,8 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			() => !this.plugin.settings.focusEditorAfterAutoPaste
 		);
 		this.addToggleSetting('respectCursorPositionWhenAutoPaste', () => this.events.trigger('update'))
-			.setName('Respect current cursor position')
-			.setDesc('When enabled, triggering auto-pasting will paste the copied text at the current cursor position if the target note is already opened. If disabled, the text will be always appended to the end of the note.');
+			.setName('Respect current insertion point')
+			.setDesc('When enabled, auto-paste inserts copied text at the current insertion point if the target note is already open. If disabled, it appends to the end of the note.');
 		this.showConditionally(
 			this.addToggleSetting('blankLineAboveAppendedContent')
 				.setName('Blank line above the appended content')
@@ -2681,7 +2681,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 		this.addHeading('PDF Annotations', 'annot', 'lucide-message-square');
 		this.addToggleSetting('annotationPopupDrag')
 			.setName('Drag & drop annotation popup to insert a link to the annotation')
-			.setDesc('Note that turning on this option disables text selection in the annotation popup (e.g. modified date, author, etc).');
+			.setDesc('Note that turning on this option disables text selection in the annotation popup, such as modified date and author.');
 		this.addToggleSetting('showAnnotationPopupOnHover')
 			.setName('If an annotation has a comment, show the annotation popup on hover')
 			.setDesc('This is the same behavior as the PDF viewers of some web browsers (e.g. Chrome/Firefox). You may have to reopen the PDF file after changing this option.');
@@ -3223,7 +3223,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			.setName('Sync page number');
 		if (this.plugin.settings.viewSyncFollowPageNumber) {
 			this.addSliderSetting('viewSyncPageDebounceInterval', 0.1, 1, 0.05)
-				.setName('Minimum update interval of the View Sync file (sec)');
+				.setName('Minimum sync-file update interval (sec)');
 		}
 
 
@@ -3464,7 +3464,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			void this.plugin.checkForUpdatesIfNeeded();
 		})
 			.setName('Automatically check for updates')
-			.setDesc('If enabled, PDF Scholia Scribe will automatically check for updates every 24 hours and notify you if a new version is available.');
+			.setDesc('If enabled, this plugin automatically checks for updates every 24 hours and notifies you if a new version is available.');
 		this.addToggleSetting('fixObsidianTextSelectionBug')
 			.setName(`Fix Obsidian 1.9's text selection bug`)
 			.then((setting) => {
@@ -3495,7 +3495,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			});
 		this.addToggleSetting('hideStampAnnotation')
 			.setName('Disable popups for rubber stamp annotations')
-			.setDesc('A rubber stamp annotation is a type of annotation that displays text or graphics intended to look like a rubber stamp. However, some applications, including iOS/iPadOS\'s "Markup", use this type of annotation also for handwriting. Often, all pieces of handwriting in a single page are grouped into a single rubber stamp annotation, which tends to be so large that it covers the entire page. In this case, annotation popups can be annoying, so you can disable them here.');
+			.setDesc('A rubber stamp annotation displays text or graphics intended to look like a rubber stamp. Some applications also use this annotation type for handwriting. Often, all handwriting on a page is grouped into one stamp that can cover the entire page. In this case, annotation popups can be annoying, so you can disable them here.');
 		this.addToggleSetting('removeWhitespaceBetweenCJChars')
 			.setName('Remove half-width whitespace between two Chinese/Japanese characters when copying text')
 			.setDesc('Such whitespace can be introduced as a result of poor post-processing of OCR (optical character recognition). Enable this option to remove it when copying links to text selections.');

@@ -747,7 +747,7 @@ export class PDFPlusContextMenu extends PDFPlusMenu {
                         if (plugin.lib.isCitationId(destId)) {
                             this.addItem((item) => {
                                 item.setSection('link')
-                                    .setTitle('Search on Google Scholar')
+                                    .setTitle('Open citation search')
                                     .setIcon('lucide-search')
                                     .onClick(() => {
                                         const url = this.child.bib?.getGoogleScholarSearchUrlFromDest(destId);

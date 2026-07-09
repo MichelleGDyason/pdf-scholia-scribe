@@ -333,7 +333,7 @@ export class BibliographyDom extends PDFPlusComponent {
 
         this.containerEl.createDiv('button-container', (el) => {
             new ButtonComponent(el)
-                .setButtonText('Google Scholar')
+                .setButtonText('Open citation search')
                 .onClick(() => {
                     const url = this.bib.getGoogleScholarSearchUrlFromDest(this.destId);
                     if (!url) {

@@ -1,5 +1,15 @@
 import { Menu, MenuItem, MenuSeparator, debounce } from 'obsidian';
 
+type MenuWithSubmenuInternals = Menu & {
+    parentMenu?: Menu;
+    closeSubmenu(): void;
+    openSubmenu(item: MenuItem): void;
+    openSubmenuSoon(item: MenuItem): void;
+    onArrowDown(): void;
+    onArrowUp(): void;
+    onArrowLeft(): void;
+    onArrowRight(): void;
+};
 
 /**
  * 
@@ -33,7 +43,7 @@ export function addProductMenuItems(rootMenu: Menu, itemAdders: ((menu: Menu) =>
                     const oldEscapeHandler = submenu.scope.keys.find((key) => key.key === 'Escape' && key.modifiers === '');
                     if (oldEscapeHandler) {
                         submenu.scope.unregister(oldEscapeHandler);
-                        submenu.scope.register([], 'Escape', rootMenu.hide.bind(rootMenu));
+                        submenu.scope.register([], 'Escape', () => rootMenu.hide());
                     }
                 }
 
@@ -75,19 +85,23 @@ export function getSelectedItemsRecursive(rootMenu: Menu) {
  * @param timeout Defaults to 250ms (as of Obsidian v1.5.11).
  */
 export function fixOpenSubmenu(menu: Menu, timeout?: number) {
-    menu.openSubmenu = function (item: MenuItem) {
+    const patchedMenu = menu as MenuWithSubmenuInternals;
+
+    patchedMenu.openSubmenu = function (this: MenuWithSubmenuInternals, item: MenuItem) {
         if (this.parentMenu) {
             this.closeSubmenu();
         }
-        return Menu.prototype.openSubmenu.call(this, item);
+        Menu.prototype.openSubmenu.call(this, item);
     };
 
-    menu.openSubmenuSoon = debounce(menu.openSubmenu.bind(menu), timeout ?? 250, true);
+    patchedMenu.openSubmenuSoon = debounce((item: MenuItem) => patchedMenu.openSubmenu(item), timeout ?? 250, true);
 }
 
 export function registerVimKeybindsToMenu(menu: Menu) {
-    menu.scope.register([], 'j', menu.onArrowDown.bind(menu));
-    menu.scope.register([], 'k', menu.onArrowUp.bind(menu));
-    menu.scope.register([], 'h', menu.onArrowLeft.bind(menu));
-    menu.scope.register([], 'l', menu.onArrowRight.bind(menu));
+    const vimMenu = menu as MenuWithSubmenuInternals;
+
+    menu.scope.register([], 'j', () => vimMenu.onArrowDown());
+    menu.scope.register([], 'k', () => vimMenu.onArrowUp());
+    menu.scope.register([], 'h', () => vimMenu.onArrowLeft());
+    menu.scope.register([], 'l', () => vimMenu.onArrowRight());
 }

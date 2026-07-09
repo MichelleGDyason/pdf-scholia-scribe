@@ -10,6 +10,27 @@ export * from './html-canvas';
 export * from './events';
 export * from './typescript';
 
+export type DebugInfoValue = string | number | boolean | string[];
+export type DebugInfo = Record<string, DebugInfoValue>;
+
+type ElectronAppBridge = {
+    remote: {
+        app: {
+            getVersion(): string;
+        };
+    };
+};
+
+type StyleSettingsPlugin = {
+    settingsManager?: {
+        settings?: Record<string, unknown>;
+    };
+};
+
+function getElectronAppVersion(): string | null {
+    const electron = window.electron as unknown as Partial<ElectronAppBridge> | undefined;
+    return electron?.remote?.app?.getVersion?.() ?? null;
+}
 
 export function getDirectPDFObj(dict: PDFDict, key: string) {
     const obj = dict.get(PDFName.of(key));
@@ -272,10 +293,7 @@ export function isVersionOlderThan(a: string, b: string) {
 }
 
 export function getInstallerVersion(): string | null {
-    return Platform.isDesktopApp ?
-        // @ts-ignore
-        window.electron.remote.app.getVersion() :
-        null;
+    return Platform.isDesktopApp ? getElectronAppVersion() : null;
 }
 
 export function getAndroidWebViewVersion() {
@@ -286,19 +304,19 @@ export function getAndroidWebViewVersion() {
  * Get the information about the Obsidian app and the system.
  * This is the same as the "SYSTEM INFO" section in the result of the "Show debug info" command.
  */
-export async function getSystemInfo(): Promise<any> {
-    if (window.electron) {
+export async function getSystemInfo(): Promise<DebugInfo> {
+    const installerVersion = getElectronAppVersion();
+    if (installerVersion) {
         return {
             'API version': apiVersion,
-            // @ts-ignore
-            'Installer version': window.electron.remote.app.getVersion(),
+            'Installer version': installerVersion,
             'Operating system': Platform.isMacOS ? 'macOS' : Platform.isWin ? 'Windows' : Platform.isLinux ? 'Linux' : 'Desktop',
         };
     }
 
     const appInfo = await window.Capacitor.Plugins.App.getInfo();
     const deviceInfo = await window.Capacitor.Plugins.Device.getInfo();
-    const info: any = {
+    const info: DebugInfo = {
         'Obsidian version': `${appInfo.version} (${appInfo.build})`,
         'API version': apiVersion,
         'Operating system': `${deviceInfo.platform} ${deviceInfo.osVersion} (${deviceInfo.manufacturer} ${deviceInfo.model})`,
@@ -311,7 +329,7 @@ export async function getSystemInfo(): Promise<any> {
 }
 
 /** Selected subset of the "Show debug info" command's result with some additional entries. */
-export async function getObsidianDebugInfo(app: App) {
+export async function getObsidianDebugInfo(app: App): Promise<DebugInfo> {
     // This is an empty string if it's the default theme
     const themeName = app.customCss.theme;
     const themeManifest = app.customCss.themes[themeName];
@@ -321,7 +339,7 @@ export async function getObsidianDebugInfo(app: App) {
     return {
         ...await getSystemInfo(),
         // This entry is not in Obsidian's built-in "Show debug info" command
-        'Use [[Wikilinks]]': app.vault.getConfig('useMarkdownLinks'),
+        'Use [[Wikilinks]]': Boolean(app.vault.getConfig('useMarkdownLinks')),
         // This entry is not in Obsidian's built-in "Show debug info" command.
         // It replaces the "Base theme" entry for identifying the color scheme even if it's set to be "adapt to system"
         'Base color scheme': activeDocument.body.hasClass('theme-dark') ? 'dark' : 'light',
@@ -334,9 +352,9 @@ export async function getObsidianDebugInfo(app: App) {
     };
 }
 
-export function getStyleSettings(app: App) {
-    // @ts-ignore
-    const fullStyleSettings = app.plugins.plugins['obsidian-style-settings']?.settingsManager.settings;
+export function getStyleSettings(app: App): Record<string, unknown> | null {
+    const styleSettingsPlugin = app.plugins.plugins['obsidian-style-settings'] as StyleSettingsPlugin | undefined;
+    const fullStyleSettings = styleSettingsPlugin?.settingsManager?.settings;
     const pdfPlusStyleSettings = fullStyleSettings ? Object.fromEntries(
         Object.entries(fullStyleSettings)
             .filter(([key]) => key.startsWith('pdf-plus@@'))

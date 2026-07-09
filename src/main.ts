@@ -32,6 +32,14 @@ const isSavedPDFViewState = (state: Partial<PDFViewState> | undefined): state is
 	return typeof state?.file === 'string' && typeof state.page === 'number';
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+	return typeof value === 'object' && value !== null;
+};
+
+const hasErrorCode = (err: unknown): err is { code: string } => {
+	return isRecord(err) && typeof err.code === 'string';
+};
+
 const collectPDFViewStates = (node: WorkspaceLayoutNode | undefined, states: PDFViewState[]) => {
 	if (!node) return;
 
@@ -186,7 +194,7 @@ export default class PDFPlus extends Plugin {
 				try {
 					await adapter.rmdir(anyStyleInputDir, true);
 				} catch (err) {
-					if (err.code !== 'ENOENT') throw err;
+					if (!hasErrorCode(err) || err.code !== 'ENOENT') throw err;
 				}
 			}
 		}
@@ -226,7 +234,8 @@ export default class PDFPlus extends Plugin {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign(this.getDefaultSettings(), await this.loadData());
+		const savedSettings = await this.loadData() as unknown;
+		this.settings = Object.assign(this.getDefaultSettings(), isRecord(savedSettings) ? savedSettings : {});
 
 		this.setCitationIdRegex();
 
@@ -517,7 +526,7 @@ export default class PDFPlus extends Plugin {
 						text: 'linkedFileProperties'
 					});
 					el.append(' are deprecated and will be removed in the near future. Please ');
-					linkEl.textContent = 'remove them from your templates';
+					linkEl.textContent = 'Remove them from your templates';
 					el.append(linkEl);
 					el.append('.');
 				});
@@ -573,7 +582,7 @@ export default class PDFPlus extends Plugin {
 	}
 
 	async saveSettings() {
-		const settings: any = Object.assign({}, this.settings);
+		const settings: Partial<PDFPlusSettings> = { ...this.settings };
 
 		// AnyStyle path: save to local storage, not to data.json
 		this.saveLocalStorage('anystylePath', settings.anystylePath);
@@ -632,7 +641,7 @@ export default class PDFPlus extends Plugin {
 		return this.app.loadLocalStorage(this.manifest.id + '-' + key);
 	}
 
-	saveLocalStorage(key: string, value?: any) {
+	saveLocalStorage(key: string, value?: unknown) {
 		this.app.saveLocalStorage(this.manifest.id + '-' + key, value);
 	}
 
