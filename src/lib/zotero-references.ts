@@ -111,13 +111,21 @@ function stringValue(value: unknown): string {
 	return typeof value === 'string' ? value : '';
 }
 
+function hasCustomToString(value: object): value is object & { toString: () => string } {
+	const toString = (value as { toString?: unknown }).toString;
+	return typeof toString === 'function' && toString !== Object.prototype.toString;
+}
+
 function stringifyScalar(value: unknown): string {
 	if (typeof value === 'string') return value;
-	if (typeof value !== 'object') return String(value);
-	if (value && typeof (value as { toString?: unknown }).toString === 'function') {
-		return (value as { toString(): string }).toString();
+	if (value === null || value === undefined) return '';
+	if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return value.toString();
+	if (typeof value === 'symbol') return value.description ?? value.toString();
+	if (typeof value === 'function') return value.name ? `[Function: ${value.name}]` : '[Function]';
+	if (hasCustomToString(value)) {
+		return value.toString();
 	}
-	return Object.prototype.toString.call(value);
+	return '[object Object]';
 }
 
 function stringifyPropertyValue(value: unknown): string {
@@ -669,7 +677,7 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 	}
 
 	formatInTextCitation(record: ScholiaReferenceRecord, page: string, mode: ScholiaCitationTextMode = 'default') {
-		const style = this.settings.zoteroInTextCitationStyle as ScholiaCitationStyle;
+		const style = this.settings.zoteroInTextCitationStyle;
 		const author = formatCitationAuthor(record.authors);
 		const year = record.year || 'n.d.';
 		const pagePart = page.trim();

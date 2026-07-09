@@ -12,6 +12,20 @@ import { showContextMenuAtSelection } from 'context-menu';
 import { RestoreDefaultModal } from 'modals/restore-default-modal';
 import { DataviewInlineFieldsModal } from './dataview';
 
+function formatDebugValue(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (value === null) return 'null';
+    if (value === undefined) return 'undefined';
+    if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return value.toString();
+    if (typeof value === 'symbol') return value.description ?? value.toString();
+    if (Array.isArray(value)) return `${value.length}`;
+    try {
+        return JSON.stringify(value) ?? Object.prototype.toString.call(value);
+    } catch {
+        return '[object Object]';
+    }
+}
+
 
 export class PDFPlusCommands extends PDFPlusLibSubmodule {
     commands: Record<string, Command>;
@@ -1051,11 +1065,11 @@ export class PDFPlusCommands extends PDFPlusLibSubmodule {
             if (Array.isArray(value)) {
                 text += `- ${key}: ${value.length}\n`;
                 value.forEach((item) => {
-                    text += `    - ${item}\n`;
+                    text += `    - ${formatDebugValue(item)}\n`;
                 });
                 continue;
             }
-            text += `- ${key}: ${value}\n`;
+            text += `- ${key}: ${formatDebugValue(value)}\n`;
         }
         text += `\n#### ${this.plugin.manifest.name} debug info\n\n`;
         text += '```\n' + JSON.stringify({ settings, styleSettings, styleSheet }) + '\n```\n';

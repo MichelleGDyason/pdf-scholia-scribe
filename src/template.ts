@@ -28,13 +28,21 @@ type TemplateVariables = Record<string, unknown>;
 
 const IDENTIFIER_PATTERN = /^[A-Za-z_$][\w$]*$/;
 
+function hasCustomToString(value: object): value is object & { toString: () => string } {
+    const toString = (value as { toString?: unknown }).toString;
+    return typeof toString === 'function' && toString !== Object.prototype.toString;
+}
+
 function stringifyScalar(value: unknown): string {
     if (typeof value === 'string') return value;
-    if (typeof value !== 'object') return String(value);
-    if (value && typeof (value as { toString?: unknown }).toString === 'function') {
-        return (value as { toString(): string }).toString();
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return value.toString();
+    if (typeof value === 'symbol') return value.description ?? value.toString();
+    if (typeof value === 'function') return value.name ? `[Function: ${value.name}]` : '[Function]';
+    if (hasCustomToString(value)) {
+        return value.toString();
     }
-    return Object.prototype.toString.call(value);
+    return '[object Object]';
 }
 
 function stringifyTemplateValue(value: unknown): string {
@@ -288,7 +296,7 @@ function cleanCitationText(value: string) {
 
 function formatColorLabel(value: unknown) {
     if (value === null || value === undefined) return '';
-    return String(value)
+    return stringifyScalar(value)
         .replace(/[_-]+/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();

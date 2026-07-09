@@ -303,7 +303,7 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
         if (isFineGrainedSplitDirection(paneType)) {
             return this.getLeafBySplit(paneType);
         }
-        return this.getLeafInSidebar(paneType as SidebarType);
+        return this.getLeafInSidebar(paneType);
     }
 
     getLeafBySplit(direction: FineGrainedSplitDirection): WorkspaceLeaf {
