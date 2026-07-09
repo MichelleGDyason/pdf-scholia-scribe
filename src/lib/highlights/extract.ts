@@ -42,7 +42,7 @@ export class HighlightExtractor extends PDFPlusLibSubmodule {
             const textRanges = rects
                 .map((rect) => this.getTextByRect(items as TextContentItem[], rect));
 
-            const rgb = annot.color ? { r: annot.color[0], g: annot.color[1], b: annot.color[2] } as RGB : null;
+            const rgb = annot.color ? { r: annot.color[0], g: annot.color[1], b: annot.color[2] } : null;
             const comment = annot.contentsObj?.str;
 
             results.push({ id: annot.id, textRanges, rgb, comment, left: rects[0][0], top: rects[0][3] });

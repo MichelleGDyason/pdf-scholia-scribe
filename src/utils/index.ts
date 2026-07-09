@@ -631,7 +631,7 @@ export function walkDescendantComponents(component: Component, callback: (compon
 export async function loadComponentAsync(component: Component) {
     if (!component._loaded) {
         component._loaded = true;
-        await Promise.resolve((component.onload as () => unknown)());
+        await Promise.resolve(component.onload());
         const promises = component._children.map(loadComponentAsync);
         await Promise.all(promises);
     }

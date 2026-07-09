@@ -84,7 +84,7 @@ type UnknownRecord = Record<string, unknown>;
 
 type NodeHttpResponse = {
 	statusCode?: number;
-	setEncoding(encoding: BufferEncoding): void;
+	setEncoding(encoding: 'utf8'): void;
 	on(event: 'data', callback: (chunk: string) => void): void;
 	on(event: 'end', callback: () => void): void;
 };

@@ -298,7 +298,7 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
     getLeaf(paneType: ExtendedPaneType | boolean): WorkspaceLeaf {
         if (paneType === '') paneType = false;
         if (typeof paneType === 'boolean' || isPaneType(paneType)) {
-            return this.app.workspace.getLeaf(paneType as PaneType | boolean);
+            return this.app.workspace.getLeaf(paneType);
         }
         if (isFineGrainedSplitDirection(paneType)) {
             return this.getLeafBySplit(paneType);
@@ -500,7 +500,9 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
         // causes the following error: TypeError: Right-hand side of 'instanceof' is not an object.
         // The following is a workaround for this problem.
         if (root === this.app.workspace.leftSplit || root === this.app.workspace.rightSplit) {
-            const sidebar = root as (typeof this.app.workspace.leftSplit | typeof this.app.workspace.rightSplit);
+            const sidebar = root === this.app.workspace.leftSplit
+                ? this.app.workspace.leftSplit
+                : this.app.workspace.rightSplit;
             const eventRef = this.app.workspace.on('active-leaf-change', (anotherLeaf) => {
                 if (anotherLeaf && anotherLeaf.getRoot() !== sidebar) {
                     sidebar.collapse();
