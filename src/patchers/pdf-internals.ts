@@ -15,8 +15,33 @@ import { camelCaseToKebabCase, getCharactersWithBoundingBoxesInPDFCoords, getTex
 import { AnnotationElement, PDFOutlineViewer, PDFViewerComponent, PDFViewerChild, PDFSearchSettings, Rect, PDFAnnotationHighlight, PDFTextHighlight, PDFRectHighlight, ObsidianViewer, PDFPageView, PDFView } from 'typings';
 import { SidebarView, SpreadMode } from 'pdfjs-enums';
 import { VimBindings } from 'vim/vim';
-import { PDFPlusSettings } from 'settings';
 
+
+type PatchedMethod<This, Args extends unknown[], Return> = (this: This, ...args: Args) => Return;
+
+const asPatchedMethod = <This, Args extends unknown[], Return>(method: unknown) => {
+    return method as PatchedMethod<This, Args, Return>;
+};
+
+const callPatchedMethod = <This, Args extends unknown[], Return>(
+    method: PatchedMethod<This, Args, Return>,
+    thisArg: This,
+    ...args: Args
+): Return => {
+    return Reflect.apply(method, thisArg, args);
+};
+
+type ObsidianViewerOpenArgs = {
+    url?: string;
+    [key: string]: unknown;
+};
+
+const PDF_PLUS_APP_OPTION_NAMES = ['defaultZoomValue', 'scrollModeOnLoad', 'spreadModeOnLoad'] as const;
+type PDFPlusAppOptionName = typeof PDF_PLUS_APP_OPTION_NAMES[number];
+
+const isPDFPlusAppOptionName = (name: unknown): name is PDFPlusAppOptionName => {
+    return typeof name === 'string' && (PDF_PLUS_APP_OPTION_NAMES as readonly string[]).includes(name);
+};
 
 export const patchPDFInternals = async (plugin: PDFPlus, pdfViewerComponent: PDFViewerComponent): Promise<boolean> => {
     if (plugin.patchStatus.pdfInternals) return true;
@@ -102,8 +127,9 @@ const reloadPDFViewerComponent = (viewer: PDFViewerComponent, file: TFile | null
 const patchPDFViewerComponent = (plugin: PDFPlus, pdfViewerComponent: PDFViewerComponent) => {
     plugin.register(around(pdfViewerComponent.constructor.prototype, {
         loadFile(old) {
+            const original = asPatchedMethod<PDFViewerComponent, [TFile, string?], Promise<unknown>>(old);
             return async function (this: PDFViewerComponent, file: TFile, subpath?: string) {
-                const ret = await old.call(this, file, subpath);
+                const ret = await callPatchedMethod(original, this, file, subpath);
 
                 this.then((child) => {
                     if (!this.visualizer || this.visualizer.file !== file) {
@@ -116,8 +142,9 @@ const patchPDFViewerComponent = (plugin: PDFPlus, pdfViewerComponent: PDFViewerC
             };
         },
         onload(old) {
+            const original = asPatchedMethod<PDFViewerComponent, [], Promise<unknown>>(old);
             return async function (this: PDFViewerComponent) {
-                const ret = await old.call(this);
+                const ret = await callPatchedMethod(original, this);
 
                 if (plugin.settings.usePageUpAndPageDown) {
                     this.scope.register([], 'PageUp', () => {
@@ -143,7 +170,8 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
 
     plugin.register(around(child.constructor.prototype, {
         load(old) {
-            return async function (this: PDFViewerChild, ...args: any[]) {
+            const original = asPatchedMethod<PDFViewerChild, unknown[], Promise<unknown>>(old);
+            return async function (this: PDFViewerChild, ...args: unknown[]) {
                 this.hoverPopover = null;
                 this.isFileExternal = false;
                 this.externalFileUrl = null;
@@ -156,7 +184,7 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                 }
                 this.component.load();
 
-                const ret = await old.call(this, ...args);
+                const ret = await callPatchedMethod(original, this, ...args);
 
                 const viewerContainerEl = this.pdfViewer?.dom?.viewerContainerEl;
                 if (viewerContainerEl) {
@@ -325,22 +353,25 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
 
         },
         unload(old) {
+            const original = asPatchedMethod<PDFViewerChild, [], unknown>(old);
             return function (this: PDFViewerChild) {
                 this.component?.unload();
-                return old.call(this);
+                return callPatchedMethod(original, this);
             };
         },
         onResize(old) {
+            const original = asPatchedMethod<PDFViewerChild, [], unknown>(old);
             return function (this: PDFViewerChild) {
                 const pdfContainerEl = this.containerEl.querySelector<HTMLElement>('.pdf-container');
                 if (pdfContainerEl) {
                     plugin.pdfViewerChildren.set(pdfContainerEl, this);
                 }
 
-                return old.call(this);
+                return callPatchedMethod(original, this);
             };
         },
         loadFile(old) {
+            const original = asPatchedMethod<PDFViewerChild, [TFile, string?], Promise<unknown>>(old);
             return async function (this: PDFViewerChild, file: TFile, subpath?: string) {
                 // Without this, if the plugin is loaded with a PDF embed open, `loadFile` seems to be called
                 // before `load` (in the second half of PDFViewerComponent.onload, the callback functions in `this.next`
@@ -372,7 +403,7 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                         const redirectFrom = app.vault.getResourcePath(file).replace(/\?\d+$/, '');
                         this.pdfViewer.pdfPlusRedirect = { from: redirectFrom, to: redirectTo };
 
-                        await old.call(this, file, subpath);
+                        await callPatchedMethod(original, this, file, subpath);
 
                         this.component.register(() => URL.revokeObjectURL(redirectTo));
 
@@ -390,7 +421,7 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                 if (!externalFileLoaded) {
                     this.isFileExternal = false;
                     this.externalFileUrl = null;
-                    await old.call(this, file, subpath);
+                    await callPatchedMethod(original, this, file, subpath);
                 }
 
                 const pdfContainerEl = this.containerEl.querySelector<HTMLElement>('.pdf-container');
@@ -731,8 +762,9 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
             };
         },
         getMarkdownLink(old) {
+            const original = asPatchedMethod<PDFViewerChild, [string?, string?, boolean?], string>(old);
             return function (this: PDFViewerChild, subpath?: string, alias?: string, embed?: boolean): string {
-                if (!this.file) return old.call(this, subpath, alias, embed);
+                if (!this.file) return callPatchedMethod(original, this, subpath, alias, embed);
                 const embedLink = lib.generateMarkdownLink(this.file, '', subpath, alias);
                 if (embed) return embedLink;
                 return embedLink.slice(1);
@@ -761,16 +793,18 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                 : {}
         ),
         getPageLinkAlias(old) {
+            const original = asPatchedMethod<PDFViewerChild, [number], string>(old);
             return function (this: PDFViewerChild, page: number): string {
                 if (this.file) {
                     const alias = lib.copyLink.getDisplayText(this, undefined, this.file, page, lib.toSingleLine(activeWindow.getSelection()?.toString() ?? ''));
                     if (alias) return alias;
                 }
 
-                return old.call(this, page);
+                return callPatchedMethod(original, this, page);
             };
         },
         highlightText(old) {
+            const original = asPatchedMethod<PDFViewerChild, [number, [[number, number], [number, number]]], void>(old);
             return function (this: PDFViewerChild, page: number, range: [[number, number], [number, number]]) {
                 const pageView = this.getPage(page);
                 const textLayer = pageView.textLayer;
@@ -804,7 +838,7 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                 }
 
                 if (!(plugin.settings.noTextHighlightsInEmbed && this.pdfViewer.isEmbed && !this.pdfViewer.dom?.containerEl.parentElement?.matches('.hover-popover'))) {
-                    old.call(this, page, range);
+                    callPatchedMethod(original, this, page, range);
                 }
 
                 if (textDivFirst) {
@@ -817,6 +851,7 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
             };
         },
         highlightAnnotation(old) {
+            const original = asPatchedMethod<PDFViewerChild, [number, string], void>(old);
             return function (this: PDFViewerChild, page: number, id: string) {
                 const getAnnotationEl = () => {
                     if (this.annotationHighlight) return this.annotationHighlight;
@@ -842,7 +877,7 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                 }
 
                 if (!(plugin.settings.noAnnotationHighlightsInEmbed && this.pdfViewer.isEmbed && !this.pdfViewer.dom?.containerEl.parentElement?.matches('.hover-popover'))) {
-                    old.call(this, page, id);
+                    callPatchedMethod(original, this, page, id);
                 }
 
                 const el = getAnnotationEl();
@@ -859,29 +894,33 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
             };
         },
         clearTextHighlight(old) {
+            const original = asPatchedMethod<PDFViewerChild, [], void>(old);
             return function (this: PDFViewerChild) {
                 if (plugin.settings.persistentTextHighlightsInEmbed && (this.pdfViewer?.isEmbed ?? this.opts.isEmbed)) {
                     return;
                 }
-                old.call(this);
+                callPatchedMethod(original, this);
             };
         },
         clearAnnotationHighlight(old) {
+            const original = asPatchedMethod<PDFViewerChild, [], void>(old);
             return function (this: PDFViewerChild) {
                 if (plugin.settings.persistentAnnotationHighlightsInEmbed && this.pdfViewer.isEmbed) {
                     return;
                 }
-                old.call(this);
+                callPatchedMethod(original, this);
             };
         },
         clearEphemeralUI(old) {
+            const original = asPatchedMethod<PDFViewerChild, [], void>(old);
             return function (this: PDFViewerChild) {
-                old.call(this);
+                callPatchedMethod(original, this);
                 lib.highlight.viewer.clearRectHighlight(this);
             };
         },
         renderAnnotationPopup(old) {
-            return function (this: PDFViewerChild, annotationElement: AnnotationElement, ...args: any[]) {
+            const original = asPatchedMethod<PDFViewerChild, [AnnotationElement, ...unknown[]], unknown>(old);
+            return function (this: PDFViewerChild, annotationElement: AnnotationElement, ...args: unknown[]) {
                 // This is a fix for a bug of Obsidian, which causes the following error when clicking on links in PDFs:
                 // 
                 // > Uncaught TypeError: Cannot read properties of undefined (reading 'str')
@@ -891,7 +930,7 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                     return;
                 }
 
-                const ret = old.call(this, annotationElement, ...args);
+                const ret = callPatchedMethod(original, this, annotationElement, ...args);
 
                 plugin.lastAnnotationPopupChild = this;
                 const { page, id } = lib.getAnnotationInfoFromAnnotationElement(annotationElement);
@@ -1019,24 +1058,27 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
             };
         },
         destroyAnnotationPopup(old) {
-            return function () {
+            const original = asPatchedMethod<PDFViewerChild, [], unknown>(old);
+            return function (this: PDFViewerChild) {
                 plugin.lastAnnotationPopupChild = null;
-                return old.call(this);
+                return callPatchedMethod(original, this);
             };
         },
         onContextMenu(old) {
-            return async function (evt: MouseEvent): Promise<void> {
+            const original = asPatchedMethod<PDFViewerChild, [MouseEvent], Promise<void>>(old);
+            return async function (this: PDFViewerChild, evt: MouseEvent): Promise<void> {
                 if (Platform.isPhone) return;
                 if (Platform.isTablet && !plugin.settings.showContextMenuOnTablet) return;
 
                 if (!plugin.settings.replaceContextMenu) {
-                    return await old.call(this, evt);
+                    return await callPatchedMethod(original, this, evt);
                 }
 
                 await onContextMenu(plugin, this, evt);
             };
         },
         onMobileCopy(old) {
+            const original = asPatchedMethod<PDFViewerChild, [ClipboardEvent, PDFPageView], unknown>(old);
             return function (this: PDFViewerChild, evt: ClipboardEvent, pageView: PDFPageView) {
                 switch (plugin.settings.mobileCopyAction) {
                     case 'text':
@@ -1048,14 +1090,15 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                         });
                         return;
                     case 'obsidian':
-                        return old.call(this, evt, pageView);
+                        return callPatchedMethod(original, this, evt, pageView);
                 }
             };
         },
         onThumbnailContextMenu(old) {
+            const original = asPatchedMethod<PDFViewerChild, [MouseEvent], unknown>(old);
             return function (this: PDFViewerChild, evt: MouseEvent) {
                 if (!plugin.settings.thumbnailContextMenu) {
-                    return old.call(this, evt);
+                    return callPatchedMethod(original, this, evt);
                 }
 
                 onThumbnailContextMenu(plugin, this, evt);
@@ -1135,11 +1178,12 @@ const patchObsidianViewer = (plugin: PDFPlus, pdfViewer: ObsidianViewer) => {
     // `Object.getPrototypeOf(pdfViewer) === window.pdfjsViewer.PDFViewerApplication`.
     //
     // See the docstring of the `ObsidianViewer` interface for more details.
-    const prototype = Object.getPrototypeOf(pdfViewer);
+    const prototype = Object.getPrototypeOf(pdfViewer) as object;
 
     plugin.register(around(prototype, {
-        open(old) {
-            return async function (this: ObsidianViewer, args: any) {
+        open(old: unknown) {
+            const original = asPatchedMethod<ObsidianViewer, [ObsidianViewerOpenArgs], Promise<unknown>>(old);
+            return async function (this: ObsidianViewer, args: ObsidianViewerOpenArgs) {
                 if (this.pdfPlusRedirect) {
                     const { from, to } = this.pdfPlusRedirect;
                     const url = args.url;
@@ -1152,11 +1196,12 @@ const patchObsidianViewer = (plugin: PDFPlus, pdfViewer: ObsidianViewer) => {
 
                 delete this.pdfPlusRedirect;
 
-                return await old.call(this, args);
+                return await callPatchedMethod(original, this, args);
             };
         },
-        load(old) {
-            return function (this: ObsidianViewer, doc: PDFDocumentProxy, ...args: any[]) {
+        load(old: unknown) {
+            const original = asPatchedMethod<ObsidianViewer, [PDFDocumentProxy, ...unknown[]], unknown>(old);
+            return function (this: ObsidianViewer, doc: PDFDocumentProxy, ...args: unknown[]) {
                 const callbacks = this.pdfPlusCallbacksOnDocumentLoaded;
                 if (callbacks) {
                     for (const callback of callbacks) {
@@ -1165,7 +1210,7 @@ const patchObsidianViewer = (plugin: PDFPlus, pdfViewer: ObsidianViewer) => {
                 }
                 delete this.pdfPlusCallbacksOnDocumentLoaded;
 
-                return old.call(this, doc, ...args);
+                return callPatchedMethod(original, this, doc, ...args);
             };
         }
     }));
@@ -1174,12 +1219,13 @@ const patchObsidianViewer = (plugin: PDFPlus, pdfViewer: ObsidianViewer) => {
 const patchAppOptions = (plugin: PDFPlus) => {
     plugin.register(around(window.pdfjsViewer.AppOptions, {
         get(old) {
-            return function (...args: any[]) {
+            const original = asPatchedMethod<typeof window.pdfjsViewer.AppOptions, unknown[], unknown>(old);
+            return function (this: typeof window.pdfjsViewer.AppOptions, ...args: unknown[]) {
                 const name = args[0];
-                if (['defaultZoomValue', 'scrollModeOnLoad', 'spreadModeOnLoad'].includes(name)) {
-                    return plugin.settings[name as keyof PDFPlusSettings];
+                if (isPDFPlusAppOptionName(name)) {
+                    return plugin.settings[name];
                 }
-                return old.apply(this, args);
+                return callPatchedMethod(original, this, ...args);
             };
         },
     }));
