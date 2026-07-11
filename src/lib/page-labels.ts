@@ -19,8 +19,19 @@ export const PAGE_LABEL_NUMBERING_STYLES = {
 
 export type PageLabelNumberingStyle = keyof typeof PAGE_LABEL_NUMBERING_STYLES;
 
+/**
+ * Narrows a dynamically decoded PDF or UI value to a supported page-label
+ * numbering style.
+ *
+ * PDF dictionary entries are dynamically typed at runtime, so even an `S`
+ * entry narrowed to `PDFName` can decode to an arbitrary string. This guard
+ * accepts only `D`, `R`, `r`, `A`, and `a`; malformed names, unsupported styles,
+ * and UI sentinel values such as `None` are rejected. Callers should use this
+ * membership check instead of casting because a cast would not validate the
+ * underlying PDF data.
+ */
 export function isPageLabelNumberingStyle(value: string): value is PageLabelNumberingStyle {
-    return Object.prototype.hasOwnProperty.call(PAGE_LABEL_NUMBERING_STYLES, value);
+    return Object.hasOwn(PAGE_LABEL_NUMBERING_STYLES, value);
 }
 
 /** 
@@ -58,6 +69,14 @@ export class PDFPageLabelDict {
 }
 
 
+/**
+ * Parsed PDF page-label ranges using one-based page indexes internally.
+ *
+ * Styles stored on each range have already passed the supported-style guard;
+ * an absent style remains `undefined` so prefix-only and unnumbered ranges can
+ * round-trip without inventing a numbering mode. Range order is normalized by
+ * page index before lookup or serialization.
+ */
 export class PDFPageLabels {
     // pageFrom: converted into a 1-based page index for easier use; it's 0-based in the original PDF document
     constructor(public doc: PDFDocument, public ranges: { pageFrom: number, dict: PDFPageLabelDict }[]) {
@@ -214,7 +233,11 @@ export class PDFPageLabels {
         return -1;
     }
 
-    then(fn: (labels: PDFPageLabels) => any) {
+    /**
+     * Runs a side-effect callback while preserving this instance for fluent
+     * page-label updates. The callback result is intentionally ignored.
+     */
+    then(fn: (labels: PDFPageLabels) => void) {
         fn(this);
         return this;
     }
