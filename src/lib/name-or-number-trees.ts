@@ -5,6 +5,21 @@
 import { PDFArray, PDFDict, PDFHexString, PDFName, PDFNumber, PDFObject, PDFRef, PDFString } from '@cantoo/pdf-lib';
 
 
+/**
+ * Shared facade for PDF name and number trees.
+ *
+ * `Key` is the decoded PDF key type: one tree uses either strings or numbers,
+ * never a mixture. `TreeNode` keeps facade callbacks specific to the matching
+ * node class. Values deliberately remain `PDFObject` because the PDF spec lets
+ * each tree's consumer define its value shape. Lookup compares keys with strict
+ * equality and `<`/`>` ordering, so callers must preserve the PDF tree's sorted
+ * key invariant; traversal otherwise retains the stored child and entry order.
+ * Duplicate entries remain visible during iteration, while lookup returns the
+ * match reached by the existing binary search.
+ *
+ * @template Key The string or number key type used consistently by one tree.
+ * @template TreeNode The concrete node type associated with that key type.
+ */
 abstract class NameOrNumberTree<Key extends string | number, TreeNode extends NameOrNumberTreeNode<Key>> {
     _rootDict: PDFDict;
 
@@ -22,7 +37,13 @@ abstract class NameOrNumberTree<Key extends string | number, TreeNode extends Na
         return this.root.get(key);
     }
 
-    iterLeaves(callback: (node: TreeNode) => any) {
+    /**
+     * Visits leaves in breadth-first child order.
+     *
+     * The callback result is intentionally ignored; only its side effects are
+     * part of traversal behavior.
+     */
+    iterLeaves(callback: (node: TreeNode) => void): void {
         this.root.iterLeaves(callback);
     }
 
@@ -30,7 +51,11 @@ abstract class NameOrNumberTree<Key extends string | number, TreeNode extends Na
         return this.root.getLeaves();
     }
 
-    iter(callbacks: { enter?: (node: TreeNode) => any, leave?: (node: TreeNode) => any }) {
+    /**
+     * Traverses nodes depth-first, invoking `enter` before children and `leave`
+     * afterward. Callback results are ignored.
+     */
+    iter(callbacks: { enter?: (node: TreeNode) => void, leave?: (node: TreeNode) => void }): void {
         this.root.iter(callbacks);
     }
 
@@ -51,18 +76,38 @@ abstract class NameOrNumberTree<Key extends string | number, TreeNode extends Na
     }
 }
 
+/**
+ * A PDF name tree whose decoded keys are strings and whose values are raw
+ * `PDFObject` instances. Numeric or mixed keys are not supported; key equality
+ * and ordering follow JavaScript string comparison after PDF string decoding.
+ */
 export class NameTree extends NameOrNumberTree<string, NameTreeNode> {
     createNode(dict: PDFDict): NameTreeNode {
         return new NameTreeNode(dict);
     }
 }
 
+/**
+ * A PDF number tree whose decoded keys are numbers and whose values are raw
+ * `PDFObject` instances. String or mixed keys are not supported; key equality
+ * and ordering use JavaScript numeric comparison after PDF number decoding.
+ */
 export class NumberTree extends NameOrNumberTree<number, NumberTreeNode> {
     createNode(dict: PDFDict): NumberTreeNode {
         return new NumberTreeNode(dict);
     }
 }
 
+/**
+ * Shared node implementation for one homogeneous PDF tree key type.
+ *
+ * `Key` represents decoded PDF string or number keys; the union constraint
+ * shares implementation without permitting mixed keys in a concrete tree.
+ * Alternating value slots remain `PDFObject` instances. Child arrays and leaf
+ * entries retain stored order unless an explicit sorting method is called.
+ *
+ * @template Key The single decoded key type used by this node and its tree.
+ */
 abstract class NameOrNumberTreeNode<Key extends string | number> {
     abstract readonly leafKey: string;
 
@@ -195,8 +240,12 @@ abstract class NameOrNumberTreeNode<Key extends string | number> {
         return size;
     }
 
-    /** Iterate over leaf nodes (and the root node if it is the only node in the tree). */
-    iterLeaves(callback: (node: NameOrNumberTreeNode<Key>) => any) {
+    /**
+     * Visits leaf nodes breadth-first, including a leaf-only root.
+     * Callback return values are ignored so traversal only observes side
+     * effects and never treats a result as a payload or control signal.
+     */
+    iterLeaves(callback: (node: NameOrNumberTreeNode<Key>) => void): void {
         const stack: NameOrNumberTreeNode<Key>[] = [this];
         while (stack.length) {
             const node = stack.shift()!;
@@ -255,7 +304,12 @@ abstract class NameOrNumberTreeNode<Key extends string | number> {
         // No need to update "Limits".
     }
 
-    iter(callbacks: { enter?: (node: NameOrNumberTreeNode<Key>) => any, leave?: (node: NameOrNumberTreeNode<Key>) => any }) {
+    /**
+     * Traverses this subtree depth-first in stored child order.
+     * `enter` runs before descendants and `leave` afterward; both results are
+     * intentionally ignored.
+     */
+    iter(callbacks: { enter?: (node: NameOrNumberTreeNode<Key>) => void, leave?: (node: NameOrNumberTreeNode<Key>) => void }): void {
         callbacks.enter?.(this);
         this.kids?.forEach((kid) => kid.iter(callbacks));
         callbacks.leave?.(this);
@@ -345,6 +399,10 @@ abstract class NameOrNumberTreeNode<Key extends string | number> {
     }
 }
 
+/**
+ * Node for a `NameTree`; it decodes PDF strings to string keys without numeric
+ * coercion and preserves values as `PDFObject` instances.
+ */
 export class NameTreeNode extends NameOrNumberTreeNode<string> {
     get leafKey() {
         return 'Names';
@@ -364,6 +422,10 @@ export class NameTreeNode extends NameOrNumberTreeNode<string> {
     }
 }
 
+/**
+ * Node for a `NumberTree`; it decodes PDF numbers to numeric keys without
+ * string coercion and preserves values as `PDFObject` instances.
+ */
 export class NumberTreeNode extends NameOrNumberTreeNode<number> {
     get leafKey() {
         return 'Nums';
