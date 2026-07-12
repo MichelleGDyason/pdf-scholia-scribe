@@ -7,8 +7,47 @@ const isTargetTypable = (evt: KeyboardEvent) => {
     return isTargetHTMLElement(evt, evt.target) && isTypable(evt.target);
 };
 
-export type VimCommand = (n?: number) => any;
+/**
+ * Executes a registered Vim key sequence with its optional numeric repeat prefix.
+ *
+ * `VimScope.handleKey()` invokes commands synchronously after an exact key match. Commands
+ * commonly mutate viewer, selection, or Vim state, but their return values never control
+ * dispatch; `void` prevents unsafe result use while still allowing incidental values. If an
+ * implementation returns a Promise, the scope does not await it, and synchronous throws or
+ * rejected Promises retain their existing propagation or fire-and-forget behavior.
+ */
+export type VimCommand = (repeatCount?: number) => void;
+
+/** Associates one canonical Vim key sequence with the command invoked for an exact match. */
 export type VimKeymap = { keys: string, func: VimCommand };
+
+/**
+ * Handles a real Escape key or configured escape alias before normal command dispatch.
+ *
+ * The argument is `true` only for the physical Escape key and `false` for an alias. Results
+ * are ignored; callbacks synchronously mutate Vim or viewer state, throws stop dispatch,
+ * and any returned Promise remains unawaited. This contract depends on the local Vim escape
+ * flow rather than Obsidian's keymap-listener return convention.
+ */
+type VimEscapeCallback = (isRealEscape: boolean) => void;
+
+/**
+ * Models Obsidian's runtime-only virtual key field used for Alt-key canonicalization.
+ * The public `KeymapInfo` type omits this property, so this local interface must be reviewed
+ * if Obsidian changes the private payload supplied to `Scope.handleKey()`.
+ */
+interface KeymapInfoWithVirtualKey extends KeymapInfo {
+    vkey: string;
+}
+
+/**
+ * Verifies that an Obsidian keymap payload contains the string virtual key required for Alt.
+ * This runtime check replaces unchecked private-property access and prevents unsafe calls on
+ * a missing or non-string `vkey` value.
+ */
+const hasVirtualKey = (info: KeymapInfo): info is KeymapInfoWithVirtualKey => {
+    return 'vkey' in info && typeof info.vkey === 'string';
+};
 
 export class VimScope extends Scope {
     modeToKeymaps: Record<string, VimKeymap[]> = {};
@@ -16,7 +55,7 @@ export class VimScope extends Scope {
     currentKeys: string = '';
     searchFrom = 0;
     searchTo = -1;
-    onEscapeCallbacks: ((isRealEscape: boolean) => any)[] = [];
+    onEscapeCallbacks: VimEscapeCallback[] = [];
     escapeAliases: string[] = [];
     typableModes: string[] = [];
 
@@ -116,7 +155,7 @@ export class VimScope extends Scope {
         this.searchTo = -1;
     }
 
-    onEscape(callback: (isRealEscape: boolean) => any) {
+    onEscape(callback: VimEscapeCallback) {
         this.onEscapeCallbacks.push(callback);
     }
 
@@ -128,7 +167,12 @@ export class VimScope extends Scope {
         this.typableModes.push(...modes);
     }
 
-    handleKey(evt: KeyboardEvent, info: KeymapInfo) {
+    /**
+     * Dispatches one Obsidian scope event while preserving Vim and parent-scope precedence.
+     * Command results are ignored; handled state is expressed solely through `preventDefault`
+     * and whether the event is delegated to the parent scope.
+     */
+    handleKey(evt: KeyboardEvent, info: KeymapInfo): void {
         let shouldCallParent = true;
 
         (() => {
@@ -196,9 +240,12 @@ export class VimScope extends Scope {
                 return `<S-${result ?? info.key}>`;
             case 'Ctrl':
                 return `<C-${result ?? info.key}>`;
-            case 'Alt':
-                // @ts-ignore
+            case 'Alt': {
+                if (!hasVirtualKey(info)) {
+                    throw new TypeError('Obsidian KeymapInfo.vkey must be a string for Alt-modified keys');
+                }
                 return `<M-${VimScope.canonicalizeSpecialKey(info.vkey) ?? info.vkey.toLowerCase()}>`;
+            }
             case 'Meta':
                 return `<M-${result ?? info.key}>`;
             default:
