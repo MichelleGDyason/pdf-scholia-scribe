@@ -96,7 +96,14 @@ export class VimCommandLineMode extends VimBindingsMode {
         }
     }
 
-    async executeCommand(cmd: string, options: Partial<{ error: ErrorReportMethod[], history: boolean }> = { error: ['notice', 'console.error'], history: true }) {
+    /**
+     * Parses and executes one command while preserving the callback's existing result semantics.
+     *
+     * The returned Promise adopts asynchronous callback results and carries incidental
+     * synchronous results, although every current caller intentionally discards it. Thrown
+     * errors and rejected callback Promises therefore remain rejections of this Promise.
+     */
+    async executeCommand(cmd: string, options: Partial<{ error: ErrorReportMethod[], history: boolean }> = { error: ['notice', 'console.error'], history: true }): Promise<unknown> {
         options = { error: [], history: true, ...options };
 
         if (options.history) {

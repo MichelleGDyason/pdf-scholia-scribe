@@ -3,7 +3,25 @@ import { VimHintTarget } from './hint';
 import { MarkdownModal } from 'modals/markdown-modal';
 
 
-export type ExCommand = { id: string, minNargs?: number, description?: string, pattern?: RegExp, func: (...args: string[]) => any };
+/**
+ * Executes a Vim Ex command with the parsed argument tokens in their original order.
+ *
+ * Implementations may complete synchronously or return a Promise. The command-line
+ * executor forwards the result to preserve Promise adoption, but its current callers
+ * deliberately ignore resolved values. `unknown` retains incidental boolean, numeric,
+ * and other results without granting the unsafe access that `any` allowed. Synchronous
+ * throws and Promise rejections propagate through `executeCommand()`'s returned Promise.
+ */
+type ExCommandCallback = (...args: string[]) => unknown;
+
+/** Describes a registered Vim Ex command and its optional lookup metadata. */
+export type ExCommand = {
+    id: string,
+    minNargs?: number,
+    description?: string,
+    pattern?: RegExp,
+    func: ExCommandCallback,
+};
 
 export const exCommands = (vim: VimBindings): ExCommand[] => {
     /***************************************************************
