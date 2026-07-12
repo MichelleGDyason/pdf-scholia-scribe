@@ -53,6 +53,17 @@ export type PDFTextPos = {
 };
 
 
+/**
+ * Projects one PDF.js text-content item onto a horizontal or vertical numeric range.
+ *
+ * `_getMergedRangeOfItems()` invokes the mapper synchronously in source-item order and
+ * consumes every result when calculating the merged bounds. Results are never null or
+ * undefined, and the mapper does not mutate parser state. A concrete contract prevents
+ * `Function.bind()` from erasing the meaningful range type to `any`; it assumes the Vim
+ * text-structure parser continues to infer lines from one geometric range per item.
+ */
+type TextItemRangeMapper = (item: TextContentItem) => { from: number, to: number };
+
 export class PDFPageTextStructureParser {
     pageView: PDFPageView;
     items: TextContentItem[];
@@ -177,11 +188,10 @@ export class PDFPageTextStructureParser {
 
     _getMergedRangeOfItems(items: TextContentItem[], direction: 'horizontal' | 'vertical' = 'vertical') {
         if (items.length === 0) return null;
-        const ranges: { from: number, to: number }[] = items.map(
-            direction === 'vertical'
-                ? this._getVerticalRangeOfItem.bind(this)
-                : this._getHorizontalRangeOfItem.bind(this)
-        );
+        const getRangeForItem: TextItemRangeMapper = direction === 'vertical'
+            ? (item) => this._getVerticalRangeOfItem(item)
+            : (item) => this._getHorizontalRangeOfItem(item);
+        const ranges = items.map(getRangeForItem);
         const from = Math.min(...ranges.map((range) => range.from));
         const to = Math.max(...ranges.map((range) => range.to));
         return { from, to };
