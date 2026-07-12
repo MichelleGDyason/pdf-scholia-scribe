@@ -5,7 +5,17 @@ import { PDFOutlineTreeNode, PDFOutlineViewer } from 'typings';
 import { SidebarView } from 'pdfjs-enums';
 
 
-type OutlineCommand = (outline: PDFOutlineViewer, n?: number) => any;
+/**
+ * Executes one synchronous Vim outline command against Obsidian's private PDF outline viewer.
+ *
+ * `toVimCommand()` supplies the current viewer first and the optional Vim repeat count second.
+ * Implementations mutate highlighted items, expansion state, or outline DOM focus indicators;
+ * their return values are ignored, and synchronous throws propagate through the Vim command.
+ * No current command returns a Promise: expansion and collapse explicitly remain fire-and-forget.
+ * Review this contract if Obsidian changes its outline viewer shape or the local Vim adapter begins
+ * consuming command results.
+ */
+type OutlineCommand = (outline: PDFOutlineViewer, repeatCount?: number) => void;
 
 export class VimOutlineMode extends VimBindingsMode {
     constructor(vim: VimBindings) {
