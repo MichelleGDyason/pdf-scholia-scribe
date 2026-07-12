@@ -116,11 +116,16 @@ abstract class PDFLinkLikePostProcessor implements HoverParent {
             let linktext: string | null = null;
             try {
                 linktext = await this.getLinkText(event);
-            } catch (e) {
-                if (e.name === 'UnknownErrorException') {
+            } catch (error: unknown) {
+                // PDF.js can reject with plain exception objects rather than Error instances.
+                const isUnknownDestinationError = typeof error === 'object'
+                    && error !== null
+                    && 'name' in error
+                    && error.name === 'UnknownErrorException';
+                if (isUnknownDestinationError) {
                     return console.warn(`${this.plugin.manifest.name}: The destination was not found in this document.`);
                 }
-                throw e;
+                throw error;
             }
 
             if (linktext === null) return;
