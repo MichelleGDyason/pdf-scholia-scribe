@@ -5,6 +5,39 @@ import { PDFPlusComponent } from './component';
 import { MultiValuedMap } from 'utils';
 
 
+/**
+ * Events emitted by the backlink index's internal Obsidian `Events` instance.
+ *
+ * Obsidian's event bus accepts arbitrary names and payloads, so this local map
+ * records the plugin-owned contract at that untyped boundary. `update` is
+ * emitted synchronously after a metadata-cache change or deletion, or a vault
+ * rename, has finished mutating the index. It intentionally carries no
+ * arguments; the listener reads the refreshed index directly. External
+ * Obsidian event payloads are consumed by `onload()` and are not forwarded.
+ * Review this map if the index adds an event or begins sending update details.
+ */
+interface PDFBacklinkIndexEventMap {
+    update: [];
+}
+
+/**
+ * Names accepted by the backlink index's plugin-internal event API.
+ *
+ * Keeping the alias tied to `PDFBacklinkIndexEventMap` prevents arbitrary
+ * strings from bypassing the documented payload contract.
+ */
+type PDFBacklinkIndexEventName = keyof PDFBacklinkIndexEventMap;
+
+/**
+ * Listener for one backlink-index event and its exact argument tuple.
+ *
+ * Callback results are intentionally ignored by Obsidian's `Events` bridge.
+ * This assumes the bridge continues to invoke listeners synchronously and to
+ * preserve argument order; review the alias if Obsidian changes that behavior.
+ */
+type PDFBacklinkIndexEventCallback<Name extends PDFBacklinkIndexEventName> = (...args: PDFBacklinkIndexEventMap[Name]) => void;
+
+
 export class PDFBacklinkIndex extends PDFPlusComponent {
     file: TFile;
     private events: Events;
@@ -157,12 +190,17 @@ export class PDFBacklinkIndex extends PDFPlusComponent {
         return cache;
     }
 
-    on(name: 'update', callback: () => any, ctx?: any): EventRef;
-    on(name: string, callback: (...args: any[]) => any, ctx?: any): EventRef {
+    /**
+     * Registers a listener for a plugin-internal backlink-index event.
+     * The optional context is opaque and forwarded to Obsidian without being
+     * inspected; callers retain the returned `EventRef` for lifecycle cleanup.
+     */
+    on<Name extends PDFBacklinkIndexEventName>(name: Name, callback: PDFBacklinkIndexEventCallback<Name>, ctx?: unknown): EventRef {
         return this.events.on(name, callback, ctx);
     }
 
-    trigger(name: string, ...args: any[]) {
+    /** Emits a mapped internal event with its documented argument tuple. */
+    trigger<Name extends PDFBacklinkIndexEventName>(name: Name, ...args: PDFBacklinkIndexEventMap[Name]): void {
         this.events.trigger(name, ...args);
     }
 }
