@@ -5,6 +5,17 @@ import { getNodeAndOffsetOfTextPos, getTextLayerInfo, isSelectionForward, repeat
 import { showContextMenuAtSelection } from 'context-menu';
 
 
+/**
+ * Performs one synchronous visual-selection motion for an optional Vim repeat count.
+ *
+ * The visual keymap wrapper passes the count as its sole argument. Implementations mutate
+ * the browser DOM `Selection` or related local Vim state and return no value; the wrapper
+ * ignores callback results and marks the selection change in the same key-handling turn.
+ * This local Vim contract does not rely on CodeMirror or private Obsidian APIs. Review it
+ * if `VimScope` changes its count argument or visual motions become asynchronous.
+ */
+type VisualMotionCallback = (count?: number) => void;
+
 export class VimVisualMode extends VimBindingsMode {
     selectionChangedByVisualMotion = false;
     previousSelection: { anchor: { page: number, pos: PDFTextPos }, head: { page: number, pos: PDFTextPos } } | null = null;
@@ -43,7 +54,7 @@ export class VimVisualMode extends VimBindingsMode {
     }
 
     defineKeymaps() {
-        const visualMotion = (func: (n?: number) => any) => {
+        const visualMotion = (func: VisualMotionCallback) => {
             return (n?: number) => (func(n), this.selectionChangedByVisualMotion = true);
         };
 
