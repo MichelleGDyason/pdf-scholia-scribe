@@ -476,12 +476,42 @@ interface PDFViewer {
     nextPage(): boolean;
 }
 
+/**
+ * The private portion of PDF.js `PageViewport.rawDims` used by backlink geometry.
+ *
+ * PDF.js derives these values from the page `viewBox`, so `pageWidth` and `pageX` are
+ * unscaled PDF user-space values: zoom and viewport rotation do not alter or swap them.
+ * The runtime object also contains height and y-origin values, but they are deliberately
+ * omitted because this plugin boundary does not read them. PDF.js normally supplies finite
+ * numbers; this type does not add runtime validation, preserving existing behavior if malformed
+ * or non-finite values reach the private API. The cached runtime object is mutable, but plugin
+ * consumers treat it as readonly. Review this contract if PDF.js changes its viewport internals.
+ */
+interface PDFPageViewportRawDims {
+    readonly pageWidth: number;
+    readonly pageX: number;
+}
+
+/**
+ * A PDF.js viewport with the private raw-dimensions contract used by Obsidian's PDF page view.
+ *
+ * Published PDF.js typings expose `rawDims` only as `Object`, despite the runtime getter returning
+ * a stable object. Replacing that single broad property keeps the rest of `PageViewport` intact and
+ * lets callers use the private geometry boundary without casts or suppressions. This assumes
+ * Obsidian continues to provide genuine PDF.js viewports and must be reviewed when its bundled
+ * PDF.js version changes the getter, coordinate space, or property names.
+ */
+type PDFPageViewport = Omit<PageViewport, 'rawDims'> & {
+    readonly rawDims: PDFPageViewportRawDims;
+};
+
 interface PDFPageView {
     /** 1-based page number */
     id: number;
     pageLabel: string | null;
     pdfPage: PDFPageProxy;
-    viewport: PageViewport;
+    /** The PDF.js viewport, including its private unscaled page geometry. */
+    viewport: PDFPageViewport;
     div: HTMLDivElement; // div.page[data-page-number][data-loaded]
     canvas: HTMLCanvasElement;
     textLayer: TextLayerBuilder | OldTextLayerBuilder | null;

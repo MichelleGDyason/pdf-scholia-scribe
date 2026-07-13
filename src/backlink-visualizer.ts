@@ -620,11 +620,9 @@ export class PDFViewerBacklinkVisualizer extends PDFBacklinkVisualizer implement
     }
 
     showIcon(x: number, y: number, pageView: PDFPageView, side: 'left' | 'right' = 'right') {
-        // @ts-ignore
         const iconSize = Math.min(pageView.viewport.rawDims.pageWidth, pageView.viewport.rawDims.pageWidth) * this.settings.backlinkIconSize / 2000;
         const rectRight: Rect = [x, y - iconSize, x + iconSize, y];
         const rectLeft: Rect = [x - iconSize, y - iconSize, x, y];
-        // @ts-ignore
         const rect = side === 'left' && rectLeft[0] >= (pageView.viewport.rawDims.pageX ?? 0) ? rectLeft : rectRight;
         const iconEl = this.lib.highlight.viewer.placeRectInPage(rect, pageView);
         iconEl.addClass('pdf-plus-backlink-icon');
