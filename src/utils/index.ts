@@ -3,6 +3,31 @@ import { PDFDict, PDFName, PDFRef } from '@cantoo/pdf-lib';
 
 import { ObsidianViewer, OldTextLayerBuilder, PDFPageView, Rect, TextContentItem, TextLayerBuilder } from 'typings';
 
+/**
+ * Models PDF.js `Util.normalizeRect()` for `[x1, y1, x2, y2]` PDF-coordinate tuples.
+ *
+ * PDF.js returns a newly allocated four-number array, but its published declaration uses `any` for
+ * both the input and output. This local contract replaces that unsafe boundary without runtime
+ * validation; review it if PDF.js changes the rectangle shape, allocation, or normalization rules.
+ */
+type NormalizePDFRect = (rect: Rect) => Rect;
+
+/**
+ * Refines Obsidian's PDF.js global only inside this utility module.
+ *
+ * Keeping the override local prevents the incomplete upstream `normalizeRect()` declaration from
+ * affecting unrelated PDF.js call shapes elsewhere while preserving every other installed export.
+ */
+type PDFJsWindowWithTypedNormalizeRect = Omit<Window, 'pdfjsLib'> & {
+    pdfjsLib: Omit<typeof import('pdfjs-dist'), 'Util'> & {
+        Util: Omit<(typeof import('pdfjs-dist'))['Util'], 'normalizeRect'> & {
+            normalizeRect: NormalizePDFRect;
+        };
+    };
+};
+
+declare const window: PDFJsWindowWithTypedNormalizeRect;
+
 export * from './color';
 export * from './suggest';
 export * from './maps';
@@ -76,9 +101,9 @@ export function pdfJsQuadPointsToArrayOfRects(quadPoints: Float32Array | Array<A
     for (const rectInQuodPoints of quadPoints) {
         const topRight = rectInQuodPoints[1];
         const bottomLeft = rectInQuodPoints[2];
-        let rect = [bottomLeft.x, bottomLeft.y, topRight.x, topRight.y];
+        let rect: Rect = [bottomLeft.x, bottomLeft.y, topRight.x, topRight.y];
         rect = window.pdfjsLib.Util.normalizeRect(rect);
-        rects.push(rect as Rect);
+        rects.push(rect);
     }
 
     return rects;
