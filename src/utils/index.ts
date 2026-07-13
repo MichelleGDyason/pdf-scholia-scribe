@@ -1,4 +1,4 @@
-import { Component, Modifier, Platform, CachedMetadata, ReferenceCache, parseLinktext, Menu, Scope, KeymapEventListener, apiVersion, App } from 'obsidian';
+import { Component, Modifier, Platform, CachedMetadata, ReferenceCache, parseLinktext, Menu, Scope, KeymapContext, apiVersion, App } from 'obsidian';
 import { PDFDict, PDFName, PDFRef } from '@cantoo/pdf-lib';
 
 import { ObsidianViewer, OldTextLayerBuilder, PDFPageView, Rect, TextContentItem, TextLayerBuilder } from 'typings';
@@ -579,8 +579,21 @@ export function encodeLinktext(linktext: string) {
     return linktext.replace(/[\\\x00\x08\x0B\x0C\x0E-\x1F ]/g, (component) => encodeURIComponent(component));
 }
 
+/**
+ * Handles a printable character matched by an Obsidian `Scope` registration.
+ *
+ * Obsidian supplies the original keyboard event and its interpreted key context; `ctx.key` is the
+ * character compared with the configured character. Returning `false` tells Obsidian to prevent
+ * the browser default and stop propagation, while `true` preserves that non-preventing handled
+ * result. `undefined` is preserved too, although Obsidian's concrete-key registration still stops
+ * parent-scope lookup. The installed `KeymapEventListener` uses `any`, so this local synchronous
+ * contract excludes unrelated values and Promises, which Obsidian does not await or interpret.
+ * Review it if `Scope.register()` changes its return or delegation semantics.
+ */
+type CharacterKeymapListener = (evt: KeyboardEvent, ctx: KeymapContext) => boolean | void;
+
 /** Register a keymap that detects a certain character, e.g. "+", "=", "*". Works regardless of the user's keyboard layout. */
-export function registerCharacterKeymap(scope: Scope, char: string, listener: KeymapEventListener) {
+export function registerCharacterKeymap(scope: Scope, char: string, listener: CharacterKeymapListener) {
     // If we pass `[]` as the first argument (`modifiers`), this won't work for some non-US keyboards (e.g. JIS).
     // Setting `modifiers` to `null` is undocumented but makes this keymap work regardless of modifiers, thereby fixing the issue.
     return scope.register(null, char, (evt, ctx) => {
