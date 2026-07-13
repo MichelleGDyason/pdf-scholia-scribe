@@ -517,12 +517,23 @@ export function getCJKRegexp(options?: Partial<{ japanese: boolean, korean: bool
     return regexp;
 }
 
+/**
+ * Models PDF.js `normalizeUnicode()` as the string transformation used by text extraction.
+ *
+ * The installed PDF.js declaration exposes `any` for both the input and output, while its runtime
+ * implementation calls string replacement and always returns a string. This local contract
+ * replaces that unsafe boundary without coercion or validation. Review it if PDF.js changes the
+ * helper's accepted value, normalization algorithm, or return type.
+ */
+type NormalizePDFUnicode = (text: string) => string;
+
 /** Process (possibly) multiline strings cleverly to convert it into a single line string. */
 export function toSingleLine(str: string, removeWhitespaceBetweenCJChars = false): string {
     // Korean characters should be excluded because whitespace has a meaning in Korean.
     // https://github.com/RyotaUshio/obsidian-pdf-plus/issues/173
     const cjRegexp = getCJKRegexp({ korean: false });
-    str = str.replace(/(.?)([\r\n]+)(.?)/g, (match, prev, br, next) => {
+    // The single-character captures are empty strings when a line break is at an input boundary.
+    str = str.replace(/(.?)([\r\n]+)(.?)/g, (match: string, prev: string, br: string, next: string): string => {
         if (cjRegexp.test(prev) && cjRegexp.test(next)) return prev + next;
         if (prev === '-' && next.match(/[a-zA-Z]/)) return next;
         // Replace the line break with a whitespace if the line break is followed by a non-empty character.
@@ -531,7 +542,7 @@ export function toSingleLine(str: string, removeWhitespaceBetweenCJChars = false
     if (removeWhitespaceBetweenCJChars) {
         str = str.replace(new RegExp(`(${cjRegexp.source}) (?=${cjRegexp.source})`, 'g'), '$1');
     }
-    return window.pdfjsViewer.removeNullCharacters(window.pdfjsLib.normalizeUnicode(str));
+    return window.pdfjsViewer.removeNullCharacters((window.pdfjsLib.normalizeUnicode as NormalizePDFUnicode)(str));
 }
 
 /**
