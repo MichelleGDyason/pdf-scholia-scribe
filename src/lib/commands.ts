@@ -6,11 +6,151 @@ import { PDFOutlines } from './outlines';
 import { TemplateProcessor } from 'template';
 import { getObsidianDebugInfo, getStyleSettings, parsePDFSubpath } from 'utils';
 import { DestArray } from 'typings';
-import { PDFPlusSettingTab } from 'settings';
+import { DEFAULT_SETTINGS, isPDFPlusSettingsKey } from 'settings';
+import type { PDFPlusSettings, PDFPlusSettingTab } from 'settings';
 import { SidebarView } from 'pdfjs-enums';
 import { showContextMenuAtSelection } from 'context-menu';
 import { RestoreDefaultModal } from 'modals/restore-default-modal';
 import { DataviewInlineFieldsModal } from './dataview';
+
+/**
+ * Represents a JSON object whose property values have not yet been validated.
+ *
+ * Clipboard text is untrusted at runtime, so parsed objects enter through this type instead of a
+ * cast to plugin settings. Arrays and null are deliberately excluded before property access.
+ */
+type UnknownRecord = Record<string, unknown>;
+
+/**
+ * Represents the complete settings snapshot emitted by the debug export command.
+ *
+ * Every current `PDFPlusSettings` field is validated before assignment, while unknown legacy
+ * fields remain attached so valid diagnostics carrying them retain the same data as before. This
+ * contract must remain synchronized with `DEFAULT_SETTINGS` and the object serialized by
+ * `copyDebugInfo()`.
+ */
+type DebugSettingsSnapshot = PDFPlusSettings & UnknownRecord;
+
+/**
+ * Models the JSON object consumed by the debug-information clipboard import.
+ *
+ * `settings` is required because it replaces the active plugin settings. Style Settings values
+ * and the generated stylesheet are optional diagnostics and may be null when unavailable. Extra
+ * top-level fields are ignored, matching the previous destructuring behaviour.
+ */
+interface ImportedDebugInfo {
+    settings: DebugSettingsSnapshot;
+    styleSettings?: UnknownRecord | null;
+    styleSheet?: string | null;
+}
+
+declare global {
+    /** Exposes the last validated debug import for deliberate inspection from the developer console. */
+    interface Window {
+        pdfPlusDebugInfo?: ImportedDebugInfo;
+    }
+}
+
+/**
+ * Checks that an untrusted JSON value is a non-null object rather than an array.
+ *
+ * This guard prevents unsafe property access while parsing clipboard input. It intentionally does
+ * not validate nested values; callers must apply the field-specific checks required by their
+ * payload instead of casting the record to a target interface.
+ */
+function isUnknownRecord(value: unknown): value is UnknownRecord {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Validates the complete settings object emitted by `copyDebugInfo()`.
+ *
+ * Primitive fields are checked against the current default's runtime type. The known nested
+ * structures validate their consumed string, boolean, template, and color values explicitly;
+ * additional fields are retained but do not weaken validation of current required fields. Update
+ * this guard when `PDFPlusSettings` gains another structured field or changes a field's shape.
+ */
+function isDebugSettingsSnapshot(value: unknown): value is DebugSettingsSnapshot {
+    if (!isUnknownRecord(value)) return false;
+
+    for (const key of ['displayTextFormats', 'copyCommands'] as const) {
+        const templates = value[key];
+        if (!Array.isArray(templates) || !templates.every((template) => {
+            return isUnknownRecord(template)
+                && typeof template.name === 'string'
+                && typeof template.template === 'string';
+        })) return false;
+    }
+
+    if (!isUnknownRecord(value.colors)
+        || !Object.values(value.colors).every((color) => typeof color === 'string')) return false;
+
+    for (const key of [
+        'ignoreExistingMarkdownTabIn',
+        'selectionProductMenuConfig',
+        'writeFileProductMenuConfig',
+        'annotationProductMenuConfig',
+        'externalURIPatterns',
+        'modifierToDropExternalPDFToCreateDummy',
+    ] as const) {
+        const items = value[key];
+        if (!Array.isArray(items) || !items.every((item) => typeof item === 'string')) return false;
+    }
+
+    const contextMenuConfig = value.contextMenuConfig;
+    if (!Array.isArray(contextMenuConfig) || !contextMenuConfig.every((item) => {
+        return isUnknownRecord(item)
+            && typeof item.id === 'string'
+            && typeof item.visible === 'boolean';
+    })) return false;
+
+    for (const key of Object.keys(DEFAULT_SETTINGS)) {
+        if (!isPDFPlusSettingsKey(key)) return false;
+        switch (key) {
+            case 'displayTextFormats':
+            case 'copyCommands':
+            case 'colors':
+            case 'ignoreExistingMarkdownTabIn':
+            case 'contextMenuConfig':
+            case 'selectionProductMenuConfig':
+            case 'writeFileProductMenuConfig':
+            case 'annotationProductMenuConfig':
+            case 'externalURIPatterns':
+            case 'modifierToDropExternalPDFToCreateDummy':
+                continue;
+        }
+        if (typeof value[key] !== typeof DEFAULT_SETTINGS[key]) return false;
+    }
+
+    return true;
+}
+
+/**
+ * Parses and validates untrusted clipboard text before debug state is mutated.
+ *
+ * The parser accepts the JSON object written inside `copyDebugInfo()`'s fenced block, requires a
+ * complete settings snapshot, and validates optional style diagnostics. Unknown top-level fields
+ * are ignored and unknown settings fields are retained. Callers must use this parser rather than
+ * casting `JSON.parse()` because validation must finish before Notices, persistence, or assignment.
+ */
+function parseImportedDebugInfo(text: string): ImportedDebugInfo {
+    const parsed: unknown = JSON.parse(text);
+    if (!isUnknownRecord(parsed) || !isDebugSettingsSnapshot(parsed.settings)) {
+        throw new TypeError('Invalid PDF Scholia Scribe debug information.');
+    }
+
+    const styleSettings = parsed.styleSettings;
+    if (styleSettings !== undefined && styleSettings !== null && !isUnknownRecord(styleSettings)) {
+        throw new TypeError('Invalid PDF Scholia Scribe Style Settings debug information.');
+    }
+
+    const styleSheet = parsed.styleSheet;
+    if (styleSheet !== undefined && styleSheet !== null && typeof styleSheet !== 'string') {
+        throw new TypeError('Invalid PDF Scholia Scribe stylesheet debug information.');
+    }
+
+    return { settings: parsed.settings, styleSettings, styleSheet };
+}
 
 function formatDebugValue(value: unknown): string {
     if (typeof value === 'string') return value;
@@ -1084,7 +1224,8 @@ export class PDFPlusCommands extends PDFPlusLibSubmodule {
         if (!checking) {
             void (async () => {
                 try {
-                    const { settings, styleSettings, styleSheet } = JSON.parse(await navigator.clipboard.readText());
+                    const debugInfo = parseImportedDebugInfo(await navigator.clipboard.readText());
+                    const { settings, styleSettings, styleSheet } = debugInfo;
 
                     new Notice(`${this.plugin.manifest.name}: Debug info loaded from clipboard.`);
 
@@ -1092,8 +1233,7 @@ export class PDFPlusCommands extends PDFPlusLibSubmodule {
                     console.debug('- settings:', settings);
                     console.debug('- styleSettings:', styleSettings);
                     console.debug('- styleSheet:', styleSheet);
-                    // @ts-ignore
-                    window.pdfPlusDebugInfo = { settings, styleSettings, styleSheet };
+                    window.pdfPlusDebugInfo = debugInfo;
 
                     this.plugin.settings = settings;
                     const tab = this.app.setting.pluginTabs.find((tab) => tab.id === this.plugin.manifest.id);
