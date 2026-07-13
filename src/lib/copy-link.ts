@@ -786,8 +786,6 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
             // This is a workaround for the problem where the `closeHoverEditorWhenLostFocus` option
             // cannot affect hover editor leafs opened by the "Hover Editor: Open new Hover Editor" command.
             const hoverEditorAPI = this.lib.workspace.hoverEditor;
-            // TypeScript complains for some reason that I don't understand
-            // @ts-ignore
             this.plugin.registerOneTimeEvent(this.app.workspace, 'active-leaf-change', (leaf) => {
                 if (leaf && hoverEditorAPI.isHoverEditorLeaf(leaf)) {
                     hoverEditorAPI.postProcessHoverEditorLeaf(leaf);
@@ -850,8 +848,6 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
         // This is a workaround for the problem where the `closeHoverEditorWhenLostFocus` option
         // cannot affect hover editor leafs opened by the "Hover Editor: Open new Hover Editor" command.
         const hoverEditorAPI = this.lib.workspace.hoverEditor;
-        // TypeScript complains for some reason that I don't understand
-        // @ts-ignore
         this.plugin.registerOneTimeEvent(this.app.workspace, 'active-leaf-change', (leaf) => {
             if (leaf && hoverEditorAPI.isHoverEditorLeaf(leaf)) {
                 hoverEditorAPI.postProcessHoverEditorLeaf(leaf);

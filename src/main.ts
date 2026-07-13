@@ -1,4 +1,5 @@
 import { Constructor, EventRef, Events, FileSystemAdapter, Keymap, Menu, Notice, ObsidianProtocolData, PaneType, Platform, Plugin, SettingTab, TFile, Workspace, WorkspaceLeaf, addIcon, apiVersion, loadPdfJs, normalizePath, requireApiVersion } from 'obsidian';
+import type { Editor, MarkdownFileInfo, MarkdownView } from 'obsidian';
 import * as pdflib from '@cantoo/pdf-lib';
 
 import { patchPDFView, patchPDFInternals, patchBacklink, patchWorkspace, patchPagePreview, patchPDFInternalFromPDFEmbed, patchMenu } from 'patchers';
@@ -8,7 +9,7 @@ import { ColorPalette } from 'color-palette';
 import { DomManager } from 'dom-manager';
 import { PDFCroppedEmbed } from 'pdf-cropped-embed';
 import { DEFAULT_SETTINGS, NamedTemplate, PDFPlusSettings, PDFPlusSettingTab } from 'settings';
-import { subpathToParams, OverloadParameters, focusObsidian, isTargetHTMLElement, KeysOfType } from 'utils';
+import { subpathToParams, focusObsidian, isTargetHTMLElement, KeysOfType } from 'utils';
 import { DestArray, PDFEmbed, PDFView, PDFViewerChild, PDFViewerComponent, PDFViewState, Rect } from 'typings';
 import { InstallerVersionModal } from 'modals';
 import { PDFExternalLinkPostProcessor, PDFInternalLinkPostProcessor, PDFOutlineItemPostProcessor, PDFThumbnailItemPostProcessor } from 'post-process';
@@ -30,6 +31,80 @@ type WorkspaceWithProtocolUnregister = Workspace & {
  * changes its protocol registration contract.
  */
 type PDFPlusObsidianProtocolCallback = (params: unknown) => void | Promise<void>;
+
+/**
+ * Authoritative payload contract for the plugin-internal `PDFPlus.events` bus.
+ *
+ * Obsidian's `Events` class accepts arbitrary names and payloads, so this map keeps emitters and
+ * listeners synchronized without changing its synchronous dispatch, ordering, mutation, or error
+ * behavior. Listener results are ignored. Add or update an entry here whenever an internal event
+ * name or payload changes.
+ */
+interface PDFPlusEventMap {
+	/** Reports the highlighted PDF location and preserves the originating viewer-child identity. */
+	highlight: [data: {
+		type: 'selection' | 'annotation';
+		source: 'obsidian' | 'pdf-plus';
+		pageNumber: number;
+		child: PDFViewerChild;
+	}];
+	/** Shares one palette instance so the other palettes can synchronize their current state. */
+	'color-palette-state-change': [data: { source: ColorPalette }];
+	/** Requests plugin-owned DOM integrations to remount after the DOM manager reloads. */
+	'update-dom': [];
+	/** Reports the explicit PDF theme-adaptation state selected from the viewer toolbar. */
+	'adapt-to-theme-change': [data: { adapt: boolean }];
+}
+
+/**
+ * Names supported by the plugin-internal event bus.
+ *
+ * Deriving this alias from `PDFPlusEventMap` prevents event names from drifting away from their
+ * argument tuples.
+ */
+type PDFPlusEventName = keyof PDFPlusEventMap;
+
+/**
+ * Listener for one plugin-internal event and its exact argument tuple.
+ *
+ * Obsidian dispatches these listeners synchronously through `Events`; return values are ignored,
+ * Promise results are not awaited, and thrown errors retain the underlying `Events` behavior.
+ */
+type PDFPlusEventCallback<Name extends PDFPlusEventName> = (...args: PDFPlusEventMap[Name]) => void;
+
+/**
+ * Obsidian Workspace events consumed through `registerOneTimeEvent()`.
+ *
+ * These are external events rather than members of `PDFPlusEventMap`, so they cannot accidentally
+ * be emitted through `PDFPlus.trigger()`. Their tuples mirror Obsidian's published Workspace API
+ * and must be reviewed if those overloads change.
+ */
+interface PDFPlusOneTimeWorkspaceEventMap {
+	/** Reports the newly active leaf, or `null` when no leaf is active. */
+	'active-leaf-change': [leaf: WorkspaceLeaf | null];
+	/** Forwards the paste event, target editor, and owning Markdown view or file information. */
+	'editor-paste': [event: ClipboardEvent, editor: Editor, info: MarkdownView | MarkdownFileInfo];
+}
+
+/**
+ * Workspace event names supported by the plugin's one-time registration helper.
+ *
+ * Derivation from `PDFPlusOneTimeWorkspaceEventMap` keeps each external name tied to its exact
+ * Obsidian argument tuple.
+ */
+type PDFPlusOneTimeWorkspaceEventName = keyof PDFPlusOneTimeWorkspaceEventMap;
+
+/**
+ * Callback invoked once after a mapped Obsidian Workspace event reaches the helper.
+ *
+ * The optional context is supplied as `this`. Results, including Promises, are ignored; removal
+ * happens only after a synchronous return, so recursive calls and thrown errors preserve the
+ * existing wrapper semantics.
+ */
+type PDFPlusOneTimeWorkspaceEventCallback<Name extends PDFPlusOneTimeWorkspaceEventName> = (
+	this: unknown,
+	...args: PDFPlusOneTimeWorkspaceEventMap[Name]
+) => void;
 
 type WorkspaceLayoutNode = {
 	state?: {
@@ -989,8 +1064,20 @@ export default class PDFPlus extends Plugin {
 		// make unstable editor selection behavior harder to diagnose.
 	}
 
-	registerOneTimeEvent<T extends Events>(events: T, ...[evt, callback, ctx]: OverloadParameters<T['on']>) {
-		const eventRef = events.on(evt, (...args: any[]) => {
+	/**
+	 * Register one plugin-owned listener for a mapped Obsidian Workspace event.
+	 *
+	 * The wrapper deliberately unregisters after callback return. A recursive trigger can therefore
+	 * re-enter it, while a thrown callback leaves it registered; changing that order would alter the
+	 * existing behavior. The EventRef is also registered for normal plugin-unload cleanup.
+	 */
+	registerOneTimeEvent<Name extends PDFPlusOneTimeWorkspaceEventName>(
+		events: Events,
+		evt: Name,
+		callback: PDFPlusOneTimeWorkspaceEventCallback<Name>,
+		ctx?: unknown
+	): void {
+		const eventRef = events.on(evt, (...args: PDFPlusOneTimeWorkspaceEventMap[Name]) => {
 			callback.call(ctx, ...args);
 			events.offref(eventRef);
 		}, ctx);
@@ -1107,16 +1194,13 @@ export default class PDFPlus extends Plugin {
 		}
 	}
 
-	on(evt: 'highlight', callback: (data: { type: 'selection' | 'annotation', source: 'obsidian' | 'pdf-plus', pageNumber: number, child: PDFViewerChild }) => any, context?: any): EventRef;
-	on(evt: 'color-palette-state-change', callback: (data: { source: ColorPalette }) => any, context?: any): EventRef;
-	on(evt: 'update-dom', callback: () => any, context?: any): EventRef;
-	on(evt: 'adapt-to-theme-change', callback: (data: { adapt: boolean }) => any, context?: any): EventRef;
-
-	on(evt: string, callback: (...data: any) => any, context?: any): EventRef {
+	/** Register a listener for one mapped plugin-internal event. */
+	on<Name extends PDFPlusEventName>(evt: Name, callback: PDFPlusEventCallback<Name>, context?: unknown): EventRef {
 		return this.events.on(evt, callback, context);
 	}
 
-	off(evt: string, callback: (...data: any) => any) {
+	/** Remove the matching callback using Obsidian's existing listener-removal semantics. */
+	off<Name extends PDFPlusEventName>(evt: Name, callback: PDFPlusEventCallback<Name>): void {
 		this.events.off(evt, callback);
 	}
 
@@ -1124,12 +1208,8 @@ export default class PDFPlus extends Plugin {
 		this.events.offref(ref);
 	}
 
-	trigger(evt: 'highlight', data: { type: 'selection' | 'annotation', source: 'obsidian' | 'pdf-plus', pageNumber: number, child: PDFViewerChild }): void;
-	trigger(evt: 'color-palette-state-change', data: { source: ColorPalette }): void;
-	trigger(evt: 'update-dom'): void;
-	trigger(evt: 'adapt-to-theme-change', data: { adapt: boolean }): void;
-
-	trigger(evt: string, ...args: any[]): void {
+	/** Synchronously emit one mapped event without transforming its argument tuple. */
+	trigger<Name extends PDFPlusEventName>(evt: Name, ...args: PDFPlusEventMap[Name]): void {
 		this.events.trigger(evt, ...args);
 	}
 
