@@ -283,6 +283,16 @@ type LinkInfoUpdater = (file: TFile, pageNumber?: number) => {
     pageNumber?: number; // if undefined, the page number will not be changed
 };
 
+/**
+ * Models the mutable property mapping supplied by Obsidian's `processFrontMatter()` API.
+ *
+ * Obsidian currently declares this callback value as `any`, although it owns and supplies a
+ * string-keyed YAML object for in-place mutation. This local contract permits arbitrary YAML
+ * value shapes without unsafe member access; the callback changes only the selected link key.
+ * Review it if Obsidian stops passing a mutable record or publishes a narrower frontmatter type.
+ */
+type MutableFrontmatter = Record<string, unknown>;
+
 export class PDFLinkUpdater extends PDFPlusLibSubmodule {
 
     // TODO: rewrite using PDFBacklinkIndex
@@ -312,7 +322,7 @@ export class PDFLinkUpdater extends PDFPlusLibSubmodule {
         const newFile = await operator();
         if (!newFile) return null; // operation failed
 
-        const promises: Promise<any>[] = [];
+        const promises: Promise<string>[] = [];
         const counts = { files: 0, links: 0 };
 
         for (const [sourcePath, updates] of updateQueue) {
@@ -463,7 +473,7 @@ export class PDFLinkUpdater extends PDFPlusLibSubmodule {
             });
         } else { // properties
             const key = refCache.key;
-            await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+            await this.app.fileManager.processFrontMatter(file, (frontmatter: MutableFrontmatter) => {
                 frontmatter[key] = newLink;
             });
         }
