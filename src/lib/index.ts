@@ -39,6 +39,37 @@ interface PDFPageToImageOptions {
     renderParams?: OptionalRenderParameters;
 }
 
+/**
+ * Names an event in the authoritative local PDF.js event map declared in `typings.d.ts`.
+ *
+ * Keeping names tied to the map prevents registrations from drifting from PDF.js or Obsidian's
+ * customized viewer. Add or change a name only when the corresponding runtime dispatch changes.
+ */
+type PDFJsEventName = keyof PDFJsEventMap;
+
+/**
+ * Receives the unchanged payload object for one mapped PDF.js event.
+ *
+ * PDF.js's published EventBus types use broad `Function` and `Object` declarations, so this local
+ * generic preserves the event-specific payload without casting. The forwarding wrapper awaits the
+ * returned value before one-shot cleanup, while PDF.js itself ignores the wrapper's Promise. The
+ * payload may be inspected or mutated, and thrown errors or rejected Promises are not swallowed.
+ */
+type PDFJsEventCallback<K extends PDFJsEventName> = (data: PDFJsEventMap[K]) => unknown;
+
+/**
+ * Handles an existing or newly rendered PDF page layer.
+ *
+ * Arguments are the one-based page number, the existing PDF.js page-view object, and whether the
+ * callback came from a render event rather than the initial page scan. Current consumers are
+ * synchronous; return values are ignored and never control registration or traversal.
+ */
+type PDFPageLifecycleCallback = (
+    pageNumber: number,
+    pageView: PDFPageView,
+    newlyRendered: boolean,
+) => void;
+
 
 export class PDFPlusLib {
     app: App;
@@ -79,11 +110,20 @@ export class PDFPlusLib {
         this.zoteroReferences = new ZoteroReferenceManager(plugin);
     }
 
-    /** 
-     * @param component A component such that the callback is unregistered when the component is unloaded, or `null` if the callback should be called only once.
+    /**
+     * Registers an event-specific callback on Obsidian's PDF.js EventBus.
+     *
+     * PDF.js dispatches synchronously with one payload object and ignores listener return values.
+     * This async forwarding listener preserves the payload identity and awaits callback completion
+     * only so a `null` component registration is removed afterward. Component-owned registrations
+     * remove the same listener on unload. No source filtering, context option, cloning, or native
+     * `once` option is added; callback rejection leaves a one-shot registration in place exactly as
+     * before, and the rejected listener Promise remains unhandled by PDF.js.
+     *
+     * @param component Owns listener cleanup, or `null` for removal after one successful callback.
      */
-    registerPDFEvent<K extends keyof PDFJsEventMap>(name: K, eventBus: EventBus, component: Component | null, callback: (data: PDFJsEventMap[K]) => any) {
-        const listener = async (data: any) => {
+    registerPDFEvent<K extends PDFJsEventName>(name: K, eventBus: EventBus, component: Component | null, callback: PDFJsEventCallback<K>): void {
+        const listener: PDFJsEventCallback<K> = async (data) => {
             await callback(data);
             if (!component) eventBus.off(name, listener);
         };
@@ -98,12 +138,12 @@ export class PDFPlusLib {
      * 
      * @param component A component such that the callback is unregistered when the component is unloaded, or `null` if the callback should be called only once.
      */
-    onPageReady(viewer: ObsidianViewer, component: Component | null, cb: (pageNumber: number, pageView: PDFPageView, newlyRendered: boolean) => any) {
+    onPageReady(viewer: ObsidianViewer, component: Component | null, cb: PDFPageLifecycleCallback): void {
         viewer.pdfViewer?._pages
             .forEach((pageView, pageIndex) => {
                 cb(pageIndex + 1, pageView, false); // page number is 1-based
             });
-        this.registerPDFEvent('pagerendered', viewer.eventBus, component, (data: { source: PDFPageView, pageNumber: number }) => {
+        this.registerPDFEvent('pagerendered', viewer.eventBus, component, (data) => {
             cb(data.pageNumber, data.source, true);
         });
     }
@@ -113,14 +153,14 @@ export class PDFPlusLib {
      * 
      * @param component A component such that the callback is unregistered when the component is unloaded, or `null` if the callback should be called only once.
      */
-    onTextLayerReady(viewer: ObsidianViewer, component: Component | null, cb: (pageNumber: number, pageView: PDFPageView, newlyRendered: boolean) => any) {
+    onTextLayerReady(viewer: ObsidianViewer, component: Component | null, cb: PDFPageLifecycleCallback): void {
         viewer.pdfViewer?._pages
             .forEach((pageView, pageIndex) => {
                 if (pageView.textLayer) {
                     cb(pageIndex + 1, pageView, false); // page number is 1-based
                 }
             });
-        this.registerPDFEvent('textlayerrendered', viewer.eventBus, component, (data: { source: PDFPageView, pageNumber: number }) => {
+        this.registerPDFEvent('textlayerrendered', viewer.eventBus, component, (data) => {
             cb(data.pageNumber, data.source, true);
         });
     }
@@ -130,14 +170,14 @@ export class PDFPlusLib {
      * 
      * @param component A component such that the callback is unregistered when the component is unloaded, or `null` if the callback should be called only once.
      */
-    onAnnotationLayerReady(viewer: ObsidianViewer, component: Component | null, cb: (pageNumber: number, pageView: PDFPageView, newlyRendered: boolean) => any) {
+    onAnnotationLayerReady(viewer: ObsidianViewer, component: Component | null, cb: PDFPageLifecycleCallback): void {
         viewer.pdfViewer?._pages
             .forEach((pageView, pageIndex) => {
                 if (pageView.annotationLayer) {
                     cb(pageIndex + 1, pageView, false); // page number is 1-based
                 }
             });
-        this.registerPDFEvent('annotationlayerrendered', viewer.eventBus, component, (data: { source: PDFPageView, pageNumber: number }) => {
+        this.registerPDFEvent('annotationlayerrendered', viewer.eventBus, component, (data) => {
             cb(data.pageNumber, data.source, true);
         });
     }

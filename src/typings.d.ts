@@ -633,12 +633,30 @@ interface TextContentItem {
     hasEOL: boolean;
 }
 
+/**
+ * Provides the typed local view of PDF.js's EventBus used by Obsidian's private PDF viewer.
+ *
+ * Upstream declarations accept arbitrary strings, `Function`, and `Object`; this interface binds
+ * each name to the single payload object in {@link PDFJsEventMap}. Dispatch is synchronous, passes
+ * the object by identity, ignores listener results, and removes listeners by callback identity.
+ * Source fields are payload data rather than registration filters, and these methods add no
+ * context or `once` options. Review this contract if Obsidian changes its bundled PDF.js EventBus.
+ */
 interface EventBus {
     on<K extends keyof PDFJsEventMap>(name: K, callback: (data: PDFJsEventMap[K]) => unknown): void;
     off<K extends keyof PDFJsEventMap>(name: K, callback: (data: PDFJsEventMap[K]) => unknown): void;
     dispatch<K extends keyof PDFJsEventMap>(name: K, data: PDFJsEventMap[K]): void;
 }
 
+/**
+ * Authoritative local contract for PDF.js and Obsidian PDF-viewer events used by this plugin.
+ *
+ * Every key is an exact runtime event name and every value is the one payload object delivered to
+ * listeners; there are no variadic argument tuples or payload copies. Most events originate in
+ * PDF.js or Obsidian's customized viewer, while plugin controls dispatch the mapped scale, scroll,
+ * and spread events through the same bus. Update this map and all producers/consumers together if
+ * an event name or payload changes, especially for private fields absent from upstream typings.
+ */
 interface PDFJsEventMap {
     outlineloaded: { source: PDFOutlineViewer, outlineCount: number, currentOutlineItemPromise: Promise<void> };
     thumbnailrendered: { source: PDFThumbnailView, pageNumber: number, pdfPage: PDFPageProxy };
