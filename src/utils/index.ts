@@ -631,13 +631,39 @@ export function isSelectionForward(selection: Selection) {
         : selection.anchorNode && selection.focusNode && selection.anchorNode.compareDocumentPosition(selection.focusNode) === Node.DOCUMENT_POSITION_FOLLOWING;
 }
 
-export function repeat(func: () => any, n?: number) {
+/**
+ * Represents one zero-argument operation invoked by the repetition helpers.
+ *
+ * Results are deliberately ignored, so `void` safely accepts callbacks with incidental primitive,
+ * object, or Promise results without exposing them as usable values. Promises are never awaited.
+ * The callback is called as a plain function; callers needing a receiver must bind it or close over
+ * it explicitly. This contract replaces `any` without adding argument forwarding that does not
+ * exist at runtime.
+ */
+type RepeatedCallback = () => void;
+
+/**
+ * Invokes a zero-argument callback synchronously while the raw count remains truthy.
+ *
+ * An omitted or nullish runtime count defaults to one. Counts are intentionally not validated or
+ * normalized: zero and `NaN` invoke nothing, positive integers converge normally, and negative,
+ * fractional, or infinite values do not converge unless the callback throws. Results are ignored,
+ * Promises remain unawaited, and synchronous exceptions stop the loop unchanged.
+ */
+export function repeat(func: RepeatedCallback, n?: number): void {
     n ??= 1;
     while (n--) func();
 }
 
-export function repeatable(func: () => any) {
-    return (n?: number) => repeat(func, n);
+/**
+ * Closes over one repeated operation and returns a wrapper whose sole argument is the repeat count.
+ *
+ * Each call delegates directly to `repeat()`, preserving its default count, plain-function `this`,
+ * synchronous ordering, ignored results, unawaited Promises, and error propagation. Every call to
+ * `repeatable()` creates a new wrapper; no callback arguments beyond the count are forwarded.
+ */
+export function repeatable(func: RepeatedCallback): (n?: number) => void {
+    return (n?: number): void => repeat(func, n);
 }
 
 // Thank you Dataview
