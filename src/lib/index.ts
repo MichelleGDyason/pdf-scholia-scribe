@@ -70,6 +70,21 @@ type PDFPageLifecycleCallback = (
     newlyRendered: boolean,
 ) => void;
 
+/**
+ * Handles one event dispatched by the active or a popout Obsidian document.
+ *
+ * `K` ties the event name to `DocumentEventMap`, preserving the browser event subtype without
+ * casting. The DOM ignores listener results, so `void` accurately documents that incidental values
+ * and Promises are not consumed or awaited. The `this` type matches Obsidian's published
+ * `Component.registerDomEvent` declaration; the unchanged callback is forwarded directly, and the
+ * target document still supplies its runtime context. Review this alias if the helper gains
+ * non-document targets or Obsidian changes that declaration.
+ */
+type GlobalDocumentEventCallback<K extends keyof DocumentEventMap> = (
+    this: HTMLElement,
+    event: DocumentEventMap[K],
+) => void;
+
 
 export class PDFPlusLib {
     app: App;
@@ -512,7 +527,18 @@ export class PDFPlusLib {
         return { page, id };
     }
 
-    registerGlobalDomEvent<K extends keyof DocumentEventMap>(component: Component, type: K, callback: (this: HTMLElement, ev: DocumentEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void {
+    /**
+     * Registers the same document listener in Obsidian's main window and every popout window.
+     *
+     * The event name determines the callback's browser event type. The callback and options object
+     * are forwarded unchanged to the active document, existing popout documents, and future popout
+     * documents. `Component` owns every DOM listener and the workspace listener used to discover new
+     * windows. Listener return values remain ignored, Promises remain unawaited, and errors keep the
+     * browser or Obsidian event-dispatch behaviour of the target document.
+     *
+     * @typeParam K A document event name whose mapped value describes the dispatched event object.
+     */
+    registerGlobalDomEvent<K extends keyof DocumentEventMap>(component: Component, type: K, callback: GlobalDocumentEventCallback<K>, options?: boolean | AddEventListenerOptions): void {
         component.registerDomEvent(activeDocument, type, callback, options);
 
         this.app.workspace.onLayoutReady(() => {
