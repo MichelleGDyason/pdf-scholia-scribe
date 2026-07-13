@@ -397,9 +397,17 @@ export class PDFPlusLib {
         ];
     }
 
-    async ensureDestArray(dest: string | DestArray, doc: PDFDocumentProxy) {
+    /**
+     * Resolves a named destination or preserves an existing internal destination array.
+     *
+     * Named PDF.js destinations contain an indirect page reference and are normalized into a new
+     * `DestArray` with a zero-based page index. An explicit `DestArray` already contains that index
+     * and is returned by identity. Missing named destinations return `null`; PDF.js lookup and page
+     * reference errors propagate unchanged.
+     */
+    async ensureDestArray(dest: string | DestArray, doc: PDFDocumentProxy): Promise<DestArray | null> {
         if (typeof dest === 'string') {
-            const destArray = await doc.getDestination(dest) as PDFJsDestArray;
+            const destArray = await doc.getDestination(dest);
             if (!destArray) return null;
             dest = this.normalizePDFJsDestArray(destArray, await doc.getPageIndex(destArray[0]) + 1);
         }
@@ -407,7 +415,14 @@ export class PDFPlusLib {
         return dest;
     }
 
-    async destToPageNumber(dest: string | DestArray, doc: PDFDocumentProxy) {
+    /**
+     * Returns the one-based page number represented by a named or explicit destination.
+     *
+     * Named destinations resolve their PDF.js page reference through `getPageIndex()`, whose result
+     * is zero-based. Explicit arrays already store a zero-based numeric index. An unresolved name
+     * returns `null`, while malformed references and rejected PDF.js operations keep propagating.
+     */
+    async destToPageNumber(dest: string | DestArray, doc: PDFDocumentProxy): Promise<number | null> {
         if (typeof dest === 'string') {
             const pdfJsDestArray = await doc.getDestination(dest);
             if (!pdfJsDestArray) return null;

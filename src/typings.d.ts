@@ -2,6 +2,7 @@ import { App, CachedMetadata, Command, Component, Constructor, Debouncer, Editab
 import { CanvasData, CanvasFileData, CanvasGroupData, CanvasLinkData, CanvasNodeData, CanvasTextData } from 'obsidian/canvas';
 import { EditorView } from '@codemirror/view';
 import { PDFDocumentProxy, PDFPageProxy, PageViewport } from 'pdfjs-dist';
+import { RefProxy } from 'pdfjs-dist/types/src/display/api';
 import { AnnotationStorage } from 'pdfjs-dist/types/src/display/annotation_storage';
 import { PDFName, PDFNumber, PDFRef, PDFNull } from '@cantoo/pdf-lib';
 import { CapacitorGlobal } from '@capacitor/core';
@@ -588,7 +589,16 @@ type Rect = [number, number, number, number];
  * destType: "XYZ" or "FitBH"
  */
 type DestArray = [page: number, destType: string, ...params: (number | null)[]];
-type PDFJsDestArray = [pageRef: { num: number, gen: number }, destType: { name: string }, ...params: (number | null)[]];
+/**
+ * Models the explicit destination arrays returned by PDF.js for named destinations.
+ *
+ * The first value is PDF.js's indirect page reference, followed by the display-mode name and its
+ * optional numeric operands. PDF.js returns these arrays by identity but publishes them only as
+ * `Array<any>`; this local tuple supplies the narrower contract consumed by page lookup, outline,
+ * annotation, citation, and copied-link code. Review it if PDF.js changes destination references,
+ * display-mode objects, or operand representation.
+ */
+type PDFJsDestArray = [pageRef: RefProxy, destType: { name: string }, ...params: (number | null)[]];
 type PdfLibDestArray = [pageRef: PDFRef, destType: PDFName, ...params: (PDFNumber | typeof PDFNull)[]];
 
 interface PDFLinkService {
@@ -1427,5 +1437,18 @@ declare module 'obsidian' {
 
     interface KeymapEventHandler {
         func: KeymapEventListener;
+    }
+}
+
+declare module 'pdfjs-dist/types/src/display/api' {
+    interface PDFDocumentProxy {
+        /**
+         * Narrows PDF.js's broad named-destination result to the runtime tuple used by this plugin.
+         *
+         * `null` means the name was not found. The returned array is not cloned or validated here,
+         * preserving PDF.js object identity and its existing malformed-reference rejection path.
+         * Update this refinement together with `PDFJsDestArray` if PDF.js changes the representation.
+         */
+        getDestination(id: string): Promise<PDFJsDestArray | null>;
     }
 }
