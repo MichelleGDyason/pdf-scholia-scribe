@@ -85,6 +85,20 @@ type GlobalDocumentEventCallback<K extends keyof DocumentEventMap> = (
     event: DocumentEventMap[K],
 ) => void;
 
+/**
+ * Handles the PDF.js document loaded by one explicitly supplied Obsidian PDF viewer.
+ *
+ * The callback receives only the viewer's `PDFDocumentProxy` and is called as a plain function, so
+ * its runtime `this` remains `undefined`. When a loading task already exists, invocation is deferred
+ * through its Promise; otherwise the callback is queued for Obsidian's patched `viewer.load()`.
+ * Return values never control loading or callback order, so `void` replaces the misleading `any`
+ * while still allowing callers to return incidental values or Promises. Promise completion is not
+ * awaited for sequencing. The loading-task path logs callback rejection, while the queued path
+ * retains Obsidian's synchronous load and error behaviour. Review this contract if Obsidian changes
+ * its private viewer loading lifecycle or begins consuming callback results.
+ */
+type PDFDocumentReadyCallback = (document: PDFDocumentProxy) => void;
+
 
 export class PDFPlusLib {
     app: App;
@@ -1133,7 +1147,19 @@ export class PDFPlusLib {
         return isVersionNewerThan(currentVersion, version);
     }
 
-    onDocumentReady(pdfViewer: ObsidianViewer, callback: (doc: PDFDocumentProxy) => any) {
+    /**
+     * Runs a callback when the supplied Obsidian viewer has a PDF.js document available.
+     *
+     * This helper follows only that viewer: it neither discovers windows nor registers DOM readiness
+     * listeners. An existing loading task owns deferred execution; otherwise the viewer stores the
+     * callback until the patched `load()` method runs and removes its callback queue. There is no
+     * component-owned unload cancellation. Main-window and popout viewers therefore behave alike
+     * when passed explicitly, and callback results remain outside the loading contract.
+     *
+     * @param pdfViewer The specific Obsidian PDF viewer whose PDF.js document is required.
+     * @param callback Receives that viewer's document; its result is not used for loading decisions.
+     */
+    onDocumentReady(pdfViewer: ObsidianViewer, callback: PDFDocumentReadyCallback): void {
         if (pdfViewer.pdfLoadingTask) {
             void pdfViewer.pdfLoadingTask.promise
                 .then((doc) => {
