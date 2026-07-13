@@ -1,10 +1,53 @@
 import { RGB, TFile } from 'obsidian';
 import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFNull, PDFNumber, PDFPage, PDFRef, PDFString } from '@cantoo/pdf-lib';
+import type { PDFObject } from '@cantoo/pdf-lib';
 
 import { PDFPlusLibSubmodule } from 'lib/submodule';
 import { formatAnnotationID, getBorderRadius, hexToRgb } from 'utils';
 import { Rect, DestArray } from 'typings';
 import { IPdfIo, TextMarkupAnnotationSubtype } from '.';
+
+
+/**
+ * Represents values nested in the literal arrays this writer passes to `PDFContext.obj()`.
+ *
+ * Numbers and strings are converted to direct PDF objects by pdf-lib, while `PDFObject` also
+ * permits prebuilt values and indirect `PDFRef` entries. The arrays remain caller-owned and are
+ * only consumed during dictionary construction. Review this union if pdf-lib changes its literal
+ * conversion contract or this writer begins emitting other annotation value shapes.
+ */
+type PDFAnnotationArrayValue = PDFObject | string | number;
+
+/**
+ * Models only the annotation fields constructed by this pdf-lib writer.
+ *
+ * Primitive and array fields are converted into direct PDF objects; `Dest` may instead contain an
+ * indirect page reference. `addAnnotation()` owns registration of the resulting dictionary and
+ * does not mutate this input object. This replaces an unrestricted value record and should be
+ * reviewed if the writer adds fields or pdf-lib changes `PDFContext.obj()` literal conversion.
+ */
+interface PDFAnnotationDictionary {
+    Subtype: TextMarkupAnnotationSubtype | 'Link';
+    Rect: number[];
+    QuadPoints: number[];
+    Contents?: PDFHexString;
+    M: PDFString;
+    T?: PDFHexString;
+    CA?: number;
+    Border?: number[];
+    C: number[];
+    Dest?: PDFString | PDFAnnotationArrayValue[];
+}
+
+/**
+ * Mutates one resolved annotation dictionary during `processAnnotation()`.
+ *
+ * Callers may finish synchronously or return `Promise<void>`; the processor awaits asynchronous
+ * work for the existing save ordering but intentionally ignores callback results. The dictionary
+ * is a direct object resolved from its page annotation reference. Review this contract if pdf-lib
+ * changes annotation lookup or callers begin returning meaningful values.
+ */
+type AnnotationProcessor = (annotation: PDFDict) => void | Promise<void>;
 
 
 export class PdfLibIO extends PDFPlusLibSubmodule implements IPdfIo {
@@ -94,7 +137,7 @@ export class PdfLibIO extends PDFPlusLibSubmodule implements IPdfIo {
         return await fn(pdfDoc);
     }
 
-    addAnnotation(page: PDFPage, annotDict: Record<string, any>): PDFRef {
+    addAnnotation(page: PDFPage, annotDict: PDFAnnotationDictionary): PDFRef {
         const context = page.doc.context;
         const ref = context.register(
             context.obj({
@@ -138,7 +181,7 @@ export class PdfLibIO extends PDFPlusLibSubmodule implements IPdfIo {
         return null;
     }
 
-    async setAnnotationColor(file: TFile, pageNumber: number, id: string, rgb: RGB): Promise<any> {
+    async setAnnotationColor(file: TFile, pageNumber: number, id: string, rgb: RGB): Promise<void> {
         await this.processAnnotation(file, pageNumber, id, async (annot) => {
             this.setColorToAnnotation(annot, rgb);
         });
@@ -152,7 +195,7 @@ export class PdfLibIO extends PDFPlusLibSubmodule implements IPdfIo {
         return null;
     }
 
-    async setAnnotationOpacity(file: TFile, pageNumber: number, id: string, opacity: number): Promise<any> {
+    async setAnnotationOpacity(file: TFile, pageNumber: number, id: string, opacity: number): Promise<void> {
         await this.processAnnotation(file, pageNumber, id, async (annot) => {
             this.setOpacityToAnnotation(annot, opacity);
         });
@@ -175,7 +218,7 @@ export class PdfLibIO extends PDFPlusLibSubmodule implements IPdfIo {
         });
     }
 
-    async processAnnotation(file: TFile, pageNumber: number, id: string, fn: (annot: PDFDict) => any): Promise<void> {
+    async processAnnotation(file: TFile, pageNumber: number, id: string, fn: AnnotationProcessor): Promise<void> {
         return await this.process(file, async (pdfDoc) => {
             const page = pdfDoc.getPage(pageNumber - 1);
             const ref = this.findAnnotationRef(page, id);
