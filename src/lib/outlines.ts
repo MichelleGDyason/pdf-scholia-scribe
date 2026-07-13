@@ -14,6 +14,47 @@ const stringifyDestination = (dest: string | DestArray | null) => {
     return 'none';
 };
 
+/**
+ * Visits one outline item for synchronous side effects while preserving linked-tree traversal.
+ *
+ * The visitor may mutate the current item, but its result is deliberately ignored and cannot
+ * short-circuit traversal. A `void` result still permits callers with incidental return values,
+ * such as counters, without exposing those values as traversal control. Thrown errors propagate
+ * immediately. Clicked-node position paths, rather than visitor results, identify duplicate items.
+ */
+type PDFOutlineVisitor = (item: PDFOutlineItem) => void;
+
+/**
+ * Visits one outline item through a serially awaited asynchronous traversal boundary.
+ *
+ * Resolved values are intentionally unknown and ignored so existing incidental results remain
+ * representable; only completion controls traversal. Rejections propagate immediately. The item
+ * may be mutated, while duplicate identity remains governed separately by PDF.js position paths.
+ */
+type AsyncPDFOutlineVisitor = (item: PDFOutlineItem) => Promise<unknown>;
+
+/**
+ * Defines optional pre-order and post-order phases for synchronous depth-first outline traversal.
+ * Both phases receive the same item, may mutate it, and cannot return traversal-control values.
+ */
+interface PDFOutlineTraversalCallbacks {
+    /** Runs before descendants in pre-order. */
+    enter?: PDFOutlineVisitor;
+    /** Runs after descendants in post-order. */
+    leave?: PDFOutlineVisitor;
+}
+
+/**
+ * Defines serially awaited pre-order and post-order phases for asynchronous outline traversal.
+ * Each phase completes before traversal advances; rejected callbacks stop traversal unchanged.
+ */
+interface AsyncPDFOutlineTraversalCallbacks {
+    /** Runs and resolves before descendants are visited. */
+    enter?: AsyncPDFOutlineVisitor;
+    /** Runs and resolves after all descendants have been visited. */
+    leave?: AsyncPDFOutlineVisitor;
+}
+
 export class PDFOutlines {
     plugin: PDFPlus;
     doc: PDFDocument;
@@ -93,7 +134,14 @@ export class PDFOutlines {
         return leaves;
     }
 
-    iter(callbacks: { enter?: (item: PDFOutlineItem) => any, leave?: (item: PDFOutlineItem) => any }) {
+    /**
+     * Visits the root and descendants depth-first in linked sibling order.
+     *
+     * `enter` runs in pre-order and `leave` in post-order. Callback results are ignored, traversal
+     * never short-circuits, and synchronous errors propagate at the visited item. Mutations remain
+     * permitted and affect subsequent links exactly as the callback leaves them.
+     */
+    iter(callbacks: PDFOutlineTraversalCallbacks): void {
         const iter = (item: PDFOutlineItem) => {
             callbacks.enter?.(item);
             item.iterChildren(iter);
@@ -103,7 +151,13 @@ export class PDFOutlines {
         if (this.root) iter(this.root);
     }
 
-    async iterAsync(callbacks: { enter?: (item: PDFOutlineItem) => Promise<any>, leave?: (item: PDFOutlineItem) => Promise<any> }) {
+    /**
+     * Serially visits the root and descendants using the same depth-first phases as {@link iter}.
+     *
+     * Each callback is awaited before traversal advances. Resolved values are ignored without
+     * short-circuiting; a rejection stops traversal at the same item and propagates to the caller.
+     */
+    async iterAsync(callbacks: AsyncPDFOutlineTraversalCallbacks): Promise<void> {
         const iter = async (item: PDFOutlineItem) => {
             await callbacks.enter?.(item);
             await item.iterChildrenAsync(iter);
@@ -574,7 +628,13 @@ export class PDFOutlineItem {
         return current;
     }
 
-    iterChildren(fn: (item: PDFOutlineItem) => any) {
+    /**
+     * Visits direct children only, from `First` through `Next`, without including this item.
+     *
+     * Results are ignored and cannot stop iteration. The callback may mutate the child; the next
+     * sibling is read afterward, preserving existing linked-tree mutation and error semantics.
+     */
+    iterChildren(fn: PDFOutlineVisitor): void {
         let item: PDFOutlineItem | null = this.firstChild;
         while (item) {
             fn(item);
@@ -582,7 +642,13 @@ export class PDFOutlineItem {
         }
     }
 
-    async iterChildrenAsync(fn: (item: PDFOutlineItem) => Promise<any>) {
+    /**
+     * Serially awaits a visitor for each direct child in linked sibling order.
+     *
+     * Resolved values are ignored. The next sibling is read after completion, and rejection stops
+     * iteration at the current child without changing propagation or mutation behavior.
+     */
+    async iterChildrenAsync(fn: AsyncPDFOutlineVisitor): Promise<void> {
         let item: PDFOutlineItem | null = this.firstChild;
         while (item) {
             await fn(item);
@@ -590,7 +656,13 @@ export class PDFOutlineItem {
         }
     }
 
-    iterAncestors(fn: (item: PDFOutlineItem) => any, includeSelf = false) {
+    /**
+     * Visits this item optionally, then each ancestor from the nearest parent through the root.
+     *
+     * Visitor results are ignored and do not short-circuit. Parent links are read after each
+     * callback, synchronous errors propagate, and the method always returns this item on success.
+     */
+    iterAncestors(fn: PDFOutlineVisitor, includeSelf = false): PDFOutlineItem {
         if (includeSelf) fn(this);
 
         let parent = this.parent;
