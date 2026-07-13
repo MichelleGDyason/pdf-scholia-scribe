@@ -5,6 +5,43 @@ import PDFPlus from 'main';
 import { PDFPlusModal } from 'modals';
 
 
+/**
+ * Runs after a page-deletion decision resolves affirmatively.
+ *
+ * The callback receives no arguments and may start the next composer step. Its completion is
+ * assimilated by the modal's existing Promise chain for error reporting, but it does not control
+ * whether the confirmation modal closes. Synchronous throws and rejected Promises continue to
+ * reach the chain's `console.error` handler. A broad `any` return obscured those lifecycle rules.
+ */
+type PDFPageDeleteConfirmedCallback = () => void | Promise<void>;
+
+/**
+ * Receives the page-label and in-place choices after the composer-options decision resolves.
+ *
+ * Arguments are passed as `keepLabels` followed by `inPlace`. Current consumers use them to launch
+ * composer operations without returning a value; a Promise return is also supported by the existing
+ * decision chain and is observed only for failures. Callback completion does not control modal
+ * closing, and synchronous throws or rejections continue to reach `console.error`.
+ */
+type PDFComposerOptionsCallback = (
+    keepLabels: boolean,
+    inPlace: boolean
+) => void | Promise<void>;
+
+/**
+ * Processes a newly created PDF document after the creation modal closes.
+ *
+ * Callbacks receive the same mutable pdf-lib document in registration order. Synchronous and
+ * asynchronous callbacks are supported and awaited serially before the next callback runs; a throw
+ * or rejection stops the sequence and reaches the existing `console.error` handler. Callbacks may
+ * persist or open the document, but their result value is not otherwise consumed, so `any` was too
+ * broad for this boundary.
+ */
+type PDFDocumentCreatedCallback = (
+    document: PDFDocument
+) => void | Promise<void>;
+
+
 export class PDFPageDeleteModal extends PDFPlusModal {
     file: TFile;
     page: number;
@@ -20,7 +57,7 @@ export class PDFPageDeleteModal extends PDFPlusModal {
         });
     }
 
-    then(callback: () => any) {
+    then(callback: PDFPageDeleteConfirmedCallback) {
         void this.#promise
             .then((value) => {
                 if (value) return callback();
@@ -119,7 +156,7 @@ export class PDFComposerModal extends PDFPlusModal {
         return this;
     }
 
-    then(callback: (keepLabels: boolean, inPlace: boolean) => any) {
+    then(callback: PDFComposerOptionsCallback) {
         void this.#promise
             .then((options) => {
                 if (options) {
@@ -201,7 +238,7 @@ export class PDFCreateModal extends PDFPlusModal {
     pageSize: keyof typeof PageSizes = 'A4';
     orientation: 'portrait' | 'landscape' = 'portrait';
 
-    next: ((doc: PDFDocument) => any)[] = [];
+    next: PDFDocumentCreatedCallback[] = [];
 
     askOptions() {
         this.open();
@@ -275,7 +312,7 @@ export class PDFCreateModal extends PDFPlusModal {
         return new Setting(this.contentEl);
     }
 
-    then(callback: (doc: PDFDocument) => any) {
+    then(callback: PDFDocumentCreatedCallback) {
         this.next.push(callback);
         return this;
     }
