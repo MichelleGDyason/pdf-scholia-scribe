@@ -1,19 +1,9 @@
-import { HoverParent, parseLinktext, type App } from 'obsidian';
+import { HoverParent, parseLinktext } from 'obsidian';
 import { around } from 'monkey-around';
 
 import PDFPlus from 'main';
+import type { PagePreviewInstance } from 'lib/page-preview-contract';
 import { asPatchedMethod, callPatchedMethod, type PatchedMethod } from 'lib/patch-utils';
-
-/**
- * Private Obsidian Page Preview plugin instance shape used by this patcher.
- *
- * Obsidian exposes the built-in page-preview plugin through `app.internalPlugins`,
- * not through the public plugin API, so this alias keeps the private contract
- * local to the code that patches it. If Obsidian changes where the page preview
- * instance lives or renames `onLinkHover`, this alias and the patch target
- * below need to change together.
- */
-type PagePreviewInstance = App['internalPlugins']['plugins']['page-preview']['instance'];
 
 /**
  * Local shape for the private `PagePreview.onLinkHover` method.

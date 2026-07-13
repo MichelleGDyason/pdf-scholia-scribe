@@ -14,6 +14,7 @@ import { InstallerVersionModal } from 'modals';
 import { PDFExternalLinkPostProcessor, PDFInternalLinkPostProcessor, PDFOutlineItemPostProcessor, PDFThumbnailItemPostProcessor } from 'post-process';
 import { BibliographyManager } from 'bib';
 import { DataviewInlineFieldsModal, withFilesWithInlineFields } from 'lib/dataview';
+import { hasPagePreviewModifierSettings } from 'lib/page-preview-contract';
 
 
 type WorkspaceWithProtocolUnregister = Workspace & {
@@ -1105,9 +1106,23 @@ export default class PDFPlus extends Plugin {
 		this.events.trigger(evt, ...args);
 	}
 
-	requireModKeyForLinkHover(id = 'pdf-plus') {
-		// @ts-ignore
-		return this.app.internalPlugins.plugins['page-preview'].instance.overrides[id]
+	/**
+	 * Resolve whether Page Preview requires the modifier key for one registered hover source.
+	 *
+	 * Obsidian keeps per-source overrides on a private core-plugin instance, so callers should use
+	 * this method instead of inspecting `internalPlugins`. A non-null override is returned unchanged
+	 * to preserve existing truthiness; otherwise the public hover-source `defaultMod` value, then
+	 * `false`, is used. Missing or malformed private state follows that same fallback. The return type
+	 * remains `unknown` because unexpected persisted override values were historically passed through.
+	 */
+	requireModKeyForLinkHover(id = 'pdf-plus'): unknown {
+		const pagePreviewPlugin: unknown = this.app.internalPlugins.plugins['page-preview'];
+		const pagePreviewInstance = isRecord(pagePreviewPlugin) ? pagePreviewPlugin.instance : undefined;
+		const override = hasPagePreviewModifierSettings(pagePreviewInstance)
+			? pagePreviewInstance.overrides[id]
+			: undefined;
+
+		return override
 			?? this.app.workspace.hoverLinkSources[id]?.defaultMod
 			?? false;
 	}
