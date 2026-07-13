@@ -22,6 +22,39 @@ export interface PagePreviewModifierSettings {
 }
 
 /**
+ * Plugin-owned state forwarded from a PDF backlink highlight through Obsidian's `hover-link` event.
+ *
+ * The visualizer always emits a truthy trigger marker and adds `scroll` only when the Markdown
+ * backlink cache contains a numeric source line. The marker remains `unknown` in this shared
+ * boundary contract because the existing Page Preview branch intentionally accepts any truthy
+ * marker. Obsidian does not publish a type for per-source hover state, so both the producer and the
+ * Page Preview patcher must import this contract and review it if that private payload channel
+ * changes. The state object is forwarded by identity and must not be cloned or normalized.
+ */
+export interface BacklinkVisualizerHoverState {
+    isTriggeredFromBacklinkVisualizer: unknown;
+    scroll?: number;
+}
+
+/**
+ * Verify that unknown Page Preview state can open the Markdown source of a backlink highlight.
+ *
+ * The guard preserves the previous truthy-marker check and requires the optional source line to be
+ * numeric. Missing or malformed state falls back to Obsidian's original Page Preview handler.
+ * Property checks replace a broad cast and prevent unsafe member access without changing object
+ * identity; property getters and proxy traps still retain their existing thrown-error behavior.
+ */
+export const isBacklinkVisualizerHoverState = (
+    state: unknown
+): state is BacklinkVisualizerHoverState & { scroll: number } => {
+    if (typeof state !== 'object' || state === null) return false;
+    return 'isTriggeredFromBacklinkVisualizer' in state
+        && !!state.isTriggeredFromBacklinkVisualizer
+        && 'scroll' in state
+        && typeof state.scroll === 'number';
+};
+
+/**
  * Verifies the private Page Preview instance has an indexable modifier-override object.
  *
  * The runtime check is required because core-plugin instances are outside Obsidian's public types

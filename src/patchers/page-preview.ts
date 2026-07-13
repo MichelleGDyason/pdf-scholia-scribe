@@ -2,7 +2,7 @@ import { HoverParent, parseLinktext } from 'obsidian';
 import { around } from 'monkey-around';
 
 import PDFPlus from 'main';
-import type { PagePreviewInstance } from 'lib/page-preview-contract';
+import { isBacklinkVisualizerHoverState, type PagePreviewInstance } from 'lib/page-preview-contract';
 import { asPatchedMethod, callPatchedMethod, type PatchedMethod } from 'lib/patch-utils';
 
 /**
@@ -19,36 +19,6 @@ type PagePreviewOnLinkHoverMethod = PatchedMethod<
     Parameters<PagePreviewInstance['onLinkHover']>,
     ReturnType<PagePreviewInstance['onLinkHover']>
 >;
-
-/**
- * Hover state emitted by the backlink visualizer when a PDF backlink highlight
- * asks Page Preview to open the corresponding Markdown location.
- *
- * This payload is plugin-specific and travels through Obsidian's untyped
- * `hover-link` state channel, so it cannot be imported from Obsidian. The
- * `scroll` field is assumed to be the Markdown line number produced by the
- * backlink visualizer. If that payload changes, update this interface and the
- * guard below before changing the Page Preview branch.
- */
-interface BacklinkVisualizerHoverState {
-    isTriggeredFromBacklinkVisualizer: unknown;
-    scroll: number;
-}
-
-/**
- * Narrows an unknown Page Preview hover state to the backlink visualizer
- * payload this patcher understands.
- *
- * The runtime check prevents unsafe reads of `isTriggeredFromBacklinkVisualizer`
- * and `scroll` from arbitrary Obsidian hover payloads. It replaces the previous
- * broad `any` state access and assumes valid backlink visualizer payloads carry
- * a truthy trigger marker plus a numeric Markdown line.
- */
-const isBacklinkVisualizerHoverState = (state: unknown): state is BacklinkVisualizerHoverState => {
-    if (typeof state !== 'object' || state === null) return false;
-    const candidate = state as Partial<Record<keyof BacklinkVisualizerHoverState, unknown>>;
-    return !!candidate.isTriggeredFromBacklinkVisualizer && typeof candidate.scroll === 'number';
-};
 
 export const patchPagePreview = (plugin: PDFPlus): boolean => {
     const app = plugin.app;

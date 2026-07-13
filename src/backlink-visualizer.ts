@@ -8,6 +8,48 @@ import { MultiValuedMap, getTextLayerInfo, isCanvas, isEmbed, isHoverPopover, is
 import { onBacklinkVisualizerContextMenu } from 'context-menu';
 import { BidirectionalMultiValuedMap } from 'utils';
 import { MergedRect } from 'lib/highlights/geometry';
+import type { BacklinkVisualizerHoverState } from 'lib/page-preview-contract';
+
+
+/**
+ * Arguments supplied when a page's backlink DOM is cleared.
+ *
+ * Cleanup callbacks receive no payload because they close over the exact element, event name, and
+ * listener identity registered by `BacklinkDomManager`.
+ */
+type BacklinkDomCleanupCallbackArgs = [];
+
+/**
+ * Synchronous cleanup callback owned by `BacklinkDomManager` for one PDF page.
+ *
+ * The manager invokes callbacks in Set insertion order and ignores their results. TypeScript's
+ * `void` callback contract still permits incidental return values or Promises, preserving the
+ * existing unawaited behavior; synchronous throws and rejected Promises are not intercepted.
+ */
+type BacklinkDomCleanupCallback = (...args: BacklinkDomCleanupCallbackArgs) => void;
+
+/**
+ * Browser event tuple forwarded to a cached backlink DOM listener.
+ *
+ * @typeParam Type - Event name whose `HTMLElementEventMap` entry determines the sole event value.
+ */
+type BacklinkDomEventCallbackArgs<Type extends keyof HTMLElementEventMap> = [
+    event: HTMLElementEventMap[Type]
+];
+
+/**
+ * Listener registered on a backlink element and removed with the same function identity.
+ *
+ * The browser supplies the element as `this` and the mapped event as the only argument. Return
+ * values, including Promises, are ignored by the existing DOM event path and are never awaited by
+ * the manager. Review this alias if Obsidian's component event-registration contract changes.
+ *
+ * @typeParam Type - Event name paired with its concrete browser event type.
+ */
+type BacklinkDomEventCallback<Type extends keyof HTMLElementEventMap> = (
+    this: HTMLElement,
+    ...args: BacklinkDomEventCallbackArgs<Type>
+) => void;
 
 
 export class PDFBacklinkVisualizer extends PDFPlusComponent {
@@ -37,7 +79,7 @@ export class BacklinkDomManager extends PDFPlusComponent {
 
     private pagewiseCacheToDomsMap = new Map<number, BidirectionalMultiValuedMap<PDFBacklinkCache, HTMLElement>>;
     private pagewiseStatus = new Map<number, { onPageReady: boolean, onTextLayerReady: boolean, onAnnotationLayerReady: boolean }>;
-    private pagewiseOnClearDomCallbacksMap = new MultiValuedMap<number, () => any>();
+    private pagewiseOnClearDomCallbacksMap = new MultiValuedMap<number, BacklinkDomCleanupCallback>();
 
     constructor(visualizer: PDFViewerBacklinkVisualizer) {
         super(visualizer.plugin);
@@ -119,7 +161,7 @@ export class BacklinkDomManager extends PDFPlusComponent {
         const pos = 'position' in cache.refCache ? cache.refCache.position : undefined;
         const lineNumber = pos?.start.line;
 
-        const state: any = { isTriggeredFromBacklinkVisualizer: true };
+        const state: BacklinkVisualizerHoverState = { isTriggeredFromBacklinkVisualizer: true };
         if (typeof lineNumber === 'number') {
             state.scroll = lineNumber;
         }
@@ -211,11 +253,18 @@ export class BacklinkDomManager extends PDFPlusComponent {
         }
     }
 
-    onClearDomInPage(pageNumber: number, callback: () => any) {
+    /** Store page-owned listener cleanup without consuming or awaiting its return value. */
+    onClearDomInPage(pageNumber: number, callback: BacklinkDomCleanupCallback) {
         this.pagewiseOnClearDomCallbacksMap.addValue(pageNumber, callback);
     }
 
-    registerDomEventForCache<K extends keyof HTMLElementEventMap>(cache: PDFBacklinkCache, el: HTMLElement, type: K, callback: (this: HTMLElement, ev: HTMLElementEventMap[K]) => any, options?: boolean | AddEventListenerOptions) {
+    /**
+     * Register one typed DOM listener and, for annotation caches, retain its exact removal closure.
+     *
+     * The component owns the initial registration while the page-clear callback removes the same
+     * listener during PDF rerendering. Neither path consumes callback results.
+     */
+    registerDomEventForCache<K extends keyof HTMLElementEventMap>(cache: PDFBacklinkCache, el: HTMLElement, type: K, callback: BacklinkDomEventCallback<K>, options?: boolean | AddEventListenerOptions) {
         this.registerDomEvent(el, type, callback, options);
         if (cache.page && cache.annotation) {
             this.onClearDomInPage(cache.page, () => {
