@@ -1,4 +1,4 @@
-import { Constructor, EventRef, Events, FileSystemAdapter, Keymap, Menu, Notice, ObsidianProtocolData, PaneType, Platform, Plugin, SettingTab, TFile, Workspace, WorkspaceLeaf, addIcon, apiVersion, loadPdfJs, normalizePath, requireApiVersion } from 'obsidian';
+import { Constructor, EventRef, Events, FileSystemAdapter, Keymap, Menu, Notice, ObsidianProtocolData, Platform, Plugin, SettingTab, TFile, Workspace, WorkspaceLeaf, addIcon, apiVersion, loadPdfJs, normalizePath, requireApiVersion } from 'obsidian';
 import type { Editor, MarkdownFileInfo, MarkdownView } from 'obsidian';
 import * as pdflib from '@cantoo/pdf-lib';
 
@@ -136,6 +136,70 @@ type PDFPlusWindow = Window & Partial<PDFPlusWindowGlobalMap>;
 
 declare const window: PDFPlusWindow;
 
+/**
+ * Object-like data whose property values have not crossed a runtime validation boundary.
+ *
+ * This replaces `any` for decoded JSON and private payloads: callers must narrow a property before
+ * using it as a concrete type. Arrays intentionally satisfy the existing object check because the
+ * historical settings loader merged every non-null object, including arrays.
+ */
+type UnknownRecord = Record<string, unknown>;
+
+/**
+ * Historical settings fields still recognized while loading persisted plugin data.
+ *
+ * Valid releases stored strings for the display-format fields and booleans for the renamed toggle
+ * fields. Values remain `unknown` here because earlier loaders copied malformed persisted values
+ * verbatim; the migration must retain that compatibility rather than assert a type it did not
+ * validate. Every field is optional because each migration can be encountered independently.
+ */
+interface LegacyPDFPlusSettings {
+	/** Pre-0.24 pane value replaced in place with the supported `right` direction. */
+	paneTypeForFirstMDLeaf?: unknown;
+	/** Pre-0.24 custom display template appended to `displayTextFormats`, then deleted. */
+	aliasFormat?: unknown;
+	/** Former search-menu toggle folded into `contextMenuConfig`, then deleted. */
+	showCopyLinkToSearchInContextMenu?: unknown;
+	/** Lowercase modifier spelling replaced in place with Obsidian's `Mod` spelling. */
+	showContextMenuOnMouseUpIf?: unknown;
+	/** Misspelled PDF-edit toggle moved to `enablePDFEdit`, then deleted. */
+	enalbeWriteHighlightToFile?: unknown;
+	/** Former auto-copy ribbon toggle moved to `autoCopyToggleRibbonIcon`, then deleted. */
+	selectToCopyToggleRibbonIcon?: unknown;
+	/** Former CJK whitespace toggle moved to `removeWhitespaceBetweenCJChars`, then deleted. */
+	removeWhitespaceBetweenCJKChars?: unknown;
+}
+
+/**
+ * Untrusted top-level JSON accepted from `Plugin.loadData()` by the historical merge behavior.
+ *
+ * Unknown properties are retained through the defaults merge and the immediate save. Maintainers
+ * adding a migration must add its historical field to `LegacyPDFPlusSettings` without narrowing
+ * the field until a runtime check proves the stored shape.
+ */
+type PersistedPDFPlusSettings = UnknownRecord & LegacyPDFPlusSettings;
+
+/**
+ * Current defaults after persisted properties have been overlaid on the same mutable object.
+ *
+ * Current fields keep their `PDFPlusSettings` contract for existing consumers, while the record
+ * side exposes only `unknown` legacy and extra values to the migration boundary.
+ */
+type LoadedPDFPlusSettings = PDFPlusSettings & PersistedPDFPlusSettings;
+
+/**
+ * Exact historical-to-current property pairs supported by `renameSetting()`.
+ *
+ * All three released fields were booleans, but migration deliberately moves the stored value
+ * unchanged so malformed data and legacy-over-current precedence remain identical. Update this map
+ * and the ordered call site together if a future property rename is added.
+ */
+interface LegacySettingRenameMap {
+	enalbeWriteHighlightToFile: 'enablePDFEdit';
+	selectToCopyToggleRibbonIcon: 'autoCopyToggleRibbonIcon';
+	removeWhitespaceBetweenCJKChars: 'removeWhitespaceBetweenCJChars';
+}
+
 type WorkspaceLayoutNode = {
 	state?: {
 		type?: string;
@@ -148,8 +212,65 @@ const isSavedPDFViewState = (state: Partial<PDFViewState> | undefined): state is
 	return typeof state?.file === 'string' && typeof state.page === 'number';
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => {
+/** Narrow an external value to an object-like property bag without trusting any property value. */
+const isRecord = (value: unknown): value is UnknownRecord => {
 	return typeof value === 'object' && value !== null;
+};
+
+/**
+ * Classify untrusted `loadData()` output using the loader's established top-level behavior.
+ *
+ * Non-null objects, including arrays, are merged and retain unknown properties. Null and primitive
+ * values become an empty record so defaults apply. No nested value is validated here, preserving
+ * existing errors and migration outcomes for malformed current or legacy fields.
+ */
+const parsePersistedSettings = (value: unknown): PersistedPDFPlusSettings => {
+	return isRecord(value) ? value : {};
+};
+
+/**
+ * Check whether decoded persisted JSON owns a historical property, including an `undefined` value.
+ *
+ * The own-property test is required because migration deletes only fields physically present in
+ * saved data. It also preserves the previous failure for null nested entries instead of silently
+ * accepting a malformed command object.
+ *
+ * @typeParam Key - Historical property name whose presence is being tested.
+ */
+const hasOwnPersistedProperty = <Key extends string>(
+	value: unknown,
+	key: Key
+): value is UnknownRecord & Record<Key, unknown> => {
+	return Object.prototype.hasOwnProperty.call(value, key) === true;
+};
+
+/**
+ * Move one own persisted property without claiming its unvalidated value has a current type.
+ *
+ * Direct assignment occurs before deletion, matching the old migration's precedence, mutation
+ * order, and thrown-error behavior. Future migrations should use this helper instead of casting a
+ * legacy value to its destination type when malformed stored values must remain compatible.
+ */
+const renameOwnPersistedProperty = (value: unknown, oldName: string, newName: string): void => {
+	if (!hasOwnPersistedProperty(value, oldName)) return;
+	value[newName] = value[oldName];
+	delete value[oldName];
+};
+
+/**
+ * Apply the former search-menu toggle without asserting that persisted JSON contains a boolean.
+ *
+ * Released data used a boolean, but the old `&&=` operation propagated any malformed truthy value
+ * into the section. The own-property guard exposes an unknown-valued record so the direct write
+ * retains that behavior without asserting the current boolean contract.
+ */
+const applyLegacySearchVisibility = (
+	section: unknown,
+	legacyVisibility: unknown
+): void => {
+	if (hasOwnPersistedProperty(section, 'visible') && section.visible) {
+		section.visible = legacyVisibility;
+	}
 };
 
 /**
@@ -364,9 +485,19 @@ export default class PDFPlus extends Plugin {
 		await this.saveSettings();
 	}
 
-	async loadSettings() {
-		const savedSettings = await this.loadData() as unknown;
-		this.settings = Object.assign(this.getDefaultSettings(), isRecord(savedSettings) ? savedSettings : {});
+	/**
+	 * Load untrusted persisted JSON, apply defaults, and run compatibility migrations in order.
+	 *
+	 * The merged object is assigned at the same point as before so load and migration failures retain
+	 * their existing state and propagation behavior. `onload()` performs the single immediate save
+	 * only after this method resolves successfully.
+	 */
+	async loadSettings(): Promise<void> {
+		const persistedData: unknown = await this.loadData();
+		const savedSettings = parsePersistedSettings(persistedData);
+		const loadedSettings: LoadedPDFPlusSettings = Object.assign(this.getDefaultSettings(), savedSettings);
+		const persistedSettings: PersistedPDFPlusSettings = loadedSettings;
+		this.settings = loadedSettings;
 
 		this.setCitationIdRegex();
 
@@ -396,56 +527,46 @@ export default class PDFPlus extends Plugin {
 
 		this.migrateIndependentSplitPDFPaneSettings();
 
-		if (this.settings.paneTypeForFirstMDLeaf as PaneType | '' === 'split') {
+		if (persistedSettings.paneTypeForFirstMDLeaf === 'split') {
 			this.settings.paneTypeForFirstMDLeaf = 'right';
 		}
 
 		for (const cmd of this.settings.copyCommands) {
-			// @ts-ignore
-			if (Object.prototype.hasOwnProperty.call(cmd, 'format')) {
-				// @ts-ignore
-				cmd.template = cmd.format;
-				// @ts-ignore
-				delete cmd.format;
-			}
+			renameOwnPersistedProperty(cmd, 'format', 'template');
 		}
 		this.migrateCitationCopyCommands();
 		this.migrateOutlineCopySettings();
 		this.migrateScholiaDefaults();
 
-		if (Object.prototype.hasOwnProperty.call(this.settings, 'aliasFormat')) {
-			this.settings.displayTextFormats.push({
+		if (hasOwnPersistedProperty(persistedSettings, 'aliasFormat')) {
+			const displayTextFormats: unknown[] = this.settings.displayTextFormats;
+			displayTextFormats.push({
 				name: 'Custom',
-				// @ts-ignore
-				template: this.settings.aliasFormat
+				template: persistedSettings.aliasFormat
 			});
-			// @ts-ignore
-			delete this.settings.aliasFormat;
+			delete persistedSettings.aliasFormat;
 		}
 
-		if (Object.prototype.hasOwnProperty.call(this.settings, 'showCopyLinkToSearchInContextMenu')) {
+		if (hasOwnPersistedProperty(persistedSettings, 'showCopyLinkToSearchInContextMenu')) {
 			const searchSectionConfig = this.settings.contextMenuConfig.find(({ id }) => id === 'search');
 			if (searchSectionConfig) {
-				// @ts-ignore
-				searchSectionConfig.visible &&= this.settings.showCopyLinkToSearchInContextMenu;
+				applyLegacySearchVisibility(searchSectionConfig, persistedSettings.showCopyLinkToSearchInContextMenu);
 			}
-			// @ts-ignore
-			delete this.settings.showCopyLinkToSearchInContextMenu;
+			delete persistedSettings.showCopyLinkToSearchInContextMenu;
 		}
 
-		// @ts-ignore
-		if (this.settings.showContextMenuOnMouseUpIf === 'mod') {
+		if (persistedSettings.showContextMenuOnMouseUpIf === 'mod') {
 			this.settings.showContextMenuOnMouseUpIf = 'Mod';
 		}
 
 		this.settings.enableEditEncryptedPDF = false;
 
-		this.renameSetting('enalbeWriteHighlightToFile', 'enablePDFEdit');
+		this.renameSetting(persistedSettings, 'enalbeWriteHighlightToFile', 'enablePDFEdit');
 
-		this.renameSetting('selectToCopyToggleRibbonIcon', 'autoCopyToggleRibbonIcon');
+		this.renameSetting(persistedSettings, 'selectToCopyToggleRibbonIcon', 'autoCopyToggleRibbonIcon');
 		this.renameCommand('pdf-plus:toggle-select-to-copy', `${this.manifest.id}:toggle-auto-copy`);
 
-		this.renameSetting('removeWhitespaceBetweenCJKChars', 'removeWhitespaceBetweenCJChars');
+		this.renameSetting(persistedSettings, 'removeWhitespaceBetweenCJKChars', 'removeWhitespaceBetweenCJChars');
 
 		this.loadContextMenuConfig();
 	}
@@ -458,13 +579,20 @@ export default class PDFPlus extends Plugin {
 		}
 	}
 
-	private renameSetting(oldId: string, newId: keyof PDFPlusSettings) {
-		if (Object.prototype.hasOwnProperty.call(this.settings, oldId)) {
-			// @ts-ignore
-			this.settings[newId] = this.settings[oldId];
-			// @ts-ignore
-			delete this.settings[oldId];
-		}
+	/**
+	 * Move one supported historical setting to its exact current property name.
+	 *
+	 * The map constrains valid old/new pairs, while `renameOwnPersistedProperty()` preserves unknown
+	 * stored values, legacy-over-current precedence, assignment-before-deletion order, and idempotency.
+	 *
+	 * @typeParam OldName - Historical key paired with one destination in `LegacySettingRenameMap`.
+	 */
+	private renameSetting<OldName extends keyof LegacySettingRenameMap>(
+		settings: PersistedPDFPlusSettings,
+		oldId: OldName,
+		newId: LegacySettingRenameMap[OldName]
+	): void {
+		renameOwnPersistedProperty(settings, oldId, newId);
 	}
 
 	private renameCommand(oldId: string, newId: string) {
