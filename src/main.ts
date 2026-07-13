@@ -21,6 +21,16 @@ type WorkspaceWithProtocolUnregister = Workspace & {
 	unregisterObsidianProtocolHandler?: (action: string) => void;
 };
 
+/**
+ * Handles one externally supplied `obsidian://` callback without trusting its payload type.
+ *
+ * Obsidian's published handler type permits any return and does not document a consumed result.
+ * This plugin narrows that to `void | Promise<void>` without catching or awaiting it, so thrown
+ * errors and rejected Promises retain the existing handling. Review this boundary if Obsidian
+ * changes its protocol registration contract.
+ */
+type PDFPlusObsidianProtocolCallback = (params: unknown) => void | Promise<void>;
+
 type WorkspaceLayoutNode = {
 	state?: {
 		type?: string;
@@ -35,6 +45,20 @@ const isSavedPDFViewState = (state: Partial<PDFViewState> | undefined): state is
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
 	return typeof value === 'object' && value !== null;
+};
+
+/**
+ * Validates decoded query data received from an external `obsidian://` URI.
+ *
+ * Obsidian documents this payload as a string map containing `action`; query values are already
+ * decoded, while missing keys stay absent and empty values remain empty strings. Unknown string
+ * keys are accepted unchanged. Rejecting non-string entries prevents unsafe forwarding without
+ * coercion; this guard must be reviewed if Obsidian changes decoding or repeated-key semantics.
+ */
+const isObsidianProtocolData = (value: unknown): value is ObsidianProtocolData => {
+	return isRecord(value)
+		&& typeof value.action === 'string'
+		&& Object.values(value).every((entry) => typeof entry === 'string');
 };
 
 const hasErrorCode = (err: unknown): err is { code: string } => {
@@ -174,7 +198,8 @@ export default class PDFPlus extends Plugin {
 	registerPluginObsidianProtocolHandler() {
 		const workspace = this.app.workspace as WorkspaceWithProtocolUnregister;
 		workspace.unregisterObsidianProtocolHandler?.(this.obsidianProtocolAction);
-		this.registerObsidianProtocolHandler(this.obsidianProtocolAction, this.obsidianProtocolHandler.bind(this));
+		const handler: PDFPlusObsidianProtocolCallback = (params) => this.obsidianProtocolHandler(params);
+		this.registerObsidianProtocolHandler(this.obsidianProtocolAction, handler);
 	}
 
 	onunload() {
@@ -1070,7 +1095,9 @@ export default class PDFPlus extends Plugin {
 		});
 	}
 
-	obsidianProtocolHandler(params: ObsidianProtocolData) {
+	obsidianProtocolHandler(params: unknown): void | Promise<void> {
+		if (!isObsidianProtocolData(params)) return;
+
 		if ('create-dummy' in params) {
 			return this.lib.dummyFileManager.createDummyFilesFromObsidianUrl(params);
 		}
