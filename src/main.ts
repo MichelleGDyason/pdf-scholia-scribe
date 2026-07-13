@@ -106,6 +106,36 @@ type PDFPlusOneTimeWorkspaceEventCallback<Name extends PDFPlusOneTimeWorkspaceEv
 	...args: PDFPlusOneTimeWorkspaceEventMap[Name]
 ) => void;
 
+/**
+ * Plugin-owned values attached to the main Obsidian window for developer-console access.
+ *
+ * `pdfPlus` is the live plugin instance and `pdflib` is the imported PDF library namespace. Keep
+ * this map synchronized with `registerGlobalVariables()` whenever a global is added or removed.
+ */
+interface PDFPlusWindowGlobalMap {
+	pdfPlus: PDFPlus;
+	pdflib: typeof pdflib;
+}
+
+/**
+ * Property names accepted by the plugin's window-global registration helper.
+ *
+ * Deriving the name from `PDFPlusWindowGlobalMap` keeps every property paired with its exact value
+ * type instead of accepting arbitrary strings.
+ */
+type PDFPlusWindowGlobalName = keyof PDFPlusWindowGlobalMap;
+
+/**
+ * Local view of the main Obsidian window while the plugin's optional globals are registered.
+ *
+ * This intersection is intentionally module-local: popout windows are not populated, and browser
+ * windows do not permanently own these properties. Registration never overwrites an existing
+ * value; unload deletes a value created by this plugin instead of restoring prior state.
+ */
+type PDFPlusWindow = Window & Partial<PDFPlusWindowGlobalMap>;
+
+declare const window: PDFPlusWindow;
+
 type WorkspaceLayoutNode = {
 	state?: {
 		type?: string;
@@ -986,17 +1016,30 @@ export default class PDFPlus extends Plugin {
 		});
 	}
 
-	private registerGlobalVariable(name: string, value: any, throwError: boolean = true) {
+	/**
+	 * Attach one mapped debugging global to this module's main Obsidian window.
+	 *
+	 * Callers should use this helper so name/value correlation, collision handling, and unload
+	 * deletion stay consistent. Existing own or inherited properties are preserved; `throwError`
+	 * controls whether that collision throws or returns without registering cleanup.
+	 *
+	 * @typeParam Name - A key whose value must match `PDFPlusWindowGlobalMap[Name]`.
+	 */
+	private registerGlobalVariable<Name extends PDFPlusWindowGlobalName>(
+		name: Name,
+		value: PDFPlusWindowGlobalMap[Name],
+		throwError: boolean = true
+	): void {
 		if (name in window) {
 			if (throwError) throw new Error(`${this.manifest.name}: Global variable "${name}" already exists.`);
 			else return;
 		}
-		// @ts-ignore
-		window[name] = value;
-		// @ts-ignore
-		this.register(() => delete window[name]);
+		const globals: Partial<PDFPlusWindowGlobalMap> = window;
+		globals[name] = value;
+		this.register(() => delete globals[name]);
 	}
 
+	/** Register the plugin instance and PDF library globals in their existing startup order. */
 	private registerGlobalVariables() {
 		this.registerGlobalVariable('pdfPlus', this, false);
 		this.registerGlobalVariable('pdflib', pdflib, false);

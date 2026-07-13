@@ -8,7 +8,6 @@ import { CapacitorGlobal } from '@capacitor/core';
 import { App as CapacitorAppPlugin } from '@capacitor/app';
 import { Device } from '@capacitor/device';
 
-import PDFPlus from 'main';
 import { BacklinkPanePDFManager } from 'pdf-backlink';
 import { PDFViewerBacklinkVisualizer } from 'backlink-visualizer';
 import { ColorPalette } from 'color-palette';
@@ -19,7 +18,6 @@ import { VimBindings } from 'vim/vim';
 
 declare global {
     interface Window {
-        pdfPlus?: PDFPlus;
         pdfjsLib: typeof import('pdfjs-dist');
         /**
          * Obsidian v1.7.7 or earlier: has the `ObsidianViewer` class. 
