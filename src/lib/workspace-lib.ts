@@ -29,18 +29,104 @@ export function isExtendedPaneType(arg: string): arg is ExtendedPaneType {
     return ['', 'tab', 'window'].contains(arg) || isFineGrainedSplitDirection(arg) || isSidebarType(arg);
 }
 
-type HoverEditorPlugin = {
-    settings?: {
-        triggerDelay?: number;
-    };
-    activePopovers?: HoverEditorPopover[];
-};
+/**
+ * The settings fragment read from the optional Hover Editor community plugin.
+ *
+ * Obsidian's public types cannot describe third-party plugin settings, so the delay remains unknown
+ * until used. Review this contract if Hover Editor moves or renames its `triggerDelay` setting.
+ */
+interface HoverEditorSettings {
+    readonly triggerDelay?: unknown;
+}
 
-type HoverEditorPopover = {
-    hoverEl: HTMLElement;
+/**
+ * The minimal loaded Hover Editor instance discovered through Obsidian's private plugin registry.
+ *
+ * Only fields consumed by this integration are modeled. Popover entries remain unknown until
+ * individually guarded, preserving their identity while preventing unsafe access to malformed
+ * third-party data. A missing or disabled plugin has no loaded registry instance and is represented
+ * as `null`. Review this contract if Obsidian changes plugin loading or Hover Editor changes these
+ * fields.
+ */
+interface HoverEditorPlugin {
+    readonly settings?: HoverEditorSettings;
+    readonly activePopovers?: readonly unknown[];
+}
+
+/**
+ * The cross-window element operations needed to associate a Hover Editor popover with a leaf.
+ *
+ * Structural methods are used instead of `instanceof HTMLElement` because a valid element may
+ * belong to an Obsidian popout window with a different DOM constructor. The contract preserves the
+ * original element and only assumes Obsidian's `hasClass()` extension remains available.
+ */
+interface HoverEditorElement {
+    contains(other: Node | null): boolean;
+    hasClass(className: string): boolean;
+}
+
+/**
+ * The minimal private Hover Editor popover contract used after matching a visible leaf.
+ *
+ * `toggleMinimized()` and `hide()` are invoked as member calls so Hover Editor retains their
+ * original receiver. Their results are intentionally ignored and never awaited. Review this shape
+ * if Hover Editor changes its popover element or lifecycle methods.
+ */
+interface HoverEditorPopover {
+    readonly hoverEl: HoverEditorElement;
     toggleMinimized(): void;
     hide(): void;
-};
+}
+
+/**
+ * Narrows an untyped third-party value to a non-array object before reading named properties.
+ *
+ * This guard replaces direct casts at Obsidian plugin boundaries; class instances remain accepted,
+ * while primitives, arrays, and `null` cannot cause unsafe member access.
+ */
+function isPropertyRecord(value: unknown): value is Record<PropertyKey, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Validates the loaded portion of Hover Editor that this integration may inspect.
+ *
+ * The registry value must be an object, optional settings must be object-like, and optional active
+ * popovers must be an array. Unknown array entries are validated separately so one malformed entry
+ * cannot be accessed unsafely. The same plugin object is returned by narrowing rather than cloned.
+ */
+function isHoverEditorPlugin(value: unknown): value is HoverEditorPlugin {
+    if (!isPropertyRecord(value)) return false;
+
+    return (value.settings === undefined || isPropertyRecord(value.settings))
+        && (value.activePopovers === undefined || Array.isArray(value.activePopovers));
+}
+
+/**
+ * Validates the element methods used to match a popover across main and popout windows.
+ *
+ * Structural checks avoid cross-window constructor failures and prevent unsafe calls when a private
+ * Hover Editor payload is malformed. Only the operations needed by this integration are required.
+ */
+function isHoverEditorElement(value: unknown): value is HoverEditorElement {
+    return isPropertyRecord(value)
+        && typeof value.contains === 'function'
+        && typeof value.hasClass === 'function';
+}
+
+/**
+ * Validates one unknown active-popover entry before its DOM and lifecycle members are used.
+ *
+ * A valid entry keeps its original identity and receiver-bound methods. Missing element operations,
+ * `toggleMinimized()`, or `hide()` cause that malformed entry to be skipped instead of throwing an
+ * accidental unsafe-access error.
+ */
+function isHoverEditorPopover(value: unknown): value is HoverEditorPopover {
+    return isPropertyRecord(value)
+        && isHoverEditorElement(value.hoverEl)
+        && typeof value.toggleMinimized === 'function'
+        && typeof value.hide === 'function';
+}
 
 /**
  * Performs a side effect for one typed value emitted by a workspace traversal.
@@ -608,25 +694,54 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
 
 
 /**
- * We could have use Hover Editor's internal APIs such as `spawnPopover` and `activePopovers`,
- * but it's better to use the public APIs if possible.
+ * Integrates with the optional Hover Editor plugin through Obsidian's `link-hover` event.
+ *
+ * Hover creation deliberately avoids Hover Editor's private `spawnPopover()` method. Private plugin
+ * state is read only to honor its trigger delay and post-process the matching popover. Both main and
+ * popout leaves are handled through Obsidian's shared workspace and structural DOM contracts.
  */
 class HoverEditorLib extends PDFPlusLibSubmodule {
 
+    /**
+     * Returns the currently loaded Hover Editor instance without retaining a stale reference.
+     *
+     * Obsidian's community-plugin registry is private and cannot provide a trustworthy public type,
+     * so its value is narrowed from `unknown`. Disabled, unloaded, missing, or malformed instances
+     * return `null`; a valid instance is returned with its exact identity.
+     */
     get hoverEditorPlugin(): HoverEditorPlugin | null {
-        return (this.app.plugins.plugins['obsidian-hover-editor'] as unknown as HoverEditorPlugin | undefined) ?? null;
+        const plugin: unknown = this.app.plugins.plugins['obsidian-hover-editor'];
+        return isHoverEditorPlugin(plugin) ? plugin : null;
     }
 
+    /**
+     * Reads Hover Editor's optional hover delay after validating its dynamic settings value.
+     *
+     * Non-numeric or missing values preserve the existing `undefined` fallback used by hover
+     * creation timing.
+     */
     get waitTime(): number | undefined {
         const triggerDelay = this.hoverEditorPlugin?.settings?.triggerDelay;
         return typeof triggerDelay === 'number' ? triggerDelay : undefined;
     }
 
+    /**
+     * Identifies a Hover Editor leaf by its existing container ancestry in either app window.
+     */
     isHoverEditorLeaf(leaf: WorkspaceLeaf): boolean {
         return leaf.containerEl.closest('.popover.hover-popover.hover-editor') !== null;
     }
 
-    async createNewHoverEditorLeaf(hoverParent: HoverParent, targetEl: HTMLElement | null, linktext: string, sourcePath: string, state?: any): Promise<WorkspaceLeaf | null> {
+    /**
+     * Requests one Hover Editor leaf through Obsidian's `link-hover` event contract.
+     *
+     * Arguments retain Obsidian's event order: hover parent, target element, link text, source path,
+     * then opaque state. State may contain private file, source-leaf, page, or subpath data and is
+     * forwarded unchanged rather than cast or inspected. The first activated hover leaf is returned;
+     * otherwise the existing timeout resolves `null`. Dispatch errors reject the returned Promise,
+     * and no event result is consumed or awaited. `targetEl` may belong to the main or a popout window.
+     */
+    async createNewHoverEditorLeaf(hoverParent: HoverParent, targetEl: HTMLElement | null, linktext: string, sourcePath: string, state?: unknown): Promise<WorkspaceLeaf | null> {
         if (!this.hoverEditorPlugin) return null;
 
         return new Promise<WorkspaceLeaf | null>((resolve) => {
@@ -646,17 +761,38 @@ class HoverEditorLib extends PDFPlusLibSubmodule {
         });
     }
 
-    iterateHoverEditorLeaves(callback: (leaf: WorkspaceLeaf) => any): void {
+    /**
+     * Visits Hover Editor leaves in Obsidian's all-leaf order, including popout leaves.
+     *
+     * Callback results are deliberately ignored, cannot short-circuit traversal, and returned
+     * Promises are not awaited; synchronous errors retain their existing propagation behaviour.
+     */
+    iterateHoverEditorLeaves(callback: (leaf: WorkspaceLeaf) => void): void {
         this.app.workspace.iterateAllLeaves((leaf) => {
             if (this.isHoverEditorLeaf(leaf)) callback(leaf);
         });
     }
 
+    /**
+     * Returns the same guarded Hover Editor popover whose element contains the supplied leaf.
+     *
+     * Unknown or malformed private entries are skipped. Structural element checks preserve main-
+     * and popout-window compatibility without reconstructing either the popover or its DOM element.
+     */
     getHoverEditorForLeaf(leaf: WorkspaceLeaf): HoverEditorPopover | null {
         return this.hoverEditorPlugin?.activePopovers
-            ?.find((popover) => popover.hoverEl.contains(leaf.containerEl)) ?? null;
+            ?.find((popover): popover is HoverEditorPopover => {
+                return isHoverEditorPopover(popover)
+                    && popover.hoverEl.contains(leaf.containerEl);
+            }) ?? null;
     }
 
+    /**
+     * Applies existing PDF Scholia Scribe lifecycle behavior to one Hover Editor leaf.
+     *
+     * Popover methods remain receiver-bound member calls, their results are ignored, and the
+     * active-leaf listener is removed at the same point after hiding an ephemeral popover.
+     */
     postProcessHoverEditorLeaf(leaf: WorkspaceLeaf): void {
         if (this.isHoverEditorLeaf(leaf)) {
             const popover = this.getHoverEditorForLeaf(leaf);
