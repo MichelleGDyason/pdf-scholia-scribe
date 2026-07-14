@@ -891,12 +891,69 @@ export class PDFPlusContextMenu extends PDFPlusMenu {
 }
 
 
-type PDFPlusProductMenuOptions = ReturnType<PDFPlusProductMenuComponent['getOptionsFromColorPalette']>;
+/**
+ * The complete product choice passed from a context menu to its PDF action.
+ *
+ * The object combines the selected color, copy template, and display-text template. It is created
+ * once per click and passed by identity to the registered action without exposing unrelated PDF,
+ * selection, annotation, page, or viewer state.
+ */
+interface PDFPlusProductMenuOptions {
+    colorName: string | null;
+    copyFormat: string;
+    displayTextFormat: string;
+}
+
+/**
+ * One product dimension used to build each level of the nested menu in configured order.
+ */
+type PDFPlusProductMenuDimension = 'color' | 'display' | 'copy-format';
+
+/**
+ * Adds one configured product dimension to the supplied menu during synchronous construction.
+ *
+ * Results are ignored and cannot affect submenu recursion. The wrapper captures its originating
+ * component, so it does not depend on the incidental receiver used by `addProductMenuItems()`;
+ * synchronous errors propagate and returned Promises would remain unawaited.
+ */
+type PDFPlusProductMenuItemAdder = (menu: Menu) => void;
+
+/**
+ * Configures a newly created product-menu component in the fluent `then()` hook.
+ *
+ * The component is the sole argument and the callback is invoked as a plain function. Results are
+ * ignored, asynchronous completion is not awaited, and synchronous errors propagate before the
+ * component can be returned. `any` is inappropriate because no result controls configuration.
+ *
+ * @typeParam Component The exact fluent subtype supplied to the callback and returned by `then()`.
+ */
+type PDFPlusProductMenuConfigurator<Component> = (this: void, menuComponent: Component) => void;
+
+/**
+ * Handles one named copy or display template selected from a product submenu.
+ *
+ * Arguments are the original template followed by Obsidian's mouse or keyboard event. The callback
+ * is invoked once as a plain function; results and Promise completion are ignored, while synchronous
+ * errors retain their existing propagation. Current handlers call `finish()` synchronously, which
+ * runs the product action and closes the root menu.
+ */
+type PDFPlusNamedTemplateClickCallback = (this: void, template: NamedTemplate, evt: MouseEvent | KeyboardEvent) => void;
+
+/**
+ * Runs the PDF action chosen through a completed product menu.
+ *
+ * `finish()` invokes the stored function as a component member, preserving the component as the
+ * original receiver, then hides the root menu. Results are ignored: synchronous throws still prevent
+ * the subsequent hide, while returned or rejected Promises remain fire-and-forget and do not delay
+ * closing or any modal/clipboard work started by the callback. The concrete options contract avoids
+ * an `any` boundary where no callback result is consumed.
+ */
+type PDFPlusProductSelectionCallback = (this: PDFPlusProductMenuComponent, options: PDFPlusProductMenuOptions) => void;
 
 export class PDFPlusProductMenuComponent extends PDFPlusComponent {
     rootMenu: Menu;
     palette: ColorPalette;
-    clickItemCallback: ((options: { colorName: string | null, copyFormat: string, displayTextFormat: string }) => any) | null = null;
+    clickItemCallback: PDFPlusProductSelectionCallback | null = null;
 
     itemToColorName = new Map<MenuItem, string | null>;
     itemToCopyFormat = new Map<MenuItem, string>;
@@ -919,7 +976,10 @@ export class PDFPlusProductMenuComponent extends PDFPlusComponent {
         return rootMenu.addChild(new PDFPlusProductMenuComponent(rootMenu, palette));
     }
 
-    then(callback: (menuComponent: this) => any) {
+    /**
+     * Runs one immediate fluent configurator and returns this exact component.
+     */
+    then(callback: PDFPlusProductMenuConfigurator<this>): this {
         callback(this);
         return this;
     }
@@ -950,7 +1010,7 @@ export class PDFPlusProductMenuComponent extends PDFPlusComponent {
         }
     }
 
-    addItems(order: ('color' | 'display' | 'copy-format')[]) {
+    addItems(order: PDFPlusProductMenuDimension[]): this {
         this.addSectionTitle();
 
         // Nested menus don't work on the mobile app, so we limit the depth to 1.
@@ -959,16 +1019,18 @@ export class PDFPlusProductMenuComponent extends PDFPlusComponent {
             order = order.slice(0, 1);
         }
 
-        addProductMenuItems(this.rootMenu, order.map((type) => {
+        const itemAdders = order.map((type): PDFPlusProductMenuItemAdder => {
             switch (type) {
                 case 'color':
-                    return this.addColorItems.bind(this);
+                    return (menu) => this.addColorItems(menu);
                 case 'copy-format':
-                    return this.addCopyFormatItems.bind(this);
+                    return (menu) => this.addCopyFormatItems(menu);
                 case 'display':
-                    return this.addDisplayTextItems.bind(this);
+                    return (menu) => this.addDisplayTextItems(menu);
             }
-        }), {
+        });
+
+        addProductMenuItems(this.rootMenu, itemAdders, {
             clickableParentItem: true,
             vim: this.settings.enableVimInContextMenu,
         });
@@ -976,7 +1038,7 @@ export class PDFPlusProductMenuComponent extends PDFPlusComponent {
         return this;
     }
 
-    private addColorItems(menu: Menu) {
+    private addColorItems(menu: Menu): void {
         const colorNames = Object.keys(this.settings.colors);
         const selectedColorName = this.palette.getState().selectedColorName;
         const selectedColorIndex = selectedColorName
@@ -1009,7 +1071,7 @@ export class PDFPlusProductMenuComponent extends PDFPlusComponent {
         fixOpenSubmenu(menu, 100);
     }
 
-    private addNamedTemplateItems(menu: Menu, templates: NamedTemplate[], checkedIndex: number, map: Map<MenuItem, string>, onClick: (template: NamedTemplate, evt: MouseEvent | KeyboardEvent) => any) {
+    private addNamedTemplateItems(menu: Menu, templates: NamedTemplate[], checkedIndex: number, map: Map<MenuItem, string>, onClick: PDFPlusNamedTemplateClickCallback): void {
         for (let i = 0; i < templates.length; i++) {
             menu.addItem((item) => {
                 item.setTitle(templates[i].name)
@@ -1028,7 +1090,7 @@ export class PDFPlusProductMenuComponent extends PDFPlusComponent {
         fixOpenSubmenu(menu, 100);
     }
 
-    private addDisplayTextItems(menu: Menu) {
+    private addDisplayTextItems(menu: Menu): void {
         this.addNamedTemplateItems(
             menu,
             this.settings.displayTextFormats,
@@ -1038,7 +1100,7 @@ export class PDFPlusProductMenuComponent extends PDFPlusComponent {
         );
     }
 
-    private addCopyFormatItems(menu: Menu) {
+    private addCopyFormatItems(menu: Menu): void {
         this.addNamedTemplateItems(
             menu,
             this.settings.copyCommands,
@@ -1048,7 +1110,7 @@ export class PDFPlusProductMenuComponent extends PDFPlusComponent {
         );
     }
 
-    private getOptionsFromColorPalette() {
+    private getOptionsFromColorPalette(): PDFPlusProductMenuOptions {
         return {
             colorName: this.palette.getColorName(),
             copyFormat: this.palette.getCopyFormat(),
@@ -1104,7 +1166,7 @@ export class PDFPlusProductMenuComponent extends PDFPlusComponent {
         this.plugin.trigger('color-palette-state-change', { source: this.palette });
     }
 
-    private finish(optionOverrides: Partial<PDFPlusProductMenuOptions>, evt: MouseEvent | KeyboardEvent) {
+    private finish(optionOverrides: Partial<PDFPlusProductMenuOptions>, evt: MouseEvent | KeyboardEvent): void {
         const options = this.getOptions(optionOverrides);
 
         if (this.settings.updateColorPaletteStateFromContextMenu && !Keymap.isModifier(evt, 'Mod')) {
@@ -1115,7 +1177,10 @@ export class PDFPlusProductMenuComponent extends PDFPlusComponent {
         this.rootMenu.hide();
     }
 
-    onItemClick(callback: (options: { colorName: string | null, copyFormat: string, displayTextFormat: string }) => any) {
+    /**
+     * Stores the action invoked once by `finish()` before the root menu is hidden.
+     */
+    onItemClick(callback: PDFPlusProductSelectionCallback): void {
         this.clickItemCallback = callback;
     }
 }
