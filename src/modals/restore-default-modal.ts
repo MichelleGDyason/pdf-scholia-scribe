@@ -1,5 +1,6 @@
 import { ButtonComponent, Notice } from 'obsidian';
 
+import { setButtonDestructiveCompat } from 'lib/obsidian-button-compat';
 import { PDFPlusModal } from './base-modal';
 
 
@@ -17,9 +18,9 @@ export class RestoreDefaultModal extends PDFPlusModal {
         });
 
         this.contentEl.createDiv('modal-button-container', (el) => {
-            new ButtonComponent(el)
-                .setButtonText('I understand, restore default settings')
-                .setWarning()
+            setButtonDestructiveCompat(
+                new ButtonComponent(el).setButtonText('I understand, restore default settings')
+            )
                 .onClick(async () => {
                     await this.plugin.restoreDefaultSettings();
                     this.close();
