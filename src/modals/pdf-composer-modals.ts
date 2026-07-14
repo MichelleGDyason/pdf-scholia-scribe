@@ -2,6 +2,7 @@ import { Setting, TFile } from 'obsidian';
 import { PDFDocument, PageSizes } from '@cantoo/pdf-lib';
 
 import PDFPlus from 'main';
+import { setButtonDestructiveCompat } from 'lib/obsidian-button-compat';
 import { PDFPlusModal } from 'modals';
 
 
@@ -77,9 +78,7 @@ export class PDFPageDeleteModal extends PDFPlusModal {
 
         new Setting(this.contentEl)
             .addButton((button) => {
-                button
-                    .setButtonText('Delete')
-                    .setWarning()
+                setButtonDestructiveCompat(button.setButtonText('Delete'))
                     .onClick(() => {
                         this.#resolve(true);
                         this.close();
