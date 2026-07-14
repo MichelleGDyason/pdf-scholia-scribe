@@ -1,6 +1,7 @@
 import { Setting, TFile, TextAreaComponent, MarkdownRenderer, RGB, ColorComponent, DropdownComponent } from 'obsidian';
 
 import PDFPlus from 'main';
+import { setButtonDestructiveCompat } from 'lib/obsidian-button-compat';
 import { getModifierNameInPlatform, hexToRgb, hookInternalLinkMouseEventHandlers, rgbToHex } from 'utils';
 import { PDFDict } from '@cantoo/pdf-lib';
 import { PDFPlusModal } from 'modals';
@@ -418,9 +419,7 @@ export class PDFAnnotationDeleteModal extends PDFAnnotationModal {
 
         new Setting(this.contentEl)
             .addButton((button) => {
-                button
-                    .setButtonText('Delete')
-                    .setWarning()
+                setButtonDestructiveCompat(button.setButtonText('Delete'))
                     .onClick(() => {
                         void this.deleteAnnotation();
                         this.close();

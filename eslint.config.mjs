@@ -64,6 +64,14 @@ export default defineConfig([
         },
     },
     {
+        files: ["src/lib/obsidian-button-compat.ts"],
+        rules: {
+            // This module isolates the annotation-delete button's Obsidian 1.12.7 compatibility branch.
+            // Do not expand this exception to unrelated deprecated APIs; remove it when support starts at 1.13.0.
+            "@typescript-eslint/no-deprecated": "off",
+        },
+    },
+    {
         files: ["src/settings.ts"],
         rules: {
             // These complete settings strings use standard technical acronyms that must remain uppercase.
