@@ -63,4 +63,18 @@ export default defineConfig([
             }],
         },
     },
+    {
+        files: ["src/settings.ts"],
+        rules: {
+            // These complete settings strings use standard technical acronyms that must remain uppercase.
+            // Exact matches keep the exception from hiding unrelated sentence-case warnings in this file.
+            "obsidianmd/ui/sentence-case": ["warn", {
+                enforceCamelCaseLower: true,
+                ignoreRegex: [
+                    "^URI patterns for PDF files$",
+                    "^Enter regular expressions that identify URIs for PDF files\\. When you drag a URI or URL from your browser into Obsidian's editor, these patterns check whether the destination is a PDF file\\. Enter each pattern on a separate line\\.$",
+                ],
+            }],
+        },
+    },
 ]);

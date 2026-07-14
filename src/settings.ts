@@ -3268,7 +3268,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 
 		this.addSetting('externalURIPatterns')
 			.setName('URI patterns for PDF files')
-			.setDesc('Specify the URI pattens for PDFs in regular expressions. When dragging and dropping a URI/URL from your browser to Obsidian\'s editor, it will be used to check if the destination file is a PDF file. If you need multiple patterns, separate them with a new line.')
+			.setDesc('Enter regular expressions that identify URIs for PDF files. When you drag a URI or URL from your browser into Obsidian\'s editor, these patterns check whether the destination is a PDF file. Enter each pattern on a separate line.')
 			.addTextArea((text) => {
 				text.inputEl.rows = 8;
 				text.inputEl.cols = 30;
