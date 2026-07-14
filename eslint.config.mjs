@@ -78,6 +78,7 @@ export default defineConfig([
                     "^incsearch$",
                     "^Remove half-width whitespace between two Chinese/Japanese characters when copying text$",
                     "^Such whitespace can be introduced as a result of poor post-processing of OCR \\(optical character recognition\\)\\. Enable this option to remove it when copying links to text selections\\.$",
+                    "^You can find more options in Style Settings > PDF Scholia Scribe\\.$",
                 ],
             }],
         },
