@@ -3428,7 +3428,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				}),
 			this.addTextSetting('vimHintChars')
 				.setName('Characters to use in hint mode')
-				.setDesc('They are used preferentially from left to right, so you might want to put the easier-to-reach keys first. This is the same as Tridactyl\'s "hintchars" option.'),
+				.setDesc('Tridactyl\'s "hintchars" option uses characters from left to right in the same way. Put easier-to-reach keys first.'),
 			this.addTextSetting('vimHintArgs')
 				.setName('Default arguments for the ":hint" command')
 				.setDesc('Space-separated list of "link"/"annot"/"backlink" or "all". Run ":help :hint" for the details.'),
