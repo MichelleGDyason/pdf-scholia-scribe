@@ -76,6 +76,7 @@ export default defineConfig([
                     "^Zoom in / zoom out: when the active file is not PDF, run Font Size Adjuster's \"Increment font size\" / \"Decrement font size\" command$",
                     "^hlsearch$",
                     "^incsearch$",
+                    "^Remove half-width whitespace between two Chinese/Japanese characters when copying text$",
                 ],
             }],
         },
