@@ -41,4 +41,15 @@ export default defineConfig([
             "@typescript-eslint/restrict-template-expressions": "warn",
         },
     },
+    {
+        files: ["src/main.ts"],
+        rules: {
+            // These public template identifiers are rendered as code. Their camelCase spelling is syntax;
+            // sentence-casing either token would misdocument valid templates and break copied examples.
+            "obsidianmd/ui/sentence-case": ["warn", {
+                enforceCamelCaseLower: true,
+                ignoreRegex: ["^linkedFile$", "^linkedFileProperties$"],
+            }],
+        },
+    },
 ]);
