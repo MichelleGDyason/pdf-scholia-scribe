@@ -42,6 +42,40 @@ type HoverEditorPopover = {
     hide(): void;
 };
 
+/**
+ * Performs a side effect for one typed value emitted by a workspace traversal.
+ *
+ * @typeParam Item The exact view or embed delivered by the enclosing iterator after narrowing.
+ *
+ * The iterator, not the visitor, owns traversal. Results are ignored and cannot short-circuit;
+ * incidental values remain harmless and returned Promises are not awaited. Synchronous errors still
+ * stop at the same item. Iterators preserve the order supplied by Obsidian's `iterateAllLeaves()` or
+ * `getLeavesOfType()` APIs, including main, floating/popout, and sidebar leaves, without active-first
+ * ordering or deduplication. Same-file leaves therefore remain separate identities. Review this
+ * contract if Obsidian changes leaf scope, order, or callback-result handling.
+ */
+type WorkspaceTraversalVisitor<Item> = (item: Item) => void;
+
+/**
+ * Visits one PDF viewer component and the file identity associated with its view or embed.
+ *
+ * The workspace iterator invokes this callback once for each discovered PDF view component and once
+ * for every embed component, preserving leaf and embed order. `file` can be `null` for a PDF view;
+ * embed files are present. Results are ignored, do not short-circuit traversal, and Promises are not
+ * awaited; synchronous errors propagate. Distinct components for the same file are never collapsed.
+ */
+type PDFViewerComponentVisitor = (component: PDFViewerComponent, file: TFile | null) => void;
+
+/**
+ * Visits the child produced by Obsidian's private `PDFViewerComponent.then()` readiness callback.
+ *
+ * Registration follows component traversal order, while invocation retains the component's existing
+ * immediate-or-deferred readiness timing. Results are ignored and Promises are not awaited by the
+ * declared private contract; synchronous errors keep that API's existing behaviour. Review this
+ * alias if Obsidian changes viewer-child readiness or callback ownership.
+ */
+type PDFViewerChildVisitor = (child: PDFViewerChild) => void;
+
 export class WorkspaceLib extends PDFPlusLibSubmodule {
     hoverEditor: HoverEditorLib;
 
@@ -50,25 +84,50 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
         this.hoverEditor = new HoverEditorLib(...args);
     }
 
-    iteratePDFViews(callback: (view: PDFView) => any): void {
+    /**
+     * Visits each loaded PDF view in Obsidian's all-leaf order.
+     *
+     * Main, popout, sidebar, hidden, pinned, and same-file leaves receive no additional filtering or
+     * reordering beyond `isPDFView()`. Visitor results are ignored and cannot stop traversal.
+     */
+    iteratePDFViews(callback: WorkspaceTraversalVisitor<PDFView>): void {
         this.app.workspace.iterateAllLeaves((leaf) => {
             const view = leaf.view;
             if (this.lib.isPDFView(view)) callback(view);
         });
     }
 
-    iterateBacklinkViews(cb: (view: BacklinkView) => any): void {
+    /**
+     * Visits each backlink view in the order returned by `Workspace.getLeavesOfType()`.
+     *
+     * The callback receives the narrowed private backlink view; its result is ignored and cannot
+     * short-circuit the array traversal.
+     */
+    iterateBacklinkViews(cb: WorkspaceTraversalVisitor<BacklinkView>): void {
         this.app.workspace.getLeavesOfType('backlink').forEach((leaf) => cb(leaf.view as BacklinkView));
     }
 
-    iterateCanvasViews(callback: (view: CanvasView) => any): void {
+    /**
+     * Visits each loaded Canvas view in Obsidian's all-leaf order.
+     *
+     * Active state, window, split, tab, visibility, and pinning do not affect ordering or inclusion;
+     * visitor results are ignored and cannot stop traversal.
+     */
+    iterateCanvasViews(callback: WorkspaceTraversalVisitor<CanvasView>): void {
         this.app.workspace.iterateAllLeaves((leaf) => {
             const view = leaf.view;
             if (this.lib.isCanvasView(view)) callback(view);
         });
     }
 
-    iteratePDFEmbeds(callback: (embed: PDFEmbed) => any): void {
+    /**
+     * Visits PDF embeds within Markdown, Canvas, and Excalidraw views in leaf and embed-array order.
+     *
+     * Same-file embeds remain distinct. Native `forEach()` still supplies incidental index and array
+     * arguments at runtime, while the public visitor contract exposes only the embed. Results are
+     * ignored and do not short-circuit either traversal level.
+     */
+    iteratePDFEmbeds(callback: WorkspaceTraversalVisitor<PDFEmbed>): void {
         this.app.workspace.iterateAllLeaves((leaf) => {
             const view = leaf.view;
             if (view instanceof MarkdownView) {
@@ -84,7 +143,13 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
         });
     }
 
-    iteratePDFViewerComponents(callback: (pdfViewerComponent: PDFViewerComponent, file: TFile | null) => any): void {
+    /**
+     * Visits every PDF viewer component discovered in PDF views and supported embed hosts.
+     *
+     * Traversal preserves Obsidian leaf order and each host's embed order. Components for separate
+     * same-file leaves are emitted independently; callback results are ignored without short-circuit.
+     */
+    iteratePDFViewerComponents(callback: PDFViewerComponentVisitor): void {
         this.app.workspace.iterateAllLeaves((leaf) => {
             const view = leaf.view;
 
@@ -103,7 +168,13 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
         });
     }
 
-    iteratePDFViewerChild(callback: (child: PDFViewerChild) => any): void {
+    /**
+     * Registers a visitor for each discovered PDF viewer child's existing readiness lifecycle.
+     *
+     * Component discovery does not merge same-file leaves. The private component decides whether the
+     * child callback runs immediately or later; this helper does not await results or own cleanup.
+     */
+    iteratePDFViewerChild(callback: PDFViewerChildVisitor): void {
         this.iteratePDFViewerComponents((component) => {
             component.then((child) => callback(child));
         });
