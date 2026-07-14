@@ -2120,7 +2120,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 									}));
 								}
 								else if (section.id === 'link') {
-									setting.setDesc('Citation search is available when right-clicking citation links in PDFs.');
+									setting.setDesc('Citation search is available when right-clicking citation links in PDF files.');
 								}
 								else if (section.id === 'speech') {
 									setting.setDesc(createFragment((el) => {
