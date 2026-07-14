@@ -1,6 +1,7 @@
-import { Component, DropdownComponent, Events, HexString, IconName, MarkdownRenderer, Modifier, Notice, ObsidianProtocolData, Platform, PluginSettingTab, Setting, TextAreaComponent, TextComponent, debounce, setIcon, setTooltip } from 'obsidian';
+import { Component, DropdownComponent, Events, HexString, IconName, MarkdownRenderer, Modifier, Notice, ObsidianProtocolData, Platform, Setting, TextAreaComponent, TextComponent, debounce, setIcon, setTooltip } from 'obsidian';
 
 import PDFPlus from 'main';
+import { LegacyCompatiblePluginSettingTab } from 'lib/obsidian-settings-tab-compat';
 import { ExtendedPaneType } from 'lib/workspace-lib';
 import { AutoFocusTarget } from 'lib/copy-link';
 import { CommandSuggest, FuzzyFileSuggest, FuzzyFolderSuggest, FuzzyMarkdownFileSuggest, KeysOfType, getModifierDictInPlatform, getModifierNameInPlatform, isHexString } from 'utils';
@@ -674,7 +675,7 @@ function isDropdownOptionArrayArgs(args: DropdownSettingArgs): args is [readonly
 }
 
 
-export class PDFPlusSettingTab extends PluginSettingTab {
+export class PDFPlusSettingTab extends LegacyCompatiblePluginSettingTab {
 	component: Component;
 	items: Partial<Record<keyof PDFPlusSettings, Setting>>;
 	headings: Map<string, Setting>;
@@ -1640,13 +1641,13 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 	/** Refresh the setting tab and then scroll back to the original position. */
 	redisplay() {
 		const scrollTop = this.contentEl.scrollTop;
-		this.display();
+		this.redisplayLegacySettingsCompat();
 		this.contentEl.scroll({ top: scrollTop });
 
 		this.events.trigger('update');
 	}
 
-	display(): void {
+	protected renderLegacySettings(): void {
 		void this.displayAsync().catch(console.error);
 	}
 

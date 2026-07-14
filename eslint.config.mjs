@@ -72,6 +72,14 @@ export default defineConfig([
         },
     },
     {
+        files: ["src/lib/obsidian-settings-tab-compat.ts"],
+        rules: {
+            // The public display() dispatch is required while minAppVersion remains below 1.13.0.
+            // Keep this exception confined to the complete legacy boundary, not settings implementations.
+            "@typescript-eslint/no-deprecated": "off",
+        },
+    },
+    {
         files: ["src/settings.ts"],
         rules: {
             // These complete settings strings use standard technical acronyms that must remain uppercase.
