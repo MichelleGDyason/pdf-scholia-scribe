@@ -3434,7 +3434,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 				.setDesc('Space-separated list of "link"/"annot"/"backlink" or "all". Run ":help :hint" for the details.'),
 			this.addHeading('Context menu', 'vim-context-menu'),
 			this.addToggleSetting('enableVimInContextMenu')
-				.setName('Enable Vim keys in PDF context menus')
+				.setName('Vim key navigation in PDF context menus')
 				.setDesc('If enabled, you can use j/k/h/l keys, instead of the arrow keys, to navigate through context menu items in the PDF viewer.'),
 			this.addHeading('Scrolling', 'vim-scroll'),
 			this.addSliderSetting('vimScrollSize', 5, 500, 5)
