@@ -52,4 +52,15 @@ export default defineConfig([
             }],
         },
     },
+    {
+        files: ["src/modals/zotero-citation-modal.ts"],
+        rules: {
+            // This search placeholder is a citation example containing two proper surnames and a year.
+            // Lowercasing either surname would make the example incorrect.
+            "obsidianmd/ui/sentence-case": ["warn", {
+                enforceCamelCaseLower: true,
+                ignoreRegex: ["^Deleuze Nietzsche 1983$"],
+            }],
+        },
+    },
 ]);
