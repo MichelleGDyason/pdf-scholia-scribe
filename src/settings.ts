@@ -2684,7 +2684,7 @@ export class PDFPlusSettingTab extends PluginSettingTab {
 			.setDesc('Note that turning on this option disables text selection in the annotation popup, such as modified date and author.');
 		this.addToggleSetting('showAnnotationPopupOnHover')
 			.setName('If an annotation has a comment, show the annotation popup on hover')
-			.setDesc('This is the same behavior as the PDF viewers of some web browsers (e.g. Chrome/Firefox). You may have to reopen the PDF file after changing this option.');
+			.setDesc('Chrome has this behavior in its PDF viewer. Firefox behaves the same way. You may have to reopen the PDF file after changing this option.');
 		this.addToggleSetting('renderMarkdownInStickyNote')
 			.setName('Render Markdown in annotation popups when the annotation has text contents');
 		if (this.plugin.settings.enablePDFEdit) {
