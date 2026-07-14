@@ -47,6 +47,63 @@ type OriginalPDFViewGetStateMethod = PatchedMethod<PDFView, PDFViewGetStateArgum
  */
 type PatchedPDFViewGetStateMethod = PatchedMethod<PDFView, PDFViewGetStateArguments, PDFViewGetStateResult>;
 
+/**
+ * Incoming private PDF view state accepted by Obsidian's `PDFView.setState()` method.
+ *
+ * The shared contract includes the document path and receiver-specific page, scroll, and zoom data.
+ * The wrapper forwards this object unchanged to Obsidian but first makes the existing shallow clone
+ * used for per-leaf delayed restoration; additional runtime properties remain preserved by that
+ * spread. Review this alias if Obsidian changes the private PDF state shape.
+ */
+type PDFViewSetStateInput = PDFViewState;
+
+/**
+ * Ordered arguments accepted by the private `PDFView.setState()` method.
+ *
+ * `state` is the exact caller-owned object and `result` is Obsidian's caller-owned history control.
+ * Both identities and their order must be preserved because history is updated before the original
+ * method runs. Review this tuple if Obsidian changes the method signature.
+ */
+type PDFViewSetStateArguments = [state: PDFViewSetStateInput, result: ViewStateResult];
+
+/**
+ * Promise returned by the PDF-aware `setState()` wrapper.
+ *
+ * The wrapper deliberately returns the new Promise created by `.then()`, not Obsidian's original
+ * Promise. It resolves to `undefined` after receiver-specific restoration registration completes,
+ * preserves original rejections, and rejects if synchronous restoration in the fulfillment callback
+ * throws. No catch handler or additional awaiting is introduced.
+ */
+type PDFViewSetStateWrapperResult = Promise<void>;
+
+/**
+ * Original private Obsidian `PDFView.setState()` method received from `monkey-around`.
+ *
+ * Obsidian receives the original state and history objects on the same `PDFView` receiver and returns
+ * `Promise<void>`. Receiver identity is essential because same-file main-window and popout leaves own
+ * separate viewer children and history. Review this alias if Obsidian changes its Promise contract.
+ */
+type OriginalPDFViewSetStateMethod = PatchedMethod<PDFView, PDFViewSetStateArguments, Promise<void>>;
+
+/**
+ * PDF-aware `setState()` wrapper installed on Obsidian's private PDF view prototype.
+ *
+ * The wrapper stores one shallow state clone under the receiver's `WorkspaceLeaf`, optionally marks
+ * the supplied history result, calls the original method once, and restores only that receiver after
+ * fulfillment. It never selects a viewer by file path or active leaf. Main-window and popout behavior
+ * therefore follows the receiving view. Review this contract with any restoration-order change.
+ */
+type PatchedPDFViewSetStateMethod = PatchedMethod<PDFView, PDFViewSetStateArguments, PDFViewSetStateWrapperResult>;
+
+/**
+ * Re-applies one captured state to the current PDF.js viewer owned by the original `PDFView` receiver.
+ *
+ * The callback is registered at the existing readiness and timer points. It intentionally performs
+ * no validation or fallback and may throw according to the existing PDF.js restoration path. Using
+ * the captured view, rather than a file lookup or active leaf, preserves same-file leaf independence.
+ */
+type PDFViewStateRestorationCallback = () => void;
+
 const clonePDFViewState = (state: PDFViewState): PDFViewState => ({ ...state });
 
 const capturePDFViewStatesForInternalsPatch = (plugin: PDFPlus) => {
@@ -67,7 +124,7 @@ const capturePDFViewStatesForInternalsPatch = (plugin: PDFPlus) => {
 const restorePDFViewState = (plugin: PDFPlus, view: PDFView, state: PDFViewState) => {
     if (typeof state.page !== 'number') return;
 
-    const applyState = () => {
+    const applyState: PDFViewStateRestorationCallback = () => {
         const pdfViewer = view.viewer.child?.pdfViewer?.pdfViewer;
         if (pdfViewer) {
             plugin.lib.applyPDFViewStateToViewer(pdfViewer, state);
@@ -130,19 +187,20 @@ export const patchPDFView = (plugin: PDFPlus): boolean => {
                 return patched;
             },
             setState(old) {
-                return function (state: PDFViewState, result: ViewStateResult): Promise<void> {
-                    const self = this as PDFView;
+                const original: OriginalPDFViewSetStateMethod = asPatchedMethod(old);
+                const patched: PatchedPDFViewSetStateMethod = function (this: PDFView, state: PDFViewSetStateInput, result: ViewStateResult): PDFViewSetStateWrapperResult {
                     const stateToRestore = clonePDFViewState(state);
                     if (!plugin.patchStatus.pdfInternals) {
-                        plugin.pdfViewStatesWhenPatched.set(self.leaf, stateToRestore);
+                        plugin.pdfViewStatesWhenPatched.set(this.leaf, stateToRestore);
                     }
                     if (plugin.settings.alwaysRecordHistory) {
                         result.history = true;
                     }
-                    return old.call(this, state, result).then(() => {
-                        restorePDFViewState(plugin, self, stateToRestore);
+                    return callPatchedMethod(original, this, [state, result]).then(() => {
+                        restorePDFViewState(plugin, this, stateToRestore);
                     });
                 };
+                return patched;
             },
             // Called inside onModify
             onLoadFile(old) {
