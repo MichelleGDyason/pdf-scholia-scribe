@@ -463,6 +463,17 @@ export class PDFPlusMenu extends Menu {
     }
 }
 
+/**
+ * Configures the `MenuItem` that Obsidian creates synchronously during `Menu.addItem()`.
+ *
+ * The item is the callback's only argument and retains its original identity. Obsidian and this
+ * override ignore the result, so `void` accurately permits existing incidental `MenuItem`, primitive,
+ * object, or Promise results without exposing them as `any`. Promise completion is never awaited and
+ * rejected Promises receive no handler; synchronous errors propagate immediately. This construction
+ * callback does not hide the menu or receive click events, and no receiver is guaranteed or rebound.
+ */
+type PDFPlusMenuItemConfigurator = (item: MenuItem) => void;
+
 export class PDFPlusContextMenu extends PDFPlusMenu {
     child: PDFViewerChild;
     currentSection: string | null;
@@ -489,7 +500,13 @@ export class PDFPlusContextMenu extends PDFPlusMenu {
         return this.child.containerEl.win;
     }
 
-    addItem(cb: (item: MenuItem) => any): this {
+    /**
+     * Adds one item, applying an externally supplied section after its configurator has run.
+     *
+     * @param cb Configures the newly created item once; its ignored result cannot affect menu
+     * construction, click handling, or later menu-hide timing.
+     */
+    addItem(cb: PDFPlusMenuItemConfigurator): this {
         if (this.currentSection) {
             return super.addItem((item) => {
                 cb(item);
