@@ -75,6 +75,7 @@ export default defineConfig([
                     "^Enter regular expressions that identify URIs for PDF files\\. When you drag a URI or URL from your browser into Obsidian's editor, these patterns check whether the destination is a PDF file\\. Enter each pattern on a separate line\\.$",
                     "^Zoom in / zoom out: when the active file is not PDF, run Font Size Adjuster's \"Increment font size\" / \"Decrement font size\" command$",
                     "^hlsearch$",
+                    "^incsearch$",
                 ],
             }],
         },
