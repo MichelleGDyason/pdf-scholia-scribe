@@ -99,6 +99,38 @@ type GlobalDocumentEventCallback<K extends keyof DocumentEventMap> = (
  */
 type PDFDocumentReadyCallback = (document: PDFDocumentProxy) => void;
 
+/**
+ * Models only the private Obsidian embed members inspected during PDF embed detection.
+ *
+ * Obsidian's public API does not expose its built-in embed implementation, although component-tree
+ * traversal supplies every candidate as a public `Component`. `loadFile` is checked only for
+ * presence, `file` remains unknown until its `TFile` identity is verified, and `containerEl` is the
+ * private DOM-node contract required for Obsidian's cross-window `Node.instanceOf()` check. The
+ * plugin does not mutate these members. Review this boundary if Obsidian renames them or stops using
+ * a DOM node as the embed container.
+ */
+interface PrivatePDFEmbedCandidate {
+    loadFile: unknown;
+    file: unknown;
+    containerEl: Node;
+}
+
+/**
+ * Checks whether a traversed Obsidian component exposes the private keys used by PDF embeds.
+ *
+ * The ordered `in` checks deliberately include inherited members without invoking getters, matching
+ * the previous detector exactly. Value validation remains in `isPDFEmbed()`: the file must be a PDF
+ * `TFile`, and the container must pass Obsidian's realm-aware HTMLElement check. Keeping this guard
+ * at the private boundary replaces repeated unsafe access without introducing constructor casts or
+ * accepting candidates that omit any required key. Malformed values retain the prior synchronous
+ * error behaviour when the later checks inspect them.
+ */
+function hasPrivatePDFEmbedMembers(component: Component): component is Component & PrivatePDFEmbedCandidate {
+    return 'loadFile' in component
+        && 'file' in component
+        && 'containerEl' in component;
+}
+
 
 export class PDFPlusLib {
     app: App;
@@ -986,10 +1018,18 @@ export class PDFPlusLib {
         return view instanceof EditableFileView && view.getViewType() === 'pdf';
     }
 
-    isPDFEmbed(embed: any): embed is PDFEmbed {
-        return 'loadFile' in embed
-            && 'file' in embed
-            && 'containerEl' in embed
+    /**
+     * Identifies Obsidian's built-in PDF embed among traversed descendant components.
+     *
+     * Detection remains structural because Obsidian does not publish the embed constructor and each
+     * window may host DOM nodes from a different realm. Required private keys are followed by public
+     * `TFile` and `Component` identity checks, Obsidian's cross-window HTMLElement check, the
+     * `.pdf-embed` class, and exclusion of this plugin's cropped embed. Successful narrowing exposes
+     * the existing local `PDFEmbed` contract (`file`, `containerEl`, and `viewer`) to consumers.
+     * Getters are read in the same order as before and any thrown error still propagates.
+     */
+    isPDFEmbed(embed: Component): embed is PDFEmbed {
+        return hasPrivatePDFEmbedMembers(embed)
             && embed.file instanceof TFile
             && embed.file.extension === 'pdf'
             && embed.containerEl.instanceOf(HTMLElement)
