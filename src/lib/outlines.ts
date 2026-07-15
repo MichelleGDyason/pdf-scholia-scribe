@@ -15,6 +15,26 @@ const stringifyDestination = (dest: string | DestArray | null) => {
 };
 
 /**
+ * Compares destinations decoded independently by PDF.js and pdf-lib.
+ *
+ * Both libraries preserve the destination structure, but decimal operands can differ by a few
+ * floating-point units after parsing the same PDF number. Structural values remain exact; only
+ * numeric values receive a magnitude-scaled machine-precision tolerance.
+ */
+const destinationsMatch = (first: DestArray, second: DestArray): boolean => {
+    if (first.length !== second.length) return false;
+
+    return first.every((value, index) => {
+        const other = second[index];
+        if (value === other) return true;
+        if (typeof value !== 'number' || typeof other !== 'number') return false;
+
+        const scale = Math.max(1, Math.abs(value), Math.abs(other));
+        return Math.abs(value - other) <= Number.EPSILON * scale;
+    });
+};
+
+/**
  * Visits one outline item for synchronous side effects while preserving linked-tree traversal.
  *
  * The visitor may mutate the current item, but its result is deliberately ignored and cannot
@@ -258,7 +278,8 @@ export class PDFOutlines {
         const pageNumber = await node.getPageNumber();
         const normalizedPDFjsDest = this.lib.normalizePDFJsDestArray(dest, pageNumber);
         const normalizedOutlineDest = outlineItem.getExplicitDestination() ?? outlineDest;
-        return JSON.stringify(normalizedPDFjsDest) === JSON.stringify(normalizedOutlineDest);
+        return Array.isArray(normalizedOutlineDest)
+            && destinationsMatch(normalizedPDFjsDest, normalizedOutlineDest);
     }
 
     removeDuplicateOutlineEntries(): number {
