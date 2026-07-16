@@ -340,7 +340,7 @@ const patchPDFViewerChild = (plugin: PDFPlus, child: PDFViewerChild) => {
                 // https://forum.obsidian.md/t/duplicate-up-arrow-up-displayed-when-searching-a-pdf-inside-obsidian/84403/3
                 const fixedApiVersion = '1.7.0';
                 const findNextButtonEl = this.findBar?.findNextButtonEl;
-                const findNextIconEl = findNextButtonEl.firstElementChild;
+                const findNextIconEl = findNextButtonEl?.firstElementChild;
 
                 if (!requireApiVersion(fixedApiVersion)
                     && findNextIconEl

@@ -1,4 +1,4 @@
-import { HoverParent, HoverPopover, Keymap, TFile, setIcon } from 'obsidian';
+import { HoverParent, HoverPopover, Keymap, Menu, TFile, setIcon } from 'obsidian';
 
 import PDFPlus from 'main';
 import { PDFPlusComponent } from 'lib/component';
@@ -144,11 +144,18 @@ export class BacklinkDomManager extends PDFPlusComponent {
 
     postProcessPage(pageNumber: number) {
         const cacheToDoms = this.getCacheToDomsMap(pageNumber);
+
+        // One visual region can represent links from several notes. Register its open action once
+        // so a double click cannot race several note opens against the same workspace leaf.
+        for (const el of cacheToDoms.values()) {
+            this.hookBacklinkDoubleClickOpener(el, cacheToDoms.getKeys(el));
+        }
+
         for (const cache of cacheToDoms.keys()) {
             const color = cache.getColor();
 
             for (const el of cacheToDoms.get(cache)) {
-                this.hookBacklinkOpeners(el, cache);
+                this.hookBacklinkHoverOpener(el, cache);
                 this.hookBacklinkViewEventHandlers(el, cache);
                 this.hookContextMenuHandler(el, cache);
                 this.hookClassAdderOnMouseOver(el, cache);
@@ -157,7 +164,14 @@ export class BacklinkDomManager extends PDFPlusComponent {
         }
     }
 
-    hookBacklinkOpeners(el: HTMLElement, cache: PDFBacklinkCache) {
+    /**
+     * Registers the preview event for one note's backlink to a highlighted PDF region.
+     *
+     * Hover previews remain cache-specific because Obsidian's hover-link contract accepts one
+     * source note. Double-click opening is registered separately per visual element so duplicate
+     * backlinks cannot all open at once.
+     */
+    hookBacklinkHoverOpener(el: HTMLElement, cache: PDFBacklinkCache) {
         const pos = 'position' in cache.refCache ? cache.refCache.position : undefined;
         const lineNumber = pos?.start.line;
 
@@ -176,13 +190,100 @@ export class BacklinkDomManager extends PDFPlusComponent {
                 state
             });
         });
+    }
 
-        this.registerDomEventForCache(cache, el, 'dblclick', (event) => {
-            if (this.plugin.settings.doubleClickHighlightToOpenBacklink) {
-                const paneType = Keymap.isModEvent(event);
-                void this.lib.workspace.openMarkdownLinkFromPDF(cache.sourcePath, this.file.path, paneType, pos ? { pos } : undefined);
+    /**
+     * Registers one open action for a visual region shared by one or more note backlinks.
+     *
+     * A highlighted selection is identified by its PDF destination, so several notes can map to
+     * the same DOM element. Registering one listener per cache previously opened every matching
+     * note. The grouped listener opens an unambiguous target directly, reuses a matching note that
+     * is already visible, or asks the reader to choose when no unique target exists.
+     */
+    hookBacklinkDoubleClickOpener(el: HTMLElement, caches: ReadonlySet<PDFBacklinkCache>) {
+        const matchingCaches = [...caches];
+
+        const onDoubleClick: BacklinkDomEventCallback<'dblclick'> = (event) => {
+            if (!this.plugin.settings.doubleClickHighlightToOpenBacklink) return;
+
+            const paneType = Keymap.isModEvent(event);
+            const cache = matchingCaches.length === 1
+                ? matchingCaches[0]
+                : this.getVisibleBacklinkCache(matchingCaches);
+
+            if (cache) {
+                this.openBacklink(cache, paneType);
+            } else if (matchingCaches.length > 1) {
+                this.showBacklinkChooser(event, matchingCaches, paneType);
             }
+        };
+
+        // PDF.js can reuse annotation containers across page refreshes. Retain the existing
+        // page-clear cleanup path so the grouped listener is not registered twice on that element.
+        const annotationCache = matchingCaches.find((cache) => cache.page && cache.annotation);
+        if (annotationCache) {
+            this.registerDomEventForCache(annotationCache, el, 'dblclick', onDoubleClick);
+        } else {
+            this.registerDomEvent(el, 'dblclick', onDoubleClick);
+        }
+    }
+
+    /**
+     * Finds the backlink whose Markdown file is currently visible in an Obsidian leaf.
+     *
+     * Reusing a visible target preserves the reader's established PDF-and-note layout. File
+     * resolution uses Obsidian's vault identity rather than path casting, and hidden tabs are not
+     * preferred over an explicit chooser when several notes reference the same PDF region.
+     */
+    getVisibleBacklinkCache(caches: readonly PDFBacklinkCache[]): PDFBacklinkCache | undefined {
+        return caches.find((cache) => {
+            const file = this.app.vault.getAbstractFileByPath(cache.sourcePath);
+            return file instanceof TFile
+                && this.lib.workspace.getExistingLeafForMarkdownFile(file)?.isVisible();
         });
+    }
+
+    /**
+     * Opens one backlink with its exact source position and the existing pane preference.
+     *
+     * Keeping this operation centralized ensures direct and menu-selected targets use identical
+     * workspace navigation, scrolling, focus, and modifier-key behavior.
+     */
+    openBacklink(cache: PDFBacklinkCache, paneType: ReturnType<typeof Keymap.isModEvent>) {
+        const pos = 'position' in cache.refCache ? cache.refCache.position : undefined;
+        void this.lib.workspace.openMarkdownLinkFromPDF(
+            cache.sourcePath,
+            this.file.path,
+            paneType,
+            pos ? { pos } : undefined
+        );
+    }
+
+    /**
+     * Shows the source notes for an ambiguous highlighted region without choosing arbitrarily.
+     *
+     * Each entry retains the exact cache and source position that Obsidian indexed. The chooser is
+     * needed only when multiple notes point to the same PDF destination and none is already visible;
+     * selecting an entry performs the same single-note open action as an unambiguous highlight.
+     */
+    showBacklinkChooser(event: MouseEvent, caches: readonly PDFBacklinkCache[], paneType: ReturnType<typeof Keymap.isModEvent>) {
+        const menu = new Menu();
+
+        for (const cache of caches) {
+            const file = this.app.vault.getAbstractFileByPath(cache.sourcePath);
+            const lineNumber = 'position' in cache.refCache
+                ? cache.refCache.position.start.line + 1
+                : undefined;
+            const title = file instanceof TFile ? file.basename : cache.sourcePath;
+
+            menu.addItem((item) => {
+                item.setTitle(lineNumber ? `${title} (line ${lineNumber})` : title)
+                    .setIcon('file-text')
+                    .onClick(() => this.openBacklink(cache, paneType));
+            });
+        }
+
+        menu.showAtMouseEvent(event);
     }
 
     hookBacklinkViewEventHandlers(el: HTMLElement, cache: PDFBacklinkCache) {
