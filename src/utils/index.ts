@@ -219,7 +219,7 @@ export function* getCharacterBoundingBoxes(node: Node) {
                 range.setStart(textNode, i);
                 range.setEnd(textNode, i + 1);
                 const rect = range.getBoundingClientRect();
-                const char = textNode.textContent![i];
+                const char = textNode.data[i];
                 yield { char, rect };
             }
         }

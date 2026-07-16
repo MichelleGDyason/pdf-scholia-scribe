@@ -35,17 +35,6 @@ interface CroppedEmbedAnnotationPage {
     getAnnotations(): Promise<CroppedEmbedAnnotationData[]>;
 }
 
-/**
- * Represents the bound render callback queued by `p-limit` for one cropped embed.
- *
- * The callback owns no external state beyond its bound embed instance, resolves to one image data
- * URL, and preserves the queue's existing asynchronous sequencing and rejection behaviour. This
- * contract replaces the broadly typed `Function.bind()` result and should be reviewed if
- * `computeDataUrl()` gains arguments or returns a different render result.
- */
-type CroppedEmbedRenderCallback = () => Promise<string>;
-
-
 export class PDFCroppedEmbed extends Component implements Embed {
     // Limit the number of concurrent PDF rendering tasks to avoid running out of memory
     // especially on mobile devices, which will cause the app to crash.
@@ -94,7 +83,7 @@ export class PDFCroppedEmbed extends Component implements Embed {
     }
 
     async loadFile() {
-        const dataUrl: string = await PDFCroppedEmbed.limit(this.computeDataUrl.bind(this) as CroppedEmbedRenderCallback);
+        const dataUrl: string = await PDFCroppedEmbed.limit(() => this.computeDataUrl());
 
         await new Promise<void>((resolve, reject) => {
             this.containerEl.empty();
