@@ -93,6 +93,18 @@ export const patchWorkspace = (plugin: PDFPlus) => {
                             }
                         }
 
+                        const returnLeaf = lib.workspace.getPDFReturnLeaf(sourcePath, file);
+                        if (returnLeaf) {
+                            const { promise } = lib.workspace.openPDFLinkTextInExistingLeafForTargetPDF(
+                                linktext,
+                                sourcePath,
+                                openViewState,
+                                file,
+                                returnLeaf
+                            );
+                            return promise;
+                        }
+
                         if (plugin.settings.singleTabForSinglePDF) {
                             const { exists, promise } = lib.workspace.openPDFLinkTextInExistingLeafForTargetPDF(linktext, sourcePath, openViewState, file);
                             if (exists) return promise;

@@ -312,6 +312,13 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
     }
 
     async openMarkdownLinkFromPDF(linktext: string, sourcePath: string, paneType: PaneType | boolean, position?: { pos: Pos } | { line: number }) {
+        const sourceActiveLeaf = this.app.workspace.getMostRecentLeaf();
+        const sourcePDFLeaf = sourceActiveLeaf?.view.getViewType() === 'pdf'
+            && this.getFilePathFromView(sourceActiveLeaf.view) === sourcePath
+            ? sourceActiveLeaf
+            : null;
+        const { path: markdownLinkPath } = parseLinktext(linktext);
+        const targetMarkdownFile = this.app.metadataCache.getFirstLinkpathDest(markdownLinkPath, sourcePath);
         let markdownLeaf: WorkspaceLeaf | undefined;
 
         if (paneType) {
@@ -354,6 +361,12 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
         }
 
         await markdownLeaf.openLinkText(linktext, sourcePath, openViewState);
+        if (sourcePDFLeaf && targetMarkdownFile?.extension === 'md') {
+            this.plugin.pdfReturnContextByMarkdownLeaf.set(markdownLeaf, {
+                pdfLeaf: sourcePDFLeaf,
+                markdownPath: targetMarkdownFile.path
+            });
+        }
         await this.revealLeaf(markdownLeaf);
 
         return;
@@ -567,22 +580,53 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
     }
 
     /**
+     * Returns the exact PDF leaf that opened the active Markdown source, when it still shows the
+     * requested target PDF.
+     *
+     * Obsidian may reuse both Markdown and PDF leaves, so this validates the active leaf identity,
+     * current Markdown path, connected PDF leaf, PDF view type, and target file path at use time.
+     * This prevents a link from falling back to an arbitrary same-file split while retaining each
+     * PDF viewer child's independent page and scroll state.
+     */
+    getPDFReturnLeaf(sourcePath: string, targetFile: TFile): WorkspaceLeaf | null {
+        const markdownLeaf = this.app.workspace.getMostRecentLeaf();
+        if (!markdownLeaf || markdownLeaf.view.getViewType() !== 'markdown') return null;
+
+        const context = this.plugin.pdfReturnContextByMarkdownLeaf.get(markdownLeaf);
+        if (!context || context.markdownPath !== sourcePath) return null;
+
+        const { pdfLeaf } = context;
+        if (!pdfLeaf.containerEl.isConnected
+            || pdfLeaf.view.getViewType() !== 'pdf'
+            || this.getFilePathFromView(pdfLeaf.view) !== targetFile.path) {
+            return null;
+        }
+
+        return pdfLeaf;
+    }
+
+    /**
      * If the target PDF file is already opened in a tab, open the link in that tab.
      * 
      * @param linktext A link text to a PDF file.
      * @param sourcePath 
      * @param openViewState `active` will be overwritten acccording to `this.plugin.settings.dontActivateAfterOpenPDF`.
      * @param targetFile If provided, it must be the target PDF file that the link points to.
+     * @param preferredLeaf Exact same-file PDF leaf retained by a PDF-to-note navigation context.
      * @returns An object containing a boolean value indicating whether a tab with the target PDF file already exists and a promise that resolves when the link is opened.
      */
-    openPDFLinkTextInExistingLeafForTargetPDF(linktext: string, sourcePath: string, openViewState?: OpenViewState, targetFile?: TFile): { exists: boolean, promise: Promise<void> } {
+    openPDFLinkTextInExistingLeafForTargetPDF(linktext: string, sourcePath: string, openViewState?: OpenViewState, targetFile?: TFile, preferredLeaf?: WorkspaceLeaf): { exists: boolean, promise: Promise<void> } {
         if (!targetFile) {
             const { path } = parseLinktext(linktext);
             targetFile = this.app.metadataCache.getFirstLinkpathDest(path, sourcePath) ?? undefined;
         }
         if (!targetFile) return { exists: false, promise: Promise.resolve() };
 
-        const sameFileLeaf = this.getExistingLeafForPDFFile(targetFile);
+        const preferredLeafMatches = preferredLeaf?.view.getViewType() === 'pdf'
+            && this.getFilePathFromView(preferredLeaf.view) === targetFile.path;
+        const sameFileLeaf = preferredLeafMatches
+            ? preferredLeaf
+            : this.getExistingLeafForPDFFile(targetFile);
         if (!sameFileLeaf) return { exists: false, promise: Promise.resolve() };
 
 

@@ -118,6 +118,18 @@ interface PDFPlusWindowGlobalMap {
 }
 
 /**
+ * Associates a Markdown leaf opened from a PDF backlink with its exact source PDF leaf.
+ *
+ * The Markdown path prevents a reused note leaf from inheriting stale routing after it displays a
+ * different note. The PDF leaf identity is retained instead of a file path because separate leaves
+ * can display the same PDF at independent scholarly reading positions.
+ */
+interface PDFReturnContext {
+	pdfLeaf: WorkspaceLeaf;
+	markdownPath: string;
+}
+
+/**
  * Property names accepted by the plugin's window-global registration helper.
  *
  * Deriving the name from `PDFPlusWindowGlobalMap` keeps every property paired with its exact value
@@ -355,6 +367,14 @@ export default class PDFPlus extends Plugin {
 	 */
 	lastPasteFile: TFile | null = null;
 	lastActiveMarkdownFile: TFile | null = null;
+	/**
+	 * Remembers the exact PDF pane that opened each Markdown leaf through a PDF backlink.
+	 *
+	 * A `WeakMap` lets closed Markdown leaves and their routing context be collected together. Callers
+	 * must validate both current file paths before using an entry because Obsidian can reuse either
+	 * leaf for another file.
+	 */
+	pdfReturnContextByMarkdownLeaf: WeakMap<WorkspaceLeaf, PDFReturnContext> = new WeakMap();
 	/** Tracks the PDFViewerChild instance that an annotation popup was rendered on for the last time. */
 	lastAnnotationPopupChild: PDFViewerChild | null = null;
 	/** Stores the file and the explicit destination array corresponding to the last link copied with the "Copy link to current page view" command */
