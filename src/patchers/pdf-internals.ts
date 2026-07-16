@@ -132,7 +132,12 @@ const patchPDFViewerComponent = (plugin: PDFPlus, pdfViewerComponent: PDFViewerC
                 const ret = await callPatchedMethod(original, this, file, subpath);
 
                 this.then((child) => {
-                    if (!this.visualizer || this.visualizer.file !== file) {
+                    // A plugin-only reload unloads the old visualizer but leaves its reference on
+                    // Obsidian's long-lived PDF component. Recreate it for the new plugin instance
+                    // even when the component is still displaying the same file.
+                    if (!this.visualizer
+                        || this.visualizer.plugin !== plugin
+                        || this.visualizer.file !== file) {
                         this.visualizer?.unload();
                         this.visualizer = this.addChild(PDFViewerBacklinkVisualizer.create(plugin, file, child));
                     }
