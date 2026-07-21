@@ -520,4 +520,4 @@ The following plugin(s) alters Obsidian's internals in such a way that prevents 
 If PDF Scholia Scribe supports your reading and writing, you can support Michelle's work here:
 
 - GitHub Sponsors: [github.com/sponsors/MichelleGDyason](https://github.com/sponsors/MichelleGDyason)
-- Buy Me a Coffee: [buymeacoffee.com/MichelleGDyason](https://www.buymeacoffee.com/MichelleGDyason)
+- Buy Me a Coffee: [buymeacoffee.com/michellegdyason](https://buymeacoffee.com/michellegdyason)
