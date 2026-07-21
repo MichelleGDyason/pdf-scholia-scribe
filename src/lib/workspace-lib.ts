@@ -580,29 +580,60 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
     }
 
     /**
-     * Returns the exact PDF leaf that opened the active Markdown source, when it still shows the
-     * requested target PDF.
+     * Returns the exact PDF leaf that opened the Markdown source, when it still shows the requested
+     * target PDF.
      *
-     * Obsidian may reuse both Markdown and PDF leaves, so this validates the active leaf identity,
-     * current Markdown path, connected PDF leaf, PDF view type, and target file path at use time.
-     * This prevents a link from falling back to an arbitrary same-file split while retaining each
-     * PDF viewer child's independent page and scroll state.
+     * Obsidian can dispatch a link click before the clicked Markdown leaf becomes the most-recent
+     * leaf, particularly when the note was opened without moving focus. Prefer the most-recent leaf,
+     * then recover a return context only when exactly one open leaf for the source note has a valid
+     * mapping. Ambiguous same-note splits deliberately fall back to normal link-opening behavior.
+     *
+     * Both Markdown and PDF leaf identities and current file paths are validated at use time because
+     * Obsidian can reuse either leaf for another file. This retains each PDF viewer child's
+     * independent page and scroll state.
      */
     getPDFReturnLeaf(sourcePath: string, targetFile: TFile): WorkspaceLeaf | null {
-        const markdownLeaf = this.app.workspace.getMostRecentLeaf();
-        if (!markdownLeaf || markdownLeaf.view.getViewType() !== 'markdown') return null;
+        const getValidReturnLeaf = (markdownLeaf: WorkspaceLeaf): WorkspaceLeaf | null => {
+            if (markdownLeaf.view.getViewType() !== 'markdown'
+                || this.getFilePathFromView(markdownLeaf.view) !== sourcePath) {
+                return null;
+            }
 
-        const context = this.plugin.pdfReturnContextByMarkdownLeaf.get(markdownLeaf);
-        if (!context || context.markdownPath !== sourcePath) return null;
+            const context = this.plugin.pdfReturnContextByMarkdownLeaf.get(markdownLeaf);
+            if (!context || context.markdownPath !== sourcePath) return null;
 
-        const { pdfLeaf } = context;
-        if (!pdfLeaf.containerEl.isConnected
-            || pdfLeaf.view.getViewType() !== 'pdf'
-            || this.getFilePathFromView(pdfLeaf.view) !== targetFile.path) {
-            return null;
+            const { pdfLeaf } = context;
+            if (!pdfLeaf.containerEl.isConnected
+                || pdfLeaf.view.getViewType() !== 'pdf'
+                || this.getFilePathFromView(pdfLeaf.view) !== targetFile.path) {
+                return null;
+            }
+
+            return pdfLeaf;
+        };
+
+        const mostRecentLeaf = this.app.workspace.getMostRecentLeaf();
+        if (mostRecentLeaf) {
+            const returnLeaf = getValidReturnLeaf(mostRecentLeaf);
+            if (returnLeaf) return returnLeaf;
         }
 
-        return pdfLeaf;
+        let uniqueReturnLeaf: WorkspaceLeaf | null = null;
+        let isAmbiguous = false;
+        this.app.workspace.iterateAllLeaves((leaf) => {
+            if (isAmbiguous || leaf === mostRecentLeaf) return;
+
+            const returnLeaf = getValidReturnLeaf(leaf);
+            if (!returnLeaf) return;
+
+            if (uniqueReturnLeaf && uniqueReturnLeaf !== returnLeaf) {
+                isAmbiguous = true;
+            } else {
+                uniqueReturnLeaf = returnLeaf;
+            }
+        });
+
+        return isAmbiguous ? null : uniqueReturnLeaf;
     }
 
     /**
