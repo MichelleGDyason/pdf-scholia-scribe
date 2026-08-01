@@ -21,6 +21,7 @@ export class PDFPlusToolbar extends PDFPlusComponent {
     }
 
     onload() {
+        this.addSearchButton();
         this.addColorPalette();
         this.replaceDisplayOptionsDropdown();
         this.addZoomLevelInputEl();
@@ -29,6 +30,27 @@ export class PDFPlusToolbar extends PDFPlusComponent {
 
     onunload() {
 
+    }
+
+    addSearchButton() {
+        const searchButtonEl = createEl('button', {
+            cls: ['clickable-icon', 'pdf-toolbar-button', 'pdf-scholia-search-button'],
+            attr: {
+                type: 'button',
+                'aria-label': 'Search this PDF',
+            },
+        });
+        setIcon(searchButtonEl, 'lucide-search');
+        setTooltip(searchButtonEl, 'Search this PDF');
+
+        this.registerDomEvent(searchButtonEl, 'click', () => {
+            this.lib.openPDFSearch(
+                this.lib.getPDFView(true),
+                this.child.findBar ?? this.child.pdfViewer?.findBar,
+            );
+        });
+        this.toolbar.toolbarLeftEl.prepend(searchButtonEl);
+        this.register(() => searchButtonEl.remove());
     }
 
     addColorPalette() {

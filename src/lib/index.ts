@@ -885,6 +885,24 @@ export class PDFPlusLib {
         return this.getPDFViewerComponent(activeOnly)?.vim;
     }
 
+    getPDFFindBar(activeOnly: boolean = false) {
+        const child = this.getPDFViewerChild(activeOnly);
+        return child?.findBar ?? child?.pdfViewer?.findBar;
+    }
+
+    openPDFSearch(view: PDFView | null | undefined, findBar?: PDFFindBar | null) {
+        if (view) {
+            view.showSearch();
+            return true;
+        }
+        if (findBar) {
+            findBar.showSearch();
+            findBar.searchComponent.inputEl.select();
+            return true;
+        }
+        return false;
+    }
+
     search(findBar: PDFFindBar, query: string, settings?: Partial<PDFSearchSettings>, findPrevious?: boolean) {
         findBar.showSearch();
         findBar.searchComponent.setValue(query);

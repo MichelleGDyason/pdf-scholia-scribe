@@ -5,6 +5,7 @@ PDF Scholia Scribe is a citation-focused fork of PDF++ for Obsidian. It is built
 The fork keeps the powerful PDF++ backlink-highlighting system, but changes the writing workflow around it:
 
 - copied PDF selections can render as author-date citations such as `(Deleuze 1983:124)`, APA or Harvard-style page citations, or numbered citations such as `[1]`;
+- a visible **Search this PDF** toolbar button opens the native PDF search bar with occurrence highlighting, result counts, and previous/next navigation;
 - in-text citation paste can produce `"quoted passage" (Author year:page)` with the PDF link hidden under the citation text;
 - quote and callout paste formats are still available, including callout headers that can use your colour labels instead of an icon;
 - PDF page labels are preferred over raw PDF page indexes, so books with front matter can cite page `47` instead of the PDF viewer's internal page number;
@@ -306,6 +307,7 @@ Customize the behavior of Obsidian\'s built-in right-click menu in PDF view.
 
 PDF++ offers the following commands for reducing mouse clicks on the PDF toolbar by assigning hotkeys to them.
 
+- **Search this PDF**: Open and focus the current PDF's search bar. Matches are highlighted and can be traversed with the previous/next controls.
 - **Show outline** / **show thumbnail**
 - **Close PDF siderbar**
 - **Zoom in** / **zoom out**
