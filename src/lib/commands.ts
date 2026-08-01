@@ -192,6 +192,10 @@ export class PDFPlusCommands extends PDFPlusLibSubmodule {
                 id: 'context-menu',
                 name: 'Show context menu at selection',
                 checkCallback: (checking) => this.showContextMenu(checking)
+            }, {
+                id: 'search-pdf',
+                name: 'Search this PDF',
+                checkCallback: (checking) => this.showSearch(checking)
             },
             {
                 id: 'extract-annotation-and-copy-links',
@@ -592,6 +596,14 @@ export class PDFPlusCommands extends PDFPlusLibSubmodule {
         }
 
         return false;
+    }
+
+    showSearch(checking: boolean) {
+        const view = this.lib.getPDFView(true);
+        const findBar = this.lib.getPDFFindBar(true);
+        if (!view && !findBar) return false;
+        if (!checking) this.lib.openPDFSearch(view, findBar);
+        return true;
     }
 
     showThumbnail(checking: boolean) {
