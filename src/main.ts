@@ -16,6 +16,7 @@ import { PDFExternalLinkPostProcessor, PDFInternalLinkPostProcessor, PDFOutlineI
 import { BibliographyManager } from 'bib';
 import { DataviewInlineFieldsModal, withFilesWithInlineFields } from 'lib/dataview';
 import { hasPagePreviewModifierSettings } from 'lib/page-preview-contract';
+import { registerScholiaDocumentWorkspace } from 'collaboration-portal';
 
 
 type WorkspaceWithProtocolUnregister = Workspace & {
@@ -418,6 +419,8 @@ export default class PDFPlus extends Plugin {
 		this.patchObsidian();
 
 		this.registerPDFEmbedCreator();
+
+		registerScholiaDocumentWorkspace(this);
 
 		this.registerHoverLinkSources();
 

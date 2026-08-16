@@ -1,6 +1,8 @@
 <h1 align="center">PDF Scholia Scribe</h1>
 
-PDF Scholia Scribe is a citation-focused fork of PDF++ for Obsidian. It is built for reading PDFs while writing scholarly notes: copy a passage, keep the link back to the exact PDF selection, and show a quiet citation label in the note instead of a long file/page/colour link.
+PDF Scholia Scribe is a citation-focused reading and annotation workspace for Obsidian. It extends PDF++ for scholarly PDF reading and adds a safe DOCX viewer, portable document annotations, and a shared discussion portal—without altering source documents.
+
+For PDFs, it keeps the writing workflow focused: copy a passage, keep the link back to the exact PDF selection, and show a quiet citation label in the note instead of a long file/page/colour link.
 
 The fork keeps the powerful PDF++ backlink-highlighting system, but changes the writing workflow around it:
 
@@ -77,6 +79,26 @@ Pires argues that urban agriculture needs planning support (2011:47).
 For notes with many citations, **Update reference list for current note** creates or refreshes a managed reference list at the end of the note. The updater recognises citations inserted by PDF Scholia Scribe, ordinary `@citekey` references, links to vault source notes, and PDF quote links that can be matched to a source note.
 
 These Zotero features are separate from PDF++'s original **Citations in PDF (experimental)** section. That original feature is for citation links already inside a PDF. PDF Scholia Scribe's added citation workflow is for writing in your Obsidian note, using Zotero metadata and your vault source notes.
+
+## DOCX, Google Docs, and collaboration
+
+PDF Scholia Scribe can also open `.docx`, `.gdoc`, `.txt`, and `.text` files inside Obsidian. DOCX files are rendered as clean, selectable pages while the original Word file remains unchanged. Images, headings, lists, tables, footnotes, and other semantic Word structures are preserved where the DOCX conversion supports them.
+
+To annotate a DOCX passage:
+
+1. Select the passage in the document viewer.
+2. Choose **Annotate selection**.
+3. Add a comment and author name.
+
+The annotation is not written into the Word file. It is stored in a readable Markdown thread under `Scholia/Annotations`, together with the quoted passage, author, timestamp, source path, a resilient text anchor, and open or resolved status. This makes annotation discussions portable, searchable, versionable, and shareable through the same mechanism used to share or sync the Obsidian vault.
+
+Saving an annotation updates the highlight and discussion sidebar in place, so the viewer keeps your current reading position. Use **Show passage** in the discussion sidebar to return to any saved highlight.
+
+Run **Open document collaboration portal** or use the collaboration ribbon icon to see annotation threads grouped by document. From the portal, collaborators can reopen the source, open the full Markdown thread note, and resolve or reopen a discussion.
+
+Google Drive `.gdoc` reference files open in an embedded Google Docs editor when Google permits the document to be framed, with an **Open in Google Docs** fallback. Google Docs comments, suggestions, permissions, and live co-editing remain native to Google. Scholia can add document-level portal notes linked to the `.gdoc` reference, but it does not currently copy Google comment threads into the vault; doing that safely requires Google account authorisation and the Google Docs/Drive APIs.
+
+Legacy binary `.doc` files show a conversion guide instead of a lossy viewer. Save a DOCX copy in Word or LibreOffice to gain reliable text rendering and annotation anchors; the original `.doc` is never modified. Plain-text files use the same read-only selection annotation model as DOCX.
 
 This is an [Obsidian.md](https://obsidian.md) plugin for a better PDF experience. Specifically:
 

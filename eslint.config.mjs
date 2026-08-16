@@ -64,6 +64,23 @@ export default defineConfig([
         },
     },
     {
+        files: ["src/document-viewer.ts", "src/collaboration-portal.ts"],
+        rules: {
+            // These complete strings contain product or project names whose published casing is required.
+            "obsidianmd/ui/sentence-case": ["warn", {
+                enforceCamelCaseLower: true,
+                ignoreRegex: [
+                    "^Portable annotation threads for DOCX, Google Docs references, and text documents\\.$",
+                    "^Open a DOCX or Google Docs reference and add an annotation or portal note\\.$",
+                    "^Open Scholia collaboration$",
+                    "^Open this document in Google Docs to view and collaborate\\.$",
+                    "^Convert this legacy Word file to DOCX$",
+                    "^Annotation added to the Scholia collaboration portal\\.$",
+                ],
+            }],
+        },
+    },
+    {
         files: ["src/lib/obsidian-button-compat.ts"],
         rules: {
             // This module isolates the annotation-delete button's Obsidian 1.12.7 compatibility branch.

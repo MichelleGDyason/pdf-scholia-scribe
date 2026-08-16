@@ -1,7 +1,7 @@
 {
     "name": "obsidian-pdf-scholia-scribe",
-    "version": "1.0.3",
-    "description": "Citation-focused PDF annotation and note-linking.",
+    "version": "1.1.1",
+    "description": "Citation-focused PDF and DOCX reading, annotation, and collaboration.",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/MichelleGDyason/pdf-scholia-scribe.git"
@@ -12,7 +12,8 @@
     "homepage": "https://github.com/MichelleGDyason/pdf-scholia-scribe#readme",
     "funding": "https://github.com/sponsors/MichelleGDyason",
     "dependencies": {
-        "@codemirror/view": "6.38.6"
+        "@codemirror/view": "6.38.6",
+        "mammoth": "^1.12.0"
     },
     "scripts": {
         "dev": "node esbuild.config.mjs",
