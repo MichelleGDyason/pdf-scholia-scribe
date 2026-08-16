@@ -1,7 +1,7 @@
 {
 	"id": "pdf-scholia-scribe",
 	"name": "PDF Scholia Scribe",
-	"version": "1.1.1",
+	"version": "1.1.2",
 	"minAppVersion": "1.12.7",
 	"description": "Citation-focused PDF and DOCX reading, annotation, and collaboration.",
 	"author": "Michelle G Dyason",

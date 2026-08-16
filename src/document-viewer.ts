@@ -1,7 +1,7 @@
 import { FileView, Notice, Platform, TFile, WorkspaceLeaf, setIcon } from 'obsidian';
-import * as mammoth from 'mammoth';
 
 import type PDFPlus from 'main';
+import { renderDocxDocument } from 'docx-renderer';
 import {
 	ScholiaAnnotation,
 	ScholiaAnnotationModal,
@@ -19,47 +19,6 @@ interface GoogleDocumentReference {
 	url: string;
 	documentId: string | null;
 }
-
-const ALLOWED_DOCX_ELEMENTS = new Set([
-	'A', 'BLOCKQUOTE', 'BR', 'CODE', 'DD', 'DEL', 'DIV', 'DL', 'DT', 'EM', 'H1', 'H2', 'H3', 'H4',
-	'H5', 'H6', 'HR', 'IMG', 'LI', 'OL', 'P', 'PRE', 'S', 'SPAN', 'STRONG', 'SUB', 'SUP', 'TABLE',
-	'TBODY', 'TD', 'TFOOT', 'TH', 'THEAD', 'TR', 'U', 'UL',
-]);
-
-const SAFE_LINK_PATTERN = /^(?:https?:|mailto:|#)/i;
-const SAFE_IMAGE_PATTERN = /^data:image\/(?:png|gif|jpe?g|webp);base64,/i;
-
-const sanitizeDocxHtml = (html: string): DocumentFragment => {
-	const parsed = new DOMParser().parseFromString(`<main>${html}</main>`, 'text/html');
-	const main = parsed.body.firstElementChild;
-	const fragment = createFragment();
-	if (!main) return fragment;
-
-	for (const element of Array.from(main.querySelectorAll('*')).reverse()) {
-		if (!ALLOWED_DOCX_ELEMENTS.has(element.tagName)) {
-			element.replaceWith(...Array.from(element.childNodes));
-			continue;
-		}
-
-		const href = element.instanceOf(HTMLAnchorElement) ? element.getAttribute('href') ?? '' : '';
-		const imageSrc = element.instanceOf(HTMLImageElement) ? element.getAttribute('src') ?? '' : '';
-		const imageAlt = element.instanceOf(HTMLImageElement) ? element.getAttribute('alt') : null;
-		for (const attribute of Array.from(element.attributes)) element.removeAttribute(attribute.name);
-
-		if (element.instanceOf(HTMLAnchorElement) && SAFE_LINK_PATTERN.test(href)) {
-			element.setAttribute('href', href);
-			element.setAttribute('rel', 'noopener noreferrer');
-			if (!href.startsWith('#')) element.setAttribute('target', '_blank');
-		}
-		if (element.instanceOf(HTMLImageElement) && SAFE_IMAGE_PATTERN.test(imageSrc)) {
-			element.setAttribute('src', imageSrc);
-			if (imageAlt) element.setAttribute('alt', imageAlt);
-		}
-	}
-
-	fragment.append(...Array.from(main.childNodes));
-	return document.importNode(fragment, true);
-};
 
 const getTextOffset = (root: HTMLElement, container: Node, offset: number): number => {
 	const range = root.ownerDocument.createRange();
@@ -229,23 +188,12 @@ export class ScholiaDocumentView extends FileView {
 		const noteButton = this.createActionButton(actions, 'message-square-plus', 'Add document note');
 		noteButton.addEventListener('click', () => this.addDocumentNote('docx'));
 
-		const binary = await this.app.vault.readBinary(file);
-		const result = await mammoth.convertToHtml(
-			{ arrayBuffer: binary },
-			{
-				externalFileAccess: false,
-				includeEmbeddedStyleMap: false,
-				idPrefix: `scholia-${file.stat.mtime}-`,
-				styleMap: ['comment-reference => sup.scholia-word-comment-reference'],
-			},
-		);
-		const article = this.documentEl.createEl('article', { cls: 'scholia-docx-page' });
-		article.appendChild(sanitizeDocxHtml(result.value));
-		if (result.messages.length) {
+		const result = await renderDocxDocument(await this.app.vault.readBinary(file), this.documentEl);
+		if (result.warnings.length) {
 			const details = this.documentEl.createEl('details', { cls: 'scholia-document-conversion-notes' });
-			details.createEl('summary', { text: `${result.messages.length} conversion note${result.messages.length === 1 ? '' : 's'}` });
+			details.createEl('summary', { text: `${result.warnings.length} document rendering note${result.warnings.length === 1 ? '' : 's'}` });
 			const list = details.createEl('ul');
-			for (const message of result.messages) list.createEl('li', { text: message.message });
+			for (const warning of result.warnings) list.createEl('li', { text: warning });
 		}
 	}
 

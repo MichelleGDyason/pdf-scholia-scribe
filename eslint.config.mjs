@@ -64,7 +64,7 @@ export default defineConfig([
         },
     },
     {
-        files: ["src/document-viewer.ts", "src/collaboration-portal.ts"],
+        files: ["src/document-viewer.ts", "src/collaboration-portal.ts", "src/docx-renderer.ts"],
         rules: {
             // These complete strings contain product or project names whose published casing is required.
             "obsidianmd/ui/sentence-case": ["warn", {
@@ -76,6 +76,7 @@ export default defineConfig([
                     "^Open this document in Google Docs to view and collaborate\\.$",
                     "^Convert this legacy Word file to DOCX$",
                     "^Annotation added to the Scholia collaboration portal\\.$",
+                    "^This Word document does not contain readable document text\\.$",
                 ],
             }],
         },

@@ -82,7 +82,7 @@ These Zotero features are separate from PDF++'s original **Citations in PDF (exp
 
 ## DOCX, Google Docs, and collaboration
 
-PDF Scholia Scribe can also open `.docx`, `.gdoc`, `.txt`, and `.text` files inside Obsidian. DOCX files are rendered as clean, selectable pages while the original Word file remains unchanged. Images, headings, lists, tables, footnotes, and other semantic Word structures are preserved where the DOCX conversion supports them.
+PDF Scholia Scribe can also open `.docx`, `.gdoc`, `.txt`, and `.text` files inside Obsidian. DOCX files are rendered as clean, selectable pages while the original Word file remains unchanged. The viewer reads Word's Open XML document content directly and never executes document HTML, scripts, macros, or remote Word resources. Headings, paragraphs, lists, tables, basic formatting, line breaks, and safe external links are rendered for reading and annotation.
 
 To annotate a DOCX passage:
 
