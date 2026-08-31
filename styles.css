@@ -742,6 +742,93 @@ body.link-icon .markdown-source-view .HyperMD-quote .cm-hmd-internal-link > .cm-
     text-transform: uppercase;
 }
 
+.pdf-scholia-zotero-annotation-import .pdf-scholia-zotero-results {
+    max-height: min(45vh, 32rem);
+    overflow-y: auto;
+}
+
+.pdf-scholia-zotero-import-source {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--size-4-2);
+}
+
+.pdf-scholia-zotero-import-source-summary {
+    min-width: 0;
+}
+
+.pdf-scholia-zotero-import-source > button {
+    grid-row: 1;
+    grid-column: 2;
+}
+
+.pdf-scholia-zotero-import-source-summary strong,
+.pdf-scholia-zotero-import-pdf strong,
+.pdf-scholia-zotero-import-pdf small {
+    display: block;
+}
+
+.pdf-scholia-zotero-import-source-summary > div,
+.pdf-scholia-zotero-import-pdf small,
+.pdf-scholia-zotero-import-status,
+.pdf-scholia-zotero-import-selection {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+.pdf-scholia-zotero-import-pdfs {
+    display: flex;
+    grid-column: 1 / -1;
+    flex-direction: column;
+    gap: var(--size-4-2);
+    margin: 0;
+}
+
+.pdf-scholia-zotero-import-pdf {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--size-4-2);
+    padding: var(--size-4-2);
+    border-radius: var(--radius-s);
+    background: var(--background-secondary);
+    cursor: pointer;
+}
+
+.pdf-scholia-zotero-import-pdf input {
+    margin-top: var(--size-2-1);
+}
+
+.pdf-scholia-zotero-import-selection {
+    margin-top: var(--size-4-3);
+    font-weight: var(--font-semibold);
+}
+
+mark.scholia-zotero-highlight {
+    padding: 0 0.12em;
+    border-bottom: 2px solid var(--scholia-zotero-color);
+    border-radius: 0.15em;
+    color: inherit;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+
+.scholia-zotero-annotation-label {
+    padding: 0.1em 0.45em;
+    border: 1px solid var(--scholia-zotero-color);
+    border-radius: 999px;
+    color: inherit;
+    font-size: 0.9em;
+}
+
+.scholia-zotero-color-swatch {
+    display: inline-block;
+    width: 0.8em;
+    height: 0.8em;
+    border: 1px solid color-mix(in srgb, var(--scholia-zotero-color), black 18%);
+    border-radius: 50%;
+    vertical-align: -0.05em;
+}
+
 /* DOCX, Google Docs, and shared annotation workspace. */
 .scholia-document-view,
 .scholia-collaboration-portal {

@@ -78,6 +78,10 @@ Pires argues that urban agriculture needs planning support (2011:47).
 
 For notes with many citations, **Update reference list for current note** creates or refreshes a managed reference list at the end of the note. The updater recognises citations inserted by PDF Scholia Scribe, ordinary `@citekey` references, links to vault source notes, and PDF quote links that can be matched to a source note.
 
+To bring Zotero PDF annotations into a note, open the destination Markdown note and run **Import annotations from Zotero PDFs**. Search for a Zotero source, load its PDF attachments, select one or more PDFs, and import. Scholia reads Zotero's local API and retains the highlighted text, exact colour, comments, page labels, annotation type, author, tags, and a direct `zotero://` link back to each annotation. Sticky notes, text annotations, area annotations, and ink annotations are represented by a coloured labelled entry when they do not contain extractable highlighted text.
+
+Imported PDFs live inside a readable managed `## Zotero annotations` block. Each PDF has its own bounded section, so selecting it again refreshes that section without duplicating annotations, deleting sections from other PDFs, or changing prose elsewhere in the note. The source Zotero library and PDF are never modified by this import.
+
 These Zotero features are separate from PDF++'s original **Citations in PDF (experimental)** section. That original feature is for citation links already inside a PDF. PDF Scholia Scribe's added citation workflow is for writing in your Obsidian note, using Zotero metadata and your vault source notes.
 
 ## DOCX, Google Docs, and collaboration

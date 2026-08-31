@@ -2440,6 +2440,8 @@ export class PDFPlusSettingTab extends LegacyCompatiblePluginSettingTab {
 				'- If you have already named the author in your sentence, set **Citation wording** to **Date only**. For example: `Pires argues ... (2011:42)`.',
 				'- If a source note in the vault has `citekey`, `author`, `year`, and `title` in its properties, it can be cited even if Zotero is closed.',
 				'- If Zotero is open, PDF Scholia Scribe can use Zotero to fill in missing details and make the reference-list entry.',
+				'- Use **Import annotations from Zotero PDFs** in an open Markdown note to choose one or more PDF attachments and bring in their coloured highlights, comments, page labels, tags, and links back to Zotero.',
+				'- Re-importing a selected PDF refreshes only that PDF\'s managed annotation section. Other imported PDFs and the rest of your note stay unchanged.',
 				'- Use the command **Update reference list for current note** when you want the `## References` section refreshed.',
 				'',
 				'The updater recognises:',
