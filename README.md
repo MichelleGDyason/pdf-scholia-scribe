@@ -12,6 +12,7 @@ The fork keeps the powerful PDF++ backlink-highlighting system, but changes the 
 - quote and callout paste formats are still available, including callout headers that can use your colour labels instead of an icon;
 - PDF page labels are preferred over raw PDF page indexes, so books with front matter can cite page `47` instead of the PDF viewer's internal page number;
 - Zotero-backed citation insertion can search Zotero and vault source notes, with a `Zotero only` option for noisy vaults and a `Date only` option for sentences where the author is already named;
+- Zotero PDF import brings both direct PDF annotations and related Zotero notes into Markdown while retaining colours, comments, headings, lists, emphasis, page labels, and links back to Zotero;
 - reference-list generation can collect citations in the current note and build a managed `References` section;
 - recent fixes make the colour-toolbar paste format obey the selected copy style, reduce paper/file icon noise, preserve editor scroll position after auto-paste, and use a desktop Zotero local-API fallback when Obsidian's browser-style request path cannot reach Zotero.
 
@@ -40,7 +41,7 @@ PDF Scholia Scribe is maintained by [Michelle G Dyason](https://github.com/Miche
 
 PDF Scholia Scribe is a maintained fork of PDF++, and a large part of the inherited PDF viewer integration is still based on PDF++ compatibility code. The compatibility layer lives mainly in `src/patchers/` and `src/typings.d.ts`; it touches Obsidian PDF viewer and PDF.js surfaces that are not all covered by stable public APIs. Those paths are guarded defensively, but PDF viewer internals can change between Obsidian releases.
 
-Zotero support is local-first. When you use Zotero citation search or reference-list generation, the plugin may query the Zotero local API at the configured base URL, which defaults to `http://127.0.0.1:23119`. It uses Obsidian's `requestUrl` first, and on desktop can fall back to a local Node HTTP request to the same localhost endpoint if the browser-style request path cannot reach Zotero. It does not contact Zotero cloud by default.
+Zotero support is local-first. When you use Zotero citation search, reference-list generation, or annotation-and-note import, the plugin may query the Zotero local API at the configured base URL, which defaults to `http://127.0.0.1:23119`. It uses Obsidian's `requestUrl` first, and on desktop can fall back to a local Node HTTP request to the same localhost endpoint if the browser-style request path cannot reach Zotero. It does not contact Zotero cloud by default.
 
 The citation workflow also reads vault Markdown notes to match source metadata, citation keys, Zotero item keys, and PDF quote links. Copy, paste, outline-copy, citation, debug export, and debug import commands can write to or read from the system clipboard when the user explicitly invokes those actions.
 
@@ -78,9 +79,15 @@ Pires argues that urban agriculture needs planning support (2011:47).
 
 For notes with many citations, **Update reference list for current note** creates or refreshes a managed reference list at the end of the note. The updater recognises citations inserted by PDF Scholia Scribe, ordinary `@citekey` references, links to vault source notes, and PDF quote links that can be matched to a source note.
 
-To bring Zotero PDF annotations into a note, open the destination Markdown note and run **Import annotations from Zotero PDFs**. Search for a Zotero source, load its PDF attachments, select one or more PDFs, and import. Scholia reads Zotero's local API and retains the highlighted text, exact colour, comments, page labels, annotation type, author, tags, and a direct `zotero://` link back to each annotation. Sticky notes, text annotations, area annotations, and ink annotations are represented by a coloured labelled entry when they do not contain extractable highlighted text.
+To bring Zotero PDF annotations into a note, open the destination Markdown note and run **Import annotations from Zotero PDFs**. Search for a Zotero source—or text held in one of its child notes—load its PDF attachments, select one or more PDFs, and import. Scholia reads Zotero's local API and retains the highlighted text, exact colour, comments, page labels, annotation type, author, tags, and a direct `zotero://` link back to each annotation. Sticky notes, text annotations, area annotations, and ink annotations are represented by a coloured labelled entry when they do not contain extractable highlighted text.
 
-Imported PDFs live inside a readable managed `## Zotero annotations` block. Each PDF has its own bounded section, so selecting it again refreshes that section without duplicating annotations, deleting sections from other PDFs, or changing prose elsewhere in the note. The source Zotero library and PDF are never modified by this import.
+The importer also recognises Zotero child notes containing embedded PDF annotations. It copies the complete related note into Markdown, including its surrounding comments and prose, headings, lists, emphasis, highlight or underline colour, page labels, and links back to the note and exact PDF annotation. When one Zotero note refers to several selected PDFs, Scholia imports that note once rather than duplicating it.
+
+Imported PDFs and Zotero notes live inside a readable managed `## Zotero annotations` block. Each PDF and Zotero note has its own bounded section, so selecting the same material again refreshes it without duplicating annotations, deleting sections for unrelated PDFs, or changing prose elsewhere in the destination note. The source Zotero library, Zotero notes, and PDFs are never modified by this import.
+
+### Handwritten notes from Nebo and OneNote
+
+Handwriting recognition has **not** yet been implemented. PDF Scholia Scribe can preserve a Zotero or PDF ink annotation as a coloured, linked annotation entry, but it does not transcribe pen strokes, run handwriting OCR, or connect directly to Nebo or OneNote. Typed or already-recognised text exported from those apps can be used after it appears as text in a PDF or Zotero note; handwritten marks that remain only as ink or an image are not converted to searchable Markdown.
 
 These Zotero features are separate from PDF++'s original **Citations in PDF (experimental)** section. That original feature is for citation links already inside a PDF. PDF Scholia Scribe's added citation workflow is for writing in your Obsidian note, using Zotero metadata and your vault source notes.
 

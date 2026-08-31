@@ -43,6 +43,17 @@ export interface ScholiaZoteroAnnotation {
 	tags: string[];
 }
 
+export interface ScholiaZoteroNote {
+	key: string;
+	parentItemKey: string;
+	title: string;
+	markdown: string;
+	annotationCount: number;
+	attachmentKeys: string[];
+	dateAdded: string;
+	dateModified: string;
+}
+
 export interface ScholiaZoteroPdf {
 	attachmentKey: string;
 	parentItemKey: string;
@@ -50,6 +61,14 @@ export interface ScholiaZoteroPdf {
 	contentType: string;
 	source: ScholiaReferenceRecord;
 	annotations: ScholiaZoteroAnnotation[];
+	notes: ScholiaZoteroNote[];
+}
+
+export interface ScholiaZoteroImportResult {
+	pdfCount: number;
+	annotationCount: number;
+	noteCount: number;
+	noteAnnotationCount: number;
 }
 
 type CitationRequest = Partial<Pick<ScholiaReferenceRecord, 'citekey' | 'zoteroKey' | 'vaultPath'>> & {
@@ -323,6 +342,171 @@ function getAnnotationPageIndex(value: unknown): number | null {
 		return null;
 	}
 	return position.pageIndex >= 0 ? position.pageIndex : null;
+}
+
+type ZoteroNoteAnnotationData = {
+	attachmentKey: string;
+	annotationKey: string;
+	color: string;
+	pageLabel: string;
+	pageIndex: number | null;
+	type: string;
+};
+
+function parseZoteroDataAttribute(value: string): UnknownRecord | null {
+	for (const candidate of [value, (() => {
+		try {
+			return decodeURIComponent(value);
+		} catch {
+			return value;
+		}
+	})()]) {
+		try {
+			const parsed: unknown = JSON.parse(candidate);
+			if (isRecord(parsed)) return parsed;
+		} catch {
+			// Zotero has used both JSON and URI-encoded JSON in note attributes.
+		}
+	}
+	return null;
+}
+
+function zoteroAttachmentKeyFromUri(value: string) {
+	const match = value.match(/\/items\/([A-Z0-9]{8,})(?:$|[/?#])/i);
+	return normalizedZoteroItemKey(match?.[1] ?? '');
+}
+
+function zoteroNoteAnnotationData(element: Element): ZoteroNoteAnnotationData | null {
+	const raw = element.getAttribute('data-annotation');
+	if (!raw) return null;
+	const data = parseZoteroDataAttribute(raw);
+	if (!data) return null;
+	const attachmentKey = zoteroAttachmentKeyFromUri(stringValue(data.attachmentURI));
+	if (!attachmentKey) return null;
+
+	return {
+		attachmentKey,
+		annotationKey: normalizedZoteroItemKey(stringValue(data.annotationKey)),
+		color: normalizedAnnotationColor(stringValue(data.color)),
+		pageLabel: cleanText(stringValue(data.pageLabel)),
+		pageIndex: getAnnotationPageIndex(data.position),
+		type: element.classList.contains('underline') ? 'underline' : 'highlight',
+	};
+}
+
+function escapeMarkdownInline(value: string) {
+	return value
+		.replace(/\\/g, '\\\\')
+		.replace(/([`*_[\]<>])/g, '\\$1');
+}
+
+function safeZoteroNoteHref(value: string) {
+	try {
+		const url = new URL(value);
+		return ['http:', 'https:', 'zotero:'].includes(url.protocol) ? value : '';
+	} catch {
+		return '';
+	}
+}
+
+function formatZoteroNoteAnnotationElement(element: Element, data: ZoteroNoteAnnotationData) {
+	const text = escapeHtml(element.textContent ?? '');
+	const color = normalizedAnnotationColor(data.color);
+	const styledText = data.type === 'underline'
+		? `<span class="scholia-zotero-note-underline" data-zotero-annotation-color="${color}" style="--scholia-zotero-color: ${color};">${text}</span>`
+		: `<mark class="scholia-zotero-highlight" data-zotero-annotation-color="${color}" style="--scholia-zotero-color: ${color}; background-color: ${color}55;">${text}</mark>`;
+	const pageNumber = data.pageIndex === null ? null : data.pageIndex + 1;
+	const pageLabel = data.pageLabel || (pageNumber === null ? '' : pageNumber.toString());
+	const params = new URLSearchParams();
+	if (pageNumber !== null) params.set('page', pageNumber.toString());
+	if (data.annotationKey) params.set('annotation', data.annotationKey);
+	const link = `zotero://open-pdf/library/items/${encodeURIComponent(data.attachmentKey)}${params.size ? `?${params.toString()}` : ''}`;
+	return pageLabel
+		? `${styledText} [Page ${escapeMarkdownLinkLabel(pageLabel)}](${link})`
+		: `${styledText} [Open in Zotero](${link})`;
+}
+
+function zoteroNoteHtmlToMarkdown(value: string) {
+	if (typeof DOMParser === 'undefined') return safeMarkdownText(value);
+	const document = new DOMParser().parseFromString(value, 'text/html');
+
+	const renderChildren = (element: Element, listDepth = 0): string => {
+		return Array.from(element.childNodes).map((node) => renderNode(node, listDepth)).join('');
+	};
+	const renderNode = (node: Node, listDepth = 0): string => {
+		if (node.nodeType === Node.TEXT_NODE) {
+			return escapeMarkdownInline((node.nodeValue ?? '').replace(/\s+/g, ' '));
+		}
+		if (!node.instanceOf(Element)) return '';
+		const tag = node.tagName.toLowerCase();
+		if (['script', 'style', 'iframe', 'object', 'embed', 'svg'].includes(tag)) return '';
+		const annotation = zoteroNoteAnnotationData(node);
+		if (annotation) return formatZoteroNoteAnnotationElement(node, annotation);
+		const children = renderChildren(node, listDepth);
+
+		switch (tag) {
+			case 'br': return '\n';
+			case 'p': return `${children.trim()}\n\n`;
+			case 'strong':
+			case 'b': return children.trim() ? `**${children.trim()}**` : '';
+			case 'em':
+			case 'i': return children.trim() ? `*${children.trim()}*` : '';
+			case 'u': return children.trim() ? `<u>${children.trim()}</u>` : '';
+			case 's':
+			case 'del': return children.trim() ? `~~${children.trim()}~~` : '';
+			case 'code': {
+				const code = node.textContent ?? '';
+				const delimiter = code.includes('`') ? '``' : '`';
+				return `${delimiter}${code}${delimiter}`;
+			}
+			case 'pre': return `~~~\n${node.textContent ?? ''}\n~~~\n\n`;
+			case 'blockquote': {
+				const quote = children.trim().split('\n').map((line) => `> ${line}`).join('\n');
+				return quote ? `${quote}\n\n` : '';
+			}
+			case 'a': {
+				const href = safeZoteroNoteHref(node.getAttribute('href') ?? '');
+				const label = children.trim() || escapeMarkdownInline(href);
+				return href && label ? `[${label}](${href})` : label;
+			}
+			case 'img': {
+				const alt = cleanText(node.getAttribute('alt') ?? '');
+				return alt ? `*[Image: ${escapeMarkdownInline(alt)}]*` : '';
+			}
+			case 'ul':
+			case 'ol': {
+				const ordered = tag === 'ol';
+				const items = Array.from(node.children).filter((child) => child.tagName.toLowerCase() === 'li');
+				return items.map((item, index) => {
+					const marker = ordered ? `${index + 1}.` : '-';
+					const body = renderChildren(item, listDepth + 1).trim().replace(/\n/g, `\n${'  '.repeat(listDepth + 1)}`);
+					return `${'  '.repeat(listDepth)}${marker} ${body}`;
+				}).join('\n') + '\n\n';
+			}
+			case 'li': return children;
+			case 'hr': return '\n---\n\n';
+			case 'h1':
+			case 'h2':
+			case 'h3':
+			case 'h4':
+			case 'h5':
+			case 'h6': {
+				const sourceLevel = Number.parseInt(tag.slice(1), 10);
+				const level = Math.min(6, sourceLevel + 4);
+				const heading = children.trim();
+				return heading ? `${'#'.repeat(level)} ${heading}\n\n` : '';
+			}
+			case 'div':
+			case 'section':
+			case 'article': return children;
+			default: return children;
+		}
+	};
+
+	return renderChildren(document.body)
+		.replace(/[ \t]+\n/g, '\n')
+		.replace(/\n{3,}/g, '\n\n')
+		.trim();
 }
 
 function getZoteroItemData(item: unknown): UnknownRecord | null {
@@ -628,12 +812,48 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 	async searchZoteroAnnotationSources(query: string) {
 		if (!query.trim()) return [];
 		const encoded = encodeURIComponent(query.trim());
-		const items = await this.requestZoteroJson(`/api/users/0/items/top?format=json&include=data&limit=25&q=${encoded}`);
-		if (!Array.isArray(items)) return [];
-		return items
+		const [items, noteItems] = await Promise.all([
+			this.requestZoteroJson(`/api/users/0/items/top?format=json&include=data&limit=25&q=${encoded}`),
+			this.requestZoteroJson(`/api/users/0/items?itemType=note&format=json&include=data&limit=25&qmode=everything&q=${encoded}`),
+		]);
+		const directSources = (Array.isArray(items) ? items : [])
 			.map((item) => this.recordFromZoteroItem(item))
 			.filter((record): record is ScholiaReferenceRecord => !!record)
 			.filter((record) => record.itemType !== 'note' && record.itemType !== 'annotation');
+		const sourceKeys = new Set<string>();
+		for (const item of Array.isArray(noteItems) ? noteItems : []) {
+			const data = getZoteroItemData(item);
+			if (!data || data.itemType !== 'note') continue;
+			const parentItemKey = normalizedZoteroItemKey(stringValue(data.parentItem));
+			if (parentItemKey) {
+				sourceKeys.add(parentItemKey);
+				continue;
+			}
+			const note = this.noteFromZoteroItem(item);
+			for (const attachmentKey of note?.attachmentKeys ?? []) sourceKeys.add(attachmentKey);
+		}
+		const noteSources = (await Promise.all(
+			Array.from(sourceKeys).map((itemKey) => this.getZoteroSourceRecordForItemKey(itemKey)),
+		)).filter((record): record is ScholiaReferenceRecord => !!record);
+		// Put sources discovered through matching note content first. Zotero can
+		// return many broad top-level matches for the same query, which otherwise
+		// pushes the exact parent of a matching child note beyond the modal limit.
+		return this.dedupeRecords([...noteSources, ...directSources]).slice(0, 25);
+	}
+
+	async getZoteroSourceRecordForItemKey(itemKey: string, visited = new Set<string>()): Promise<ScholiaReferenceRecord | null> {
+		const key = normalizedZoteroItemKey(itemKey);
+		if (!key || visited.has(key)) return null;
+		visited.add(key);
+		const item = await this.requestZoteroJson(`/api/users/0/items/${encodeURIComponent(key)}?format=json&include=data`);
+		const data = getZoteroItemData(item);
+		if (!data) return null;
+		const itemType = stringValue(data.itemType);
+		const parentItemKey = normalizedZoteroItemKey(stringValue(data.parentItem));
+		if (parentItemKey && ['attachment', 'annotation', 'note'].includes(itemType)) {
+			return this.getZoteroSourceRecordForItemKey(parentItemKey, visited);
+		}
+		return this.recordFromZoteroItem(item);
 	}
 
 	async getZoteroRecordByItemKey(itemKey: string) {
@@ -659,6 +879,9 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 		const candidates = source.itemType === 'attachment'
 			? [await this.requestZoteroJson(`/api/users/0/items/${encodeURIComponent(source.zoteroKey)}?format=json&include=data`)]
 			: await this.requestZoteroItemList(`/api/users/0/items/${encodeURIComponent(source.zoteroKey)}/children?format=json&include=data`);
+		const notes = candidates
+			.map((item) => this.noteFromZoteroItem(item))
+			.filter((note): note is ScholiaZoteroNote => !!note);
 		const attachments = candidates.filter((item) => {
 			const data = getZoteroItemData(item);
 			if (!data || data.itemType !== 'attachment') return false;
@@ -685,9 +908,37 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 				contentType: stringValue(data.contentType) || 'application/pdf',
 				source,
 				annotations,
+				notes: notes.filter((note) => note.attachmentKeys.includes(attachmentKey)),
 			};
 		}));
 		return pdfs.filter((pdf) => !!pdf.attachmentKey);
+	}
+
+	noteFromZoteroItem(item: unknown): ScholiaZoteroNote | null {
+		const data = getZoteroItemData(item);
+		if (!data || data.itemType !== 'note') return null;
+		const key = normalizedZoteroItemKey(stringValue(data.key) || (isRecord(item) ? stringValue(item.key) : ''));
+		const html = stringValue(data.note);
+		if (!key || !html.trim() || typeof DOMParser === 'undefined') return null;
+		const document = new DOMParser().parseFromString(html, 'text/html');
+		const annotationElements = Array.from(document.querySelectorAll('[data-annotation]'));
+		const annotations = annotationElements
+			.map((element) => zoteroNoteAnnotationData(element))
+			.filter((annotation): annotation is ZoteroNoteAnnotationData => !!annotation);
+		if (!annotations.length) return null;
+		const heading = document.querySelector('h1, h2, h3, h4, h5, h6')?.textContent ?? '';
+		const fallbackTitle = document.body.textContent ?? '';
+		const title = cleanText(heading || fallbackTitle).slice(0, 100) || 'Zotero note';
+		return {
+			key,
+			parentItemKey: normalizedZoteroItemKey(stringValue(data.parentItem)),
+			title,
+			markdown: zoteroNoteHtmlToMarkdown(html),
+			annotationCount: annotations.length,
+			attachmentKeys: Array.from(new Set(annotations.map((annotation) => annotation.attachmentKey))),
+			dateAdded: stringValue(data.dateAdded),
+			dateModified: stringValue(data.dateModified),
+		};
 	}
 
 	annotationFromZoteroItem(item: unknown): ScholiaZoteroAnnotation | null {
@@ -902,14 +1153,22 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 		return label;
 	}
 
-	importZoteroAnnotations(view: MarkdownView, pdfs: ScholiaZoteroPdf[]) {
+	importZoteroAnnotations(view: MarkdownView, pdfs: ScholiaZoteroPdf[]): ScholiaZoteroImportResult {
 		const selectedPdfs = pdfs.filter((pdf) => !!pdf.attachmentKey);
-		if (!selectedPdfs.length) return 0;
+		if (!selectedPdfs.length) {
+			return { pdfCount: 0, annotationCount: 0, noteCount: 0, noteAnnotationCount: 0 };
+		}
 		const content = view.editor.getValue();
 		const block = this.buildManagedZoteroAnnotationBlock(content, selectedPdfs);
 		const range = this.getManagedZoteroAnnotationRange(content, block);
 		this.replaceEditorRange(view, content, range, 'pdf-scholia-scribe-zotero-annotations');
-		return selectedPdfs.reduce((count, pdf) => count + pdf.annotations.length, 0);
+		const notes = this.dedupeZoteroNotes(selectedPdfs.flatMap((pdf) => pdf.notes));
+		return {
+			pdfCount: selectedPdfs.length,
+			annotationCount: selectedPdfs.reduce((count, pdf) => count + pdf.annotations.length, 0),
+			noteCount: notes.length,
+			noteAnnotationCount: notes.reduce((count, note) => count + note.annotationCount, 0),
+		};
 	}
 
 	buildManagedZoteroAnnotationBlock(content: string, pdfs: ScholiaZoteroPdf[]) {
@@ -919,10 +1178,7 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 			? content.slice(existingStart + MANAGED_ZOTERO_ANNOTATIONS_START.length, existingEnd).trim()
 			: '';
 
-		for (const pdf of pdfs) {
-			const section = this.formatZoteroPdfAnnotationSection(pdf);
-			const sectionStart = this.zoteroPdfSectionStart(pdf.attachmentKey);
-			const sectionEnd = this.zoteroPdfSectionEnd(pdf.attachmentKey);
+		const upsertSection = (section: string, sectionStart: string, sectionEnd: string) => {
 			const currentStart = body.indexOf(sectionStart);
 			const currentEnd = body.indexOf(sectionEnd, currentStart + sectionStart.length);
 			if (currentStart >= 0 && currentEnd > currentStart) {
@@ -930,6 +1186,22 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 			} else {
 				body = body ? `${body.trimEnd()}\n\n${section}` : section;
 			}
+		};
+
+		for (const pdf of pdfs) {
+			const section = this.formatZoteroPdfAnnotationSection(pdf);
+			const sectionStart = this.zoteroPdfSectionStart(pdf.attachmentKey);
+			const sectionEnd = this.zoteroPdfSectionEnd(pdf.attachmentKey);
+			upsertSection(section, sectionStart, sectionEnd);
+		}
+
+		const notes = this.dedupeZoteroNotes(pdfs.flatMap((pdf) => pdf.notes));
+		for (const note of notes) {
+			const relatedPdfs = pdfs.filter((pdf) => note.attachmentKeys.includes(pdf.attachmentKey));
+			const source = relatedPdfs[0]?.source ?? pdfs[0]?.source;
+			if (!source) continue;
+			const section = this.formatZoteroNoteSection(note, source, relatedPdfs);
+			upsertSection(section, this.zoteroNoteSectionStart(note.key), this.zoteroNoteSectionEnd(note.key));
 		}
 
 		return `${MANAGED_ZOTERO_ANNOTATIONS_START}\n${body}\n${MANAGED_ZOTERO_ANNOTATIONS_END}`;
@@ -957,11 +1229,36 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 			'',
 			sourceDetails,
 			sourceDetails ? '' : null,
-			`[Open source in Zotero](${parentLink}) · [Open PDF in Zotero](${pdfLink}) · ${pdf.annotations.length} annotation${pdf.annotations.length === 1 ? '' : 's'}`,
+			`[Open source in Zotero](${parentLink}) · [Open PDF in Zotero](${pdfLink}) · ${pdf.annotations.length} PDF annotation${pdf.annotations.length === 1 ? '' : 's'} · ${pdf.notes.length} related Zotero note${pdf.notes.length === 1 ? '' : 's'}`,
 			'',
 			annotations,
 			this.zoteroPdfSectionEnd(pdf.attachmentKey),
 		].filter((line): line is string => line !== null).join('\n');
+	}
+
+	formatZoteroNoteSection(note: ScholiaZoteroNote, source: ScholiaReferenceRecord, pdfs: ScholiaZoteroPdf[]) {
+		const sourceTitle = safeMarkdownText(source.title || 'Untitled source').replace(/\r?\n/g, ' ');
+		const noteTitle = safeMarkdownText(note.title || 'Zotero note').replace(/\r?\n/g, ' ');
+		const noteLink = `zotero://select/items/0_${encodeURIComponent(note.key)}`;
+		const pdfLinks = pdfs.map((pdf) => {
+			const title = escapeMarkdownLinkLabel(pdf.attachmentTitle || 'PDF');
+			return `[${title}](zotero://open-pdf/library/items/${encodeURIComponent(pdf.attachmentKey)})`;
+		});
+		const metadata = [
+			`[Open note in Zotero](${noteLink})`,
+			`${note.annotationCount} embedded annotation${note.annotationCount === 1 ? '' : 's'}`,
+			pdfLinks.length ? `Related PDFs: ${pdfLinks.join(', ')}` : '',
+		].filter(Boolean).join(' · ');
+
+		return [
+			this.zoteroNoteSectionStart(note.key),
+			`### ${sourceTitle} — Zotero note: ${noteTitle}`,
+			'',
+			metadata,
+			'',
+			note.markdown || '*This Zotero note is empty.*',
+			this.zoteroNoteSectionEnd(note.key),
+		].join('\n');
 	}
 
 	formatZoteroAnnotation(pdf: ScholiaZoteroPdf, annotation: ScholiaZoteroAnnotation, index: number) {
@@ -1003,6 +1300,20 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 
 	zoteroPdfSectionEnd(attachmentKey: string) {
 		return `<!-- scholia-zotero-pdf:v1:${attachmentKey}:end -->`;
+	}
+
+	zoteroNoteSectionStart(noteKey: string) {
+		return `<!-- scholia-zotero-note:v1:${noteKey}:start -->`;
+	}
+
+	zoteroNoteSectionEnd(noteKey: string) {
+		return `<!-- scholia-zotero-note:v1:${noteKey}:end -->`;
+	}
+
+	dedupeZoteroNotes(notes: ScholiaZoteroNote[]) {
+		const byKey = new Map<string, ScholiaZoteroNote>();
+		for (const note of notes) byKey.set(note.key, note);
+		return Array.from(byKey.values());
 	}
 
 	getManagedZoteroAnnotationRange(content: string, block: string): ManagedBlockRange {

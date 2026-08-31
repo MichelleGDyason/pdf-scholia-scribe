@@ -25,7 +25,7 @@ export class ZoteroAnnotationImportModal extends PDFPlusModal {
 		this.contentEl.addClass('pdf-scholia-zotero-annotation-import');
 		this.contentEl.createEl('p', {
 			cls: 'setting-item-description',
-			text: `Choose Zotero PDF attachments to import into ${this.view.file?.path ?? 'the active note'}. Re-importing a PDF refreshes its managed section.`,
+			text: `Choose Zotero PDF attachments to import into ${this.view.file?.path ?? 'the active note'}. Scholia also includes Zotero notes containing annotations from those PDFs. Re-importing refreshes the managed sections.`,
 		});
 
 		new Setting(this.contentEl)
@@ -137,7 +137,7 @@ export class ZoteroAnnotationImportModal extends PDFPlusModal {
 		const textEl = labelEl.createDiv();
 		textEl.createEl('strong', { text: pdf.attachmentTitle });
 		textEl.createEl('small', {
-			text: `${pdf.annotations.length} annotation${pdf.annotations.length === 1 ? '' : 's'}${pdf.annotations.length ? '' : ' — selecting this PDF will refresh an existing section to empty'}`,
+			text: `${pdf.annotations.length} PDF annotation${pdf.annotations.length === 1 ? '' : 's'} · ${pdf.notes.length} Zotero note${pdf.notes.length === 1 ? '' : 's'}${pdf.annotations.length || pdf.notes.length ? '' : ' — selecting this PDF will refresh an existing section to empty'}`,
 		});
 		this.component.registerDomEvent(checkbox, 'change', () => {
 			if (checkbox.checked) this.selectedPdfs.set(pdf.attachmentKey, pdf);
@@ -153,18 +153,22 @@ export class ZoteroAnnotationImportModal extends PDFPlusModal {
 			return;
 		}
 
-		const annotationCount = this.lib.zoteroReferences.importZoteroAnnotations(this.view, pdfs);
-		new Notice(`${this.plugin.manifest.name}: Imported ${annotationCount} annotation${annotationCount === 1 ? '' : 's'} from ${pdfs.length} PDF${pdfs.length === 1 ? '' : 's'}.`);
+		const result = this.lib.zoteroReferences.importZoteroAnnotations(this.view, pdfs);
+		new Notice(`${this.plugin.manifest.name}: Imported ${result.annotationCount} PDF annotation${result.annotationCount === 1 ? '' : 's'} and ${result.noteCount} Zotero note${result.noteCount === 1 ? '' : 's'} containing ${result.noteAnnotationCount} embedded annotation${result.noteAnnotationCount === 1 ? '' : 's'} from ${result.pdfCount} PDF${result.pdfCount === 1 ? '' : 's'}.`);
 		this.close();
 	}
 
 	updateSelectionSummary() {
 		const pdfCount = this.selectedPdfs.size;
-		const annotationCount = Array.from(this.selectedPdfs.values())
+		const pdfs = Array.from(this.selectedPdfs.values());
+		const annotationCount = pdfs
 			.reduce((count, pdf) => count + pdf.annotations.length, 0);
+		const notes = new Map(pdfs.flatMap((pdf) => pdf.notes).map((note) => [note.key, note]));
+		const noteAnnotationCount = Array.from(notes.values())
+			.reduce((count, note) => count + note.annotationCount, 0);
 		if (this.selectionEl) {
 			this.selectionEl.setText(pdfCount
-				? `${pdfCount} PDF${pdfCount === 1 ? '' : 's'} selected · ${annotationCount} annotation${annotationCount === 1 ? '' : 's'}`
+				? `${pdfCount} PDF${pdfCount === 1 ? '' : 's'} selected · ${annotationCount} PDF annotation${annotationCount === 1 ? '' : 's'} · ${notes.size} Zotero note${notes.size === 1 ? '' : 's'} (${noteAnnotationCount} embedded annotation${noteAnnotationCount === 1 ? '' : 's'})`
 				: 'No PDFs selected.');
 		}
 		this.importButton

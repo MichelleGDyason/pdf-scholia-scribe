@@ -812,6 +812,15 @@ mark.scholia-zotero-highlight {
     -webkit-box-decoration-break: clone;
 }
 
+.scholia-zotero-note-underline {
+    text-decoration-line: underline;
+    text-decoration-color: var(--scholia-zotero-color);
+    text-decoration-thickness: 0.16em;
+    text-underline-offset: 0.14em;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+
 .scholia-zotero-annotation-label {
     padding: 0.1em 0.45em;
     border: 1px solid var(--scholia-zotero-color);

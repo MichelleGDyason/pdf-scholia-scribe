@@ -1,7 +1,7 @@
 {
     "name": "obsidian-pdf-scholia-scribe",
-    "version": "1.2.0",
-    "description": "Citation-focused PDF and DOCX reading, annotation, and collaboration.",
+    "version": "1.2.1",
+    "description": "Scholarly PDF and DOCX reading with Zotero citations, colour-preserving annotation and note import, and portable collaboration.",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/MichelleGDyason/pdf-scholia-scribe.git"

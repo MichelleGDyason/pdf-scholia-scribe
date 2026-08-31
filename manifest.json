@@ -1,9 +1,9 @@
 {
 	"id": "pdf-scholia-scribe",
 	"name": "PDF Scholia Scribe",
-	"version": "1.2.0",
+	"version": "1.2.1",
 	"minAppVersion": "1.12.7",
-	"description": "Citation-focused PDF and DOCX reading, annotation, and collaboration.",
+	"description": "Scholarly PDF and DOCX reading with Zotero citations, colour-preserving annotation and note import, and portable collaboration.",
 	"author": "Michelle G Dyason",
 	"authorUrl": "https://github.com/MichelleGDyason",
 	"fundingUrl": "https://github.com/sponsors/MichelleGDyason",
