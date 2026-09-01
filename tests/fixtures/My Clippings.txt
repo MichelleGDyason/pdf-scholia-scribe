@@ -1,0 +1,10 @@
+Live Kindle Fixture (Synthetic Author)
+- Your Highlight on page 14 | Location 301-302 | Added on Monday, 1 September 2026 10:15:00 AM
+
+A synthetic Kindle highlight for live import testing.
+==========
+Live Kindle Fixture (Synthetic Author)
+- Your Note on page 14 | Location 301-302 | Added on Monday, 1 September 2026 10:16:00 AM
+
+A paired Kindle comment.
+==========

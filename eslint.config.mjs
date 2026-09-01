@@ -17,6 +17,8 @@ export default defineConfig([
             "eslint.config.mjs",
             "esbuild.config.mjs",
             "version-bump.mjs",
+			"scripts/**",
+			"tests/**",
         ],
     },
     ...obsidianmd.configs.recommended,
@@ -63,6 +65,21 @@ export default defineConfig([
             }],
         },
     },
+	{
+		files: ["src/modals/annotation-import-modal.ts"],
+		rules: {
+			// Apple Books and Apple Preview are published product names, not ordinary sentence words.
+			"obsidianmd/ui/sentence-case": ["warn", {
+				enforceCamelCaseLower: true,
+				ignoreRegex: [
+					"^Apple Books$",
+					"^Apple Preview$",
+					"^Paste Apple Books highlights or notes$",
+					"^Paste shared Apple Books text here\.\.\.$",
+				],
+			}],
+		},
+	},
     {
         files: ["src/document-viewer.ts", "src/collaboration-portal.ts", "src/docx-renderer.ts"],
         rules: {

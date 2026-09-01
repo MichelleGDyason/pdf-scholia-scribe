@@ -1,7 +1,7 @@
 import { Command, MarkdownView, Notice, TFile, WorkspaceLeaf, normalizePath, setIcon } from 'obsidian';
 
 import { PDFPlusLibSubmodule } from './submodule';
-import { PDFComposerModal, PDFCreateModal, PDFPageDeleteModal, PDFPageLabelEditModal, PDFOutlineTitleModal, DummyFileModal, ZoteroAnnotationImportModal, ZoteroCitationModal } from 'modals';
+import { AnnotationImportModal, PDFComposerModal, PDFCreateModal, PDFPageDeleteModal, PDFPageLabelEditModal, PDFOutlineTitleModal, DummyFileModal, ZoteroAnnotationImportModal, ZoteroCitationModal } from 'modals';
 import { PDFOutlines } from './outlines';
 import { TemplateProcessor } from 'template';
 import { getObsidianDebugInfo, getStyleSettings, parsePDFSubpath } from 'utils';
@@ -363,6 +363,10 @@ export class PDFPlusCommands extends PDFPlusLibSubmodule {
                 id: 'import-zotero-annotations',
                 name: 'Import annotations from Zotero PDFs',
                 callback: () => this.importZoteroAnnotations()
+            }, {
+                id: 'import-reading-app-annotations',
+                name: 'Import annotations from Zotero, Kindle, Apple Books, or Apple Preview',
+                callback: () => this.importReadingAppAnnotations()
             }, {
                 id: 'update-reference-list',
                 name: 'Update reference list for current note',
@@ -1313,6 +1317,16 @@ export class PDFPlusCommands extends PDFPlusLibSubmodule {
         }
 
         new ZoteroAnnotationImportModal(this.plugin, view).open();
+    }
+
+    importReadingAppAnnotations() {
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (!view || !view.file) {
+            new Notice(`${this.plugin.manifest.name}: Open the Markdown note that should receive the annotations, then run this command again.`);
+            return;
+        }
+
+        new AnnotationImportModal(this.plugin, view).open();
     }
 
     updateReferenceList() {

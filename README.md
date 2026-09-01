@@ -1,6 +1,6 @@
 <h1 align="center">PDF Scholia Scribe</h1>
 
-PDF Scholia Scribe is a citation-focused reading and annotation workspace for Obsidian. It extends PDF++ for scholarly PDF reading and adds a safe DOCX viewer, portable document annotations, and a shared discussion portal—without altering source documents.
+PDF Scholia Scribe is a citation-focused reading and annotation workspace for Obsidian. It extends PDF++ for scholarly PDF reading and adds local annotation import from Zotero, Kindle, Apple Books, and Apple Preview, a safe DOCX viewer, portable document annotations, and a shared discussion portal—without altering source documents.
 
 For PDFs, it keeps the writing workflow focused: copy a passage, keep the link back to the exact PDF selection, and show a quiet citation label in the note instead of a long file/page/colour link.
 
@@ -13,6 +13,7 @@ The fork keeps the powerful PDF++ backlink-highlighting system, but changes the 
 - PDF page labels are preferred over raw PDF page indexes, so books with front matter can cite page `47` instead of the PDF viewer's internal page number;
 - Zotero-backed citation insertion can search Zotero and vault source notes, with a `Zotero only` option for noisy vaults and a `Date only` option for sentences where the author is already named;
 - Zotero PDF import brings both direct PDF annotations and related Zotero notes into Markdown while retaining colours, comments, headings, lists, emphasis, page labels, and links back to Zotero;
+- a single reading-app importer can bring Kindle clippings, Apple Books shared highlights and notes, and editable Apple Preview PDF annotations into the selected Markdown note, retaining every colour, comment, page or location, date, author, and source link the export makes available;
 - reference-list generation can collect citations in the current note and build a managed `References` section;
 - recent fixes make the colour-toolbar paste format obey the selected copy style, reduce paper/file icon noise, preserve editor scroll position after auto-paste, and use a desktop Zotero local-API fallback when Obsidian's browser-style request path cannot reach Zotero.
 
@@ -85,9 +86,23 @@ The importer also recognises Zotero child notes containing embedded PDF annotati
 
 Imported PDFs and Zotero notes live inside a readable managed `## Zotero annotations` block. Each PDF and Zotero note has its own bounded section, so selecting the same material again refreshes it without duplicating annotations, deleting sections for unrelated PDFs, or changing prose elsewhere in the destination note. The source Zotero library, Zotero notes, and PDFs are never modified by this import.
 
+### Import from Kindle, Apple Books, and Apple Preview
+
+Open the destination Markdown note and run **Import annotations from Zotero, Kindle, Apple Books, or Apple Preview**. Choose a source, select one or more exports, inspect the documents and import notices, tick the documents you want, and import them into the open note. Zotero remains available in the same chooser and opens the library-search importer described above.
+
+The local adapters currently accept:
+
+- **Kindle:** `My Clippings.txt`, including highlights, standalone notes, bookmarks, page numbers, Kindle locations, and dates. An adjacent note at the same location is attached to its highlight as a comment. Duplicate clipping records are removed. Annotated or searchable PDF exports from Kindle Scribe use the same PDF adapter as Preview; text is imported only when Amazon has included recognised text or editable PDF annotation text in the export.
+- **Apple Books:** shared or exported `.txt` and `.html` highlights and notes, pasted shared text, and annotated PDFs. Labelled title, author, note, colour, chapter, page, location, and date fields are retained when the shared format supplies them. Apple Books share layouts can vary, so Scholia displays an import notice when it must preserve otherwise-unlabelled text using the export file name.
+- **Apple Preview:** PDFs saved with editable highlight, underline, squiggly, strikeout, sticky-note, text-box, ink, stamp, or shape annotations. Scholia retains extractable marked text, comments, colour, author, dates, annotation type, and page or page label. PDF signature fields and redactions are skipped by default. A PDF produced with **Print → Save as PDF** may have flattened its annotations; Scholia reports that condition instead of inventing missing annotations. Apple documents this distinction in the [Preview annotation guide](https://support.apple.com/en-au/guide/preview/prvw11580/mac).
+
+Imports are read-only and local: the selected export, source PDF, Kindle library, Apple Books library, and Preview document are not modified or uploaded. Each imported document receives a stable bounded section inside `## Reading app annotations`; re-importing the same document refreshes that section without overwriting prose or other imported documents. If exactly one PDF with the same file name exists in the vault, page headings link back to that PDF and annotation. Otherwise Scholia keeps the source file name and page without creating an ambiguous link.
+
+Apple Books itself supports coloured highlights, attached notes, and navigation back to highlighted passages; see Apple's [Books highlights and notes guide](https://support.apple.com/en-mide/guide/books/ibks3975f128/mac) and [sharing guide](https://support.apple.com/en-au/guide/iphone/iph17bf340c1/ios). What reaches Markdown still depends on the fields contained in the particular share or export format.
+
 ### Handwritten notes from Nebo and OneNote
 
-Handwriting recognition has **not** yet been implemented. PDF Scholia Scribe can preserve a Zotero or PDF ink annotation as a coloured, linked annotation entry, but it does not transcribe pen strokes, run handwriting OCR, or connect directly to Nebo or OneNote. Typed or already-recognised text exported from those apps can be used after it appears as text in a PDF or Zotero note; handwritten marks that remain only as ink or an image are not converted to searchable Markdown.
+Handwriting recognition has **not** yet been implemented. PDF Scholia Scribe can preserve a Zotero, Kindle PDF, Apple Books PDF, or Apple Preview ink annotation as a coloured, page-linked annotation entry, but it does not transcribe pen strokes, run handwriting OCR, or connect directly to Nebo or OneNote. Typed or already-recognised text exported from those apps can be used after it appears as text in a PDF, shared Apple Books text, or Zotero note; handwritten marks that remain only as ink or an image are not converted to searchable Markdown.
 
 These Zotero features are separate from PDF++'s original **Citations in PDF (experimental)** section. That original feature is for citation links already inside a PDF. PDF Scholia Scribe's added citation workflow is for writing in your Obsidian note, using Zotero metadata and your vault source notes.
 

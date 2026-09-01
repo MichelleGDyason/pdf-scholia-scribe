@@ -156,7 +156,7 @@ Generate vault links in the existing form:
 
 For PDFs outside the vault, first offer a read-only file selection and import the annotations without moving the PDF. A later option may use the existing dummy-file mechanism to retain an external-file link, but it must remain explicit.
 
-Skip signatures and redactions by default. Report them in the preview as unsupported/sensitive rather than silently importing their appearance data. A flattened mark should produce a document warning, not a fabricated annotation.
+Skip PDF signature fields and redactions by default. Report them in the preview as unsupported/sensitive rather than silently importing their appearance data. A flattened mark should produce a document warning, not a fabricated annotation.
 
 Required synthetic PDF fixtures:
 

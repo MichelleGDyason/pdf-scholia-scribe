@@ -7,3 +7,4 @@ export * from './dummy-file-modals';
 export * from './installer-version-modal';
 export * from './zotero-citation-modal';
 export * from './zotero-annotation-import-modal';
+export * from './annotation-import-modal';

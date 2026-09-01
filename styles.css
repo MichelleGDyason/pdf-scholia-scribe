@@ -803,6 +803,57 @@ body.link-icon .markdown-source-view .HyperMD-quote .cm-hmd-internal-link > .cm-
     font-weight: var(--font-semibold);
 }
 
+.pdf-scholia-import-help,
+.pdf-scholia-import-status {
+    margin: var(--size-4-2) 0;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+.pdf-scholia-import-paste textarea {
+    width: min(100%, 40rem);
+    min-height: 8rem;
+    resize: vertical;
+}
+
+.pdf-scholia-import-preview {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-2);
+    max-height: min(42vh, 30rem);
+    margin-top: var(--size-4-3);
+    overflow-y: auto;
+}
+
+.pdf-scholia-import-document {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--size-4-2);
+    padding: var(--size-4-2);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    background: var(--background-secondary);
+    cursor: pointer;
+}
+
+.pdf-scholia-import-document input {
+    margin-top: var(--size-2-1);
+}
+
+.pdf-scholia-import-document strong,
+.pdf-scholia-import-document small {
+    display: block;
+}
+
+.pdf-scholia-import-document small {
+    color: var(--text-muted);
+}
+
+.pdf-scholia-import-document .pdf-scholia-import-warning {
+    margin-top: var(--size-2-1);
+    color: var(--text-warning);
+}
+
 mark.scholia-zotero-highlight {
     padding: 0 0.12em;
     border-bottom: 2px solid var(--scholia-zotero-color);
@@ -810,6 +861,32 @@ mark.scholia-zotero-highlight {
     color: inherit;
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
+}
+
+mark.scholia-import-highlight {
+    padding: 0 0.12em;
+    border-bottom: 2px solid var(--scholia-import-color);
+    border-radius: 0.15em;
+    color: inherit;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+
+.scholia-import-annotation-label {
+    padding: 0.1em 0.45em;
+    border: 1px solid var(--scholia-import-color);
+    border-radius: 999px;
+    color: inherit;
+    font-size: 0.9em;
+}
+
+.scholia-import-color-swatch {
+    display: inline-block;
+    width: 0.85em;
+    height: 0.85em;
+    border: 1px solid color-mix(in srgb, var(--scholia-import-color), black 20%);
+    border-radius: 50%;
+    vertical-align: -0.08em;
 }
 
 .scholia-zotero-note-underline {

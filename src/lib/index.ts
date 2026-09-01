@@ -23,6 +23,7 @@ import * as utils from 'utils';
 import { DummyFileManager } from './dummy-file-manager';
 import { RenderParameters } from 'pdfjs-dist/types/src/display/api';
 import { ZoteroReferenceManager } from './zotero-references';
+import { AnnotationImportManager } from './annotation-import';
 
 
 type OptionalRenderParameters = Omit<RenderParameters, 'canvas' | 'canvasContext' | 'viewport' | 'transform'>
@@ -145,6 +146,7 @@ export class PDFPlusLib {
     dummyFileManager: DummyFileManager;
     speech: Speech;
     zoteroReferences: ZoteroReferenceManager;
+    annotationImports: AnnotationImportManager;
 
     utils = utils;
 
@@ -169,6 +171,7 @@ export class PDFPlusLib {
         this.dummyFileManager = new DummyFileManager(plugin);
         this.speech = new Speech(plugin);
         this.zoteroReferences = new ZoteroReferenceManager(plugin);
+        this.annotationImports = new AnnotationImportManager(plugin);
     }
 
     /**
