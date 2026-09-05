@@ -67,8 +67,7 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
         return null;
     }
 
-    getTemplateVariables(subpathParams: Record<string, SubpathParamValue>) {
-        const selection = activeWindow.getSelection();
+    getTemplateVariables(subpathParams: Record<string, SubpathParamValue>, selection: Selection | null = activeWindow.getSelection()) {
         if (!selection) return null;
         const pageEl = this.lib.getPageElFromSelection(selection);
         if (!pageEl || pageEl.dataset.pageNumber === undefined) return null;
@@ -414,8 +413,8 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
         return { child, copyButtonEl, template, page, id };
     }
 
-    copyLinkToSelection(checking: boolean, templates: { copyFormat: string, displayTextFormat?: string }, colorName?: string, autoPaste?: boolean): boolean {
-        const variables = this.getTemplateVariables(colorName ? { color: colorName.toLowerCase() } : {});
+    copyLinkToSelection(checking: boolean, templates: { copyFormat: string, displayTextFormat?: string }, colorName?: string, autoPaste?: boolean, selection?: Selection | null): boolean {
+        const variables = this.getTemplateVariables(colorName ? { color: colorName.toLowerCase() } : {}, selection);
 
         if (variables) {
             const { child, file, subpath, page, text } = variables;
@@ -543,24 +542,24 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
     }
 
     // TODO: A better, more concise function name 😅
-    writeHighlightAnnotationToSelectionIntoFileAndCopyLink(checking: boolean, templates: { copyFormat: string, displayTextFormat?: string }, colorName?: string, autoPaste?: boolean): boolean {
+    writeHighlightAnnotationToSelectionIntoFileAndCopyLink(checking: boolean, templates: { copyFormat: string, displayTextFormat?: string }, colorName?: string, autoPaste?: boolean, selection: Selection | null = activeWindow.getSelection()): boolean {
         // Get and store the selected text before writing file because
         // the file modification will cause the PDF viewer to be reloaded,
         // which will clear the selection.
-        const selection = activeWindow.getSelection();
         if (!selection) return false;
         const text = this.lib.toSingleLine(selection.toString());
         if (!text) return false;
 
         if (!checking) {
-            const palette = this.lib.getColorPaletteAssociatedWithSelection();
-            const copied = this.copyLinkToSelection(false, templates, colorName, autoPaste);
+            const palette = this.lib.getColorPaletteAssociatedWithSelection(selection);
+            const copied = this.copyLinkToSelection(false, templates, colorName, autoPaste, selection);
             if (!copied) return false;
 
             palette?.setStatus('Link copied; saving PDF highlight...', 10000);
             this.lib.highlight.writeFile.addTextMarkupAnnotationToSelection(
                 this.settings.selectionBacklinkVisualizeStyle === 'highlight' ? 'Highlight' : 'Underline',
-                colorName
+                colorName,
+                selection
             )
                 .then((result) => {
                     if (!result) {

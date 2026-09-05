@@ -342,8 +342,7 @@ export class PDFPlusLib {
         return ColorPalette.elInstanceMap.get(paletteEl) ?? null;
     }
 
-    getColorPaletteAssociatedWithSelection() {
-        const selection = activeWindow.getSelection();
+    getColorPaletteAssociatedWithSelection(selection: Selection | null = activeWindow.getSelection()) {
 
         if (selection && selection.rangeCount > 0) {
             const range = selection.getRangeAt(0);

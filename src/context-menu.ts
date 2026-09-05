@@ -661,7 +661,10 @@ export class PDFPlusContextMenu extends PDFPlusMenu {
         await (async () => {
             if (annot) {
                 const { id } = lib.getAnnotationInfoFromAnnotationElement(annot);
-                annotatedText = await child.getAnnotatedText(pageView, id);
+                // The native helper may load page text before resolving, which delays the
+                // entire menu. The clicked annotation is already on a rendered page, so use
+                // its text-layer geometry for the labels needed while constructing the menu.
+                annotatedText = child.getTextByRect(pageView, annot.data.rect);
 
                 // copy link to annotation with custom formats //
 
@@ -1180,6 +1183,7 @@ export class PDFPlusProductMenuComponent extends PDFPlusComponent {
             this.plugin.settings.defaultDisplayTextFormatIndex = displayTextFormatIndex;
         }
 
+        void this.plugin.saveSettings();
         this.plugin.trigger('color-palette-state-change', { source: this.palette });
     }
 

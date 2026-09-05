@@ -21,11 +21,11 @@ export class AnnotationWriteFileLib extends PDFPlusLibSubmodule {
         return this.pdflib;
     }
 
-    async addTextMarkupAnnotationToSelection(subtype: TextMarkupAnnotationSubtype, colorName?: string) {
+    async addTextMarkupAnnotationToSelection(subtype: TextMarkupAnnotationSubtype, colorName?: string, selection?: Selection | null) {
         return this.addAnnotationToSelection(async (file, page, rects) => {
             const io = this.getPdfIo();
             return await io.addTextMarkupAnnotation(file, page, rects, subtype, colorName);
-        });
+        }, selection);
     }
 
     /**
@@ -38,8 +38,8 @@ export class AnnotationWriteFileLib extends PDFPlusLibSubmodule {
         });
     }
 
-    async addAnnotationToSelection(annotator: Annotator) {
-        const windowSelection = activeWindow.getSelection();
+    async addAnnotationToSelection(annotator: Annotator, selection?: Selection | null) {
+        const windowSelection = selection === undefined ? activeWindow.getSelection() : selection;
         if (!windowSelection) return null;
 
         const pageAndSelection = this.lib.copyLink.getPageAndTextRangeFromSelection(windowSelection);

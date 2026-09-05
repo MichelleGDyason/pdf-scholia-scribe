@@ -143,11 +143,15 @@ export class ColorPalette extends PDFPlusComponent {
         });
     }
 
-    onItemPointerUp(itemEl: HTMLElement, name: string | null, evt: MouseEvent) {
+    onItemPointerUp(itemEl: HTMLElement, name: string | null, evt: PointerEvent) {
+        // `activeWindow` can point at a different Obsidian window after the toolbar
+        // receives focus. Read the selection from the PDF pane that owns this palette.
+        const selection = this.child.containerEl.win.getSelection();
         const colorChanged = !itemEl.hasClass('is-active');
         this.setActiveItem(name);
         if (this.plugin.settings.syncColorPaletteItem && this.plugin.settings.syncDefaultColorPaletteItem) {
             this.plugin.settings.defaultColorPaletteItemIndex = name ? (Object.keys(this.plugin.settings.colors).indexOf(name) + 1) : 0;
+            void this.plugin.saveSettings();
         }
 
         if (colorChanged) {
@@ -158,11 +162,11 @@ export class ColorPalette extends PDFPlusComponent {
 
         let handled = false;
         if (this.writeFile) {
-            handled = this.lib.copyLink.writeHighlightAnnotationToSelectionIntoFileAndCopyLink(false, { copyFormat: template }, name ?? undefined);
+            handled = this.lib.copyLink.writeHighlightAnnotationToSelectionIntoFileAndCopyLink(false, { copyFormat: template }, name ?? undefined, undefined, selection);
         }
 
         if (!handled) {
-            handled = this.lib.copyLink.copyLinkToSelection(false, { copyFormat: template }, name ?? undefined);
+            handled = this.lib.copyLink.copyLinkToSelection(false, { copyFormat: template }, name ?? undefined, undefined, selection);
         }
 
         if (!handled) {
@@ -270,6 +274,7 @@ export class ColorPalette extends PDFPlusComponent {
                 this.updateTooltips();
                 if (this.plugin.settings.syncColorPaletteAction && this.plugin.settings.syncDefaultColorPaletteAction) {
                     this.plugin.settings.defaultColorPaletteActionIndex = this.actionIndex;
+                    void this.plugin.saveSettings();
                 }
             },
             (menu) => {
@@ -296,6 +301,7 @@ export class ColorPalette extends PDFPlusComponent {
             () => {
                 if (this.plugin.settings.syncDisplayTextFormat && this.plugin.settings.syncDefaultDisplayTextFormat) {
                     this.plugin.settings.defaultDisplayTextFormatIndex = this.displayTextFormatIndex;
+                    void this.plugin.saveSettings();
                 }
             },
             (menu) => {
@@ -348,6 +354,7 @@ export class ColorPalette extends PDFPlusComponent {
 
                 if (this.plugin.settings.syncWriteFileToggle && this.plugin.settings.syncDefaultWriteFileToggle) {
                     this.plugin.settings.defaultWriteFileToggle = this.writeFile;
+                    void this.plugin.saveSettings();
                 }
 
                 this.plugin.trigger('color-palette-state-change', { source: this });
@@ -446,6 +453,7 @@ export class ColorPalette extends PDFPlusComponent {
     setWriteFile(value: boolean) {
         this.writeFile = value;
         this.writeFileButtonEl?.toggleClass('is-active', value);
+        this.updateTooltips();
     }
 
     addCropButton(paletteEl: HTMLElement) {
@@ -631,7 +639,9 @@ export class ColorPalette extends PDFPlusComponent {
         const commandName = this.plugin.settings.copyCommands[this.actionIndex].name;
         const quiet = this.plugin.settings.quietColorPaletteTooltip;
         const tooltip = name !== null
-            ? (quiet ? name : `Copy link with format "${commandName}" & add ${name.toLowerCase()} ${this.plugin.settings.selectionBacklinkVisualizeStyle}`)
+            ? (quiet ? name : this.writeFile
+                ? `Copy link with format "${commandName}" & add ${name.toLowerCase()} ${this.plugin.settings.selectionBacklinkVisualizeStyle}`
+                : `Copy link with format "${commandName}" using ${name.toLowerCase()} color`)
             : (quiet ? 'No color specified' : `Copy link with "${commandName}" format without specifying color`);
         setTooltip(pickerEl, tooltip);
     }
