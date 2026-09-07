@@ -17,6 +17,7 @@ import { BibliographyManager } from 'bib';
 import { DataviewInlineFieldsModal, withFilesWithInlineFields } from 'lib/dataview';
 import { hasPagePreviewModifierSettings } from 'lib/page-preview-contract';
 import { registerScholiaDocumentWorkspace } from 'collaboration-portal';
+import { registerNoteTextAlignment } from 'note-text-alignment';
 
 
 type WorkspaceWithProtocolUnregister = Workspace & {
@@ -421,6 +422,7 @@ export default class PDFPlus extends Plugin {
 		this.registerPDFEmbedCreator();
 
 		registerScholiaDocumentWorkspace(this);
+		registerNoteTextAlignment(this);
 
 		this.registerHoverLinkSources();
 

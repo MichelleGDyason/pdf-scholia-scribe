@@ -1,6 +1,6 @@
 {
     "name": "obsidian-pdf-scholia-scribe",
-    "version": "1.3.2",
+    "version": "1.3.3",
     "description": "Scholarly PDF/DOCX reading with Zotero, Kindle, Apple Books, and Apple Preview annotation import that preserves colours and comments.",
     "repository": {
         "type": "git",
@@ -21,6 +21,7 @@
         "lint:obsidian": "eslint .",
         "lint:fix": "eslint src/ --ext .ts,.tsx --fix",
         "test:annotation-import": "node scripts/run-annotation-import-tests.mjs",
+        "test:note-alignment": "node scripts/run-note-text-alignment-tests.mjs",
         "review": "pnpm build && pnpm lint:obsidian",
         "version": "node version-bump.mjs && git add manifest.json versions.json"
     },

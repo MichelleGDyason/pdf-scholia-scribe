@@ -1273,3 +1273,30 @@ mark.scholia-import-highlight {
         grid-template-columns: 1fr;
     }
 }
+
+/* Note-level text alignment selected through PDF Scholia Scribe. Current Obsidian
+   keeps the `cssclasses` class on the source view while reading view is its sibling;
+   the direct preview selector also supports versions that class the preview itself. */
+.scholia-note-align-left .cm-line,
+.scholia-note-align-left .markdown-preview-sizer,
+.scholia-note-align-left + .markdown-reading-view .markdown-preview-sizer {
+    text-align: left;
+}
+
+.scholia-note-align-center .cm-line,
+.scholia-note-align-center .markdown-preview-sizer,
+.scholia-note-align-center + .markdown-reading-view .markdown-preview-sizer {
+    text-align: center;
+}
+
+.scholia-note-align-right .cm-line,
+.scholia-note-align-right .markdown-preview-sizer,
+.scholia-note-align-right + .markdown-reading-view .markdown-preview-sizer {
+    text-align: right;
+}
+
+.scholia-note-align-justify .cm-line,
+.scholia-note-align-justify .markdown-preview-sizer,
+.scholia-note-align-justify + .markdown-reading-view .markdown-preview-sizer {
+    text-align: justify;
+}
