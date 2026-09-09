@@ -18,6 +18,7 @@ import { DataviewInlineFieldsModal, withFilesWithInlineFields } from 'lib/datavi
 import { hasPagePreviewModifierSettings } from 'lib/page-preview-contract';
 import { registerScholiaDocumentWorkspace } from 'collaboration-portal';
 import { registerNoteTextAlignment } from 'note-text-alignment';
+import { registerTextReordering } from 'text-reordering';
 
 
 type WorkspaceWithProtocolUnregister = Workspace & {
@@ -423,6 +424,7 @@ export default class PDFPlus extends Plugin {
 
 		registerScholiaDocumentWorkspace(this);
 		registerNoteTextAlignment(this);
+		registerTextReordering(this);
 
 		this.registerHoverLinkSources();
 

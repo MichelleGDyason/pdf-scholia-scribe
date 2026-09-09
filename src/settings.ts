@@ -2227,11 +2227,22 @@ export class PDFPlusSettingTab extends LegacyCompatiblePluginSettingTab {
 					'- **go to page**: this command brings the cursor to the page number input field in the PDF toolbar. Enter a page number and press Enter to jump to the page.',
 					'- **show copy format menu**: opens the paste-format menu, such as in-text citation, quote, or callout.',
 					'- **show display text format menu**: opens the citation-label menu, such as Harvard, APA, ASA, or numbered style.',
+					'- **move line or selection up/down** and **move paragraph or block up/down**: reorder writing in a Markdown note without cutting and pasting.',
 					'- **enable PDF edit** / **disable PDF edit**',
 					'- and more...',
 				], setting.descEl);
 			})
 			.then((setting) => this.addHotkeySettingButton(setting));
+		this.addSetting()
+			.setName('Reorder writing in Markdown notes')
+			.then((setting) => {
+				this.renderMarkdown([
+					'Use **Move line or selection up/down** for exact Markdown source lines, or **Move paragraph or block up/down** for prose separated by blank lines.',
+					'',
+					'The same actions are available by right-clicking in editing view and choosing **Reorder text**. To imitate Word-style drafting, assign shortcuts such as `Option` + `Shift` + `↑` and `Option` + `Shift` + `↓` in Obsidian\'s Hotkeys settings.',
+				], setting.descEl);
+			})
+			.then((setting) => this.addHotkeySettingButton(setting, `${this.plugin.manifest.name}: Move`));
 		this.addToggleSetting('executeBuiltinCommandForOutline')
 			.setName('Show outline: when the active file is not PDF, run the core outline plugin\'s "show outline" command')
 			.setDesc('By turning this on, you can use the same hotkey to show the outline of a Markdown file and a PDF file without key conflict.');
