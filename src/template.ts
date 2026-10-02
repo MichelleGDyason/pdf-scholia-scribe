@@ -3,6 +3,7 @@ import * as obsidian from 'obsidian';
 
 import PDFPlus from 'main';
 import { PDFPlusLib } from 'lib';
+import { selectAssociatedMarkdownFile } from 'template-associated-markdown';
 
 type CitationInfo = {
     author: string;
@@ -696,12 +697,13 @@ export class PDFPlusTemplateProcessor extends TemplateProcessor {
             }
         }
 
-        if (proxyMDs.length > 1) {
-            const msg = `Multiple markdown files are associated with this PDF file:\n${proxyMDs.map(file => '- ' + file.path).join('\n')}\nAborting.`;
-            throw Error(msg);
-        }
-
-        return proxyMDs.first() ?? null;
+        const linkedFile = this.findLinkedFile(pdf);
+        const openMarkdownFiles = this.findOpenMarkdownFiles();
+        return selectAssociatedMarkdownFile(proxyMDs, [
+            this.plugin.lastActiveMarkdownFile,
+            linkedFile,
+            ...openMarkdownFiles,
+        ]);
     }
 
     findLinkedFile(pdf: TFile) {

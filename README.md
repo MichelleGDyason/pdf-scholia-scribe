@@ -141,7 +141,7 @@ PDF++ stands out among other PDF annotation tools for the following reasons:
 - PDF++ acts as **a complement to Obsidian's native PDF viewer rather than replacing it**. It allows you to make sidenotes as **pure markdown**, so you will not lose your annotations even if the plugin stops working as long as Obsidian is alive. It will not leave behind a pile of unreadable JSON even if this plugin stops working in the future, unlike [Annotator](https://github.com/elias-sundqvist/obsidian-annotator).
   > I'm not a fan of `.md` files that are actually not markdown at all. The value of the markdown format does not lie in the file extension!
 - PDF++ makes Obsidian work as **a stand-alone PDF annotation tool**. You can seamlessly annotate your PDFs using Obsidian's rich markdown editor without switching between Obsidian and an external app like Zotero or Marginnote.
-- Annotations for a single PDF are no longer confined to a single file and **can be distributed across the whole vault**. It establishes a novel, *Obsidian-native* way of PDF annotation.
+- Annotations for a single PDF are no longer confined to a single file and **can be distributed across the whole vault**. When several Markdown notes are associated with the same PDF, copying or auto-pasting an annotation targets the active, linked, or open associated note instead of aborting. It establishes a novel, *Obsidian-native* way of PDF annotation.
 - PDF++ does not introduce plugin-dependent syntaxes except for a few *optional* ones (`&color=...`/`&rect=...` link parameters).
 
 🚀 [Install](#installation)<br>
