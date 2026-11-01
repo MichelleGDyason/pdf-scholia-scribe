@@ -24,6 +24,7 @@ import { DummyFileManager } from './dummy-file-manager';
 import { RenderParameters } from 'pdfjs-dist/types/src/display/api';
 import { ZoteroReferenceManager } from './zotero-references';
 import { AnnotationImportManager } from './annotation-import';
+import { ReadingNoteMetadataManager } from './reading-note-metadata';
 
 
 type OptionalRenderParameters = Omit<RenderParameters, 'canvas' | 'canvasContext' | 'viewport' | 'transform'>
@@ -147,6 +148,7 @@ export class PDFPlusLib {
     speech: Speech;
     zoteroReferences: ZoteroReferenceManager;
     annotationImports: AnnotationImportManager;
+    readingNoteMetadata: ReadingNoteMetadataManager;
 
     utils = utils;
 
@@ -172,6 +174,7 @@ export class PDFPlusLib {
         this.speech = new Speech(plugin);
         this.zoteroReferences = new ZoteroReferenceManager(plugin);
         this.annotationImports = new AnnotationImportManager(plugin);
+        this.readingNoteMetadata = new ReadingNoteMetadataManager(plugin);
     }
 
     /**

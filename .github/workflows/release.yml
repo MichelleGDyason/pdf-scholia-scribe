@@ -26,9 +26,18 @@ jobs:
         with:
           version: 11.8.0
 
+      - name: Verify release version
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          manifest_version="$(node -p "require('./manifest.json').version")"
+          package_version="$(node -p "require('./package.json').version")"
+          test "$tag" = "$manifest_version"
+          test "$tag" = "$package_version"
+
       - name: Build plugin
         run: |
           pnpm install --frozen-lockfile
+          pnpm test:release
           pnpm build
 
       - name: Generate artifact attestations

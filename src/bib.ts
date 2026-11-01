@@ -3,6 +3,7 @@ import { PDFDocumentProxy } from 'pdfjs-dist';
 
 import PDFPlus from 'main';
 import { PDFPlusComponent } from 'lib/component';
+import { findBibliographyStartIndex } from 'lib/bibliography-text-core';
 import { isCanvas, isEmbed, isHoverPopover, isNonEmbedLike, onModKeyPress, toSingleLine } from 'utils';
 import { PDFViewerChild, PDFJsDestArray, TextContentItem } from 'typings';
 
@@ -236,26 +237,12 @@ class BibliographyTextExtractor {
 
         // Whole lotta hand-crafted rules LOL
 
-        let beginIndex = -1;
-        if (destArray[1].name === 'XYZ') {
-            const left = destArray[2];
-            const top = destArray[3];
-            if (left === null || top === null) return null;
-            beginIndex = items.findIndex((item: TextContentItem) => {
-                if (!item.str) return false;
-                const itemLeft = item.transform[4];
-                const itemTop = item.transform[5] + (item.height || item.transform[0]) * 0.8;
-                return left <= itemLeft && itemTop <= top;
-            });
-        } else if (destArray[1].name === 'FitBH') {
-            const top = destArray[2];
-            if (top === null) return null;
-            beginIndex = items.findIndex((item: TextContentItem) => {
-                if (!item.str) return false;
-                const itemTop = item.transform[5] + (item.height || item.transform[0]) * 0.8;
-                return itemTop <= top;
-            });
-        }
+        const [, destination, ...destinationParams] = destArray;
+        const beginIndex = findBibliographyStartIndex(
+            items,
+            destination.name,
+            destinationParams,
+        );
 
         if (beginIndex === -1) return null;
 
@@ -366,7 +353,7 @@ export class BibliographyDom extends PDFPlusComponent {
                 this.containerEl.createDiv({ text: bibText });
             } else {
                 if (this.bib.initialized) {
-                    this.containerEl.createDiv({ text: 'No bibliography found' });
+                    this.containerEl.createDiv({ text: 'Citation link found, but the bibliography text could not be extracted' });
                 } else {
                     this.containerEl.createDiv({ text: 'Loading...' });
                     this.registerRenderOn('extracted');
@@ -380,7 +367,7 @@ export class BibliographyDom extends PDFPlusComponent {
                 .onClick(() => {
                     const url = this.bib.getGoogleScholarSearchUrlFromDest(this.destId);
                     if (!url) {
-                        new Notice(`${this.plugin.manifest.name}: ${this.bib.initialized ? 'No bibliography found' : 'Still loading the bibliography information. Please try again later.'}`);
+                        new Notice(`${this.plugin.manifest.name}: ${this.bib.initialized ? 'Citation link found, but the bibliography text could not be extracted.' : 'Still loading the bibliography information. Please try again later.'}`);
                         return;
                     }
                     window.open(url);

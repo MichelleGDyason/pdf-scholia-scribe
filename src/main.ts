@@ -1208,6 +1208,30 @@ export default class PDFPlus extends Plugin {
 			}
 		}));
 
+		this.registerEvent(this.app.workspace.on('editor-menu', (menu, _editor, info) => {
+			const note = info.file;
+			if (!(note instanceof TFile) || note.extension !== 'md') return;
+			menu.addItem((item) => item
+				.setTitle('Fill empty properties from open PDF…')
+				.setIcon('file-search')
+				.onClick(() => {
+					void this.lib.readingNoteMetadata.openPreview(note).catch(console.error);
+				}));
+		}));
+
+		this.registerEvent(this.app.workspace.on('file-menu', (menu, file) => {
+			if (!(file instanceof TFile) || (file.extension !== 'md' && file.extension !== 'pdf')) return;
+			const isPdf = file.extension === 'pdf';
+			menu.addItem((item) => item
+				.setTitle(isPdf ? 'Fill reading-note properties from this PDF…' : 'Fill empty properties from open PDF…')
+				.setIcon('file-search')
+				.onClick(() => {
+					void this.lib.readingNoteMetadata
+						.openPreview(isPdf ? null : file, isPdf ? file : null)
+						.catch(console.error);
+				}));
+		}));
+
 		// Sync the external app with Obsidian
 		if (Platform.isDesktopApp) {
 			this.registerEvent(this.app.workspace.on('active-leaf-change', (leaf) => {

@@ -1,6 +1,7 @@
 import { EditorPosition, MarkdownView, Notice, Platform, TFile, getLinkpath, requestUrl } from 'obsidian';
 
 import { PDFPlusLibSubmodule } from './submodule';
+import { parseTranslatedBookExtraMetadata } from './reading-note-metadata-core';
 
 
 export type ScholiaCitationStyle = 'asa' | 'harvard' | 'apa' | 'numeric';
@@ -16,15 +17,26 @@ export interface ScholiaReferenceRecord {
 	vaultPath: string;
 	title: string;
 	authors: string[];
+	translators: string[];
 	year: string;
 	reference: string;
 	itemType: string;
 	publisher: string;
 	containerTitle: string;
+	volume: string;
+	issue: string;
 	place: string;
 	pages: string;
 	doi: string;
 	url: string;
+	isbn: string;
+	edition: string;
+	language: string;
+	originalTitle: string;
+	originalDatePublished: string;
+	originalPublisher: string;
+	originalLanguage: string;
+	forewordAuthors: string[];
 	properties?: Record<string, unknown>;
 }
 
@@ -93,15 +105,26 @@ const CITEKEY_KEYS = [
 ];
 const ZOTERO_ITEM_KEY_KEYS = ['zoteroKey', 'zotero_key', 'zoteroItemKey', 'zotero_item_key', 'itemKey', 'item_key'];
 const AUTHOR_KEYS = ['author', 'authors', 'creator', 'creators', 'by', 'writer', 'writers'];
+const TRANSLATOR_KEYS = ['translator', 'translators'];
 const YEAR_KEYS = ['year', 'date', 'published', 'publicationDate', 'publication_date', 'publicationYear', 'publication_year', 'issued'];
 const TITLE_KEYS = ['title', 'shortTitle', 'short_title', 'name'];
 const REFERENCE_KEYS = ['reference', 'references', 'bibliography', 'bibliographyEntry', 'bibliography_entry', 'citationFull', 'citation_full'];
 const PUBLISHER_KEYS = ['publisher', 'press'];
 const CONTAINER_TITLE_KEYS = ['containerTitle', 'container-title', 'journal', 'journalTitle', 'journal_title', 'publicationTitle', 'publication_title', 'bookTitle', 'book_title'];
+const VOLUME_KEYS = ['volume'];
+const ISSUE_KEYS = ['issue', 'number'];
 const PLACE_KEYS = ['place', 'location', 'publisherPlace', 'publisher_place'];
-const PAGES_KEYS = ['pages', 'pageRange', 'page_range'];
+const PAGES_KEYS = ['pages', 'pageRange', 'page_range', 'numPages', 'num_pages', 'numberOfPages', 'number_of_pages'];
 const DOI_KEYS = ['doi', 'DOI'];
 const URL_KEYS = ['url', 'URL', 'source_url', 'sourceUrl'];
+const ISBN_KEYS = ['isbn', 'ISBN'];
+const EDITION_KEYS = ['edition'];
+const LANGUAGE_KEYS = ['language', 'lang'];
+const ORIGINAL_TITLE_KEYS = ['originalTitle', 'original_title', 'origTitle', 'orig_title'];
+const ORIGINAL_DATE_KEYS = ['originalDatePublished', 'original_date_published', 'originalDate', 'original_date', 'origDate', 'orig_date'];
+const ORIGINAL_PUBLISHER_KEYS = ['originalPublisher', 'original_publisher', 'origPublisher', 'orig_publisher'];
+const ORIGINAL_LANGUAGE_KEYS = ['originalLanguage', 'original_language', 'origLanguage', 'orig_language'];
+const FOREWORD_AUTHOR_KEYS = ['forewordAuthor', 'foreword_author', 'forwardAuthor', 'forward_author'];
 const PDF_LINK_KEYS = ['PDF', 'pdf', 'sourcePdf', 'source_pdf', 'pdfFile', 'pdf_file', 'file'];
 
 
@@ -113,15 +136,26 @@ function emptyRecord(source: ScholiaReferenceSource): ScholiaReferenceRecord {
 		vaultPath: '',
 		title: '',
 		authors: [],
+		translators: [],
 		year: '',
 		reference: '',
 		itemType: '',
 		publisher: '',
 		containerTitle: '',
+		volume: '',
+		issue: '',
 		place: '',
 		pages: '',
 		doi: '',
 		url: '',
+		isbn: '',
+		edition: '',
+		language: '',
+		originalTitle: '',
+		originalDatePublished: '',
+		originalPublisher: '',
+		originalLanguage: '',
+		forewordAuthors: [],
 	};
 }
 
@@ -541,15 +575,26 @@ function mergeRecords(base: ScholiaReferenceRecord, incoming: ScholiaReferenceRe
 		vaultPath: base.vaultPath || incoming.vaultPath,
 		title: base.title || incoming.title,
 		authors: base.authors.length ? base.authors : incoming.authors,
+		translators: base.translators.length ? base.translators : incoming.translators,
 		year: base.year || incoming.year,
 		reference: base.reference || incoming.reference,
 		itemType: base.itemType || incoming.itemType,
 		publisher: base.publisher || incoming.publisher,
 		containerTitle: base.containerTitle || incoming.containerTitle,
+		volume: base.volume || incoming.volume,
+		issue: base.issue || incoming.issue,
 		place: base.place || incoming.place,
 		pages: base.pages || incoming.pages,
 		doi: base.doi || incoming.doi,
 		url: base.url || incoming.url,
+		isbn: base.isbn || incoming.isbn,
+		edition: base.edition || incoming.edition,
+		language: base.language || incoming.language,
+		originalTitle: base.originalTitle || incoming.originalTitle,
+		originalDatePublished: base.originalDatePublished || incoming.originalDatePublished,
+		originalPublisher: base.originalPublisher || incoming.originalPublisher,
+		originalLanguage: base.originalLanguage || incoming.originalLanguage,
+		forewordAuthors: base.forewordAuthors.length ? base.forewordAuthors : incoming.forewordAuthors,
 		properties: base.properties ?? incoming.properties,
 	};
 	return merged;
@@ -586,9 +631,12 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 		const citekey = firstValue(properties, CITEKEY_KEYS);
 		const title = firstValue(properties, TITLE_KEYS);
 		const authors = splitAuthors(flattenPropertyValue(findProperty(properties, AUTHOR_KEYS)));
+		const translators = splitAuthors(flattenPropertyValue(findProperty(properties, TRANSLATOR_KEYS)));
 		const year = getYear(properties);
 		const reference = firstValue(properties, REFERENCE_KEYS);
 		const zoteroKey = firstValue(properties, ZOTERO_ITEM_KEY_KEYS);
+		const extraMetadata = parseTranslatedBookExtraMetadata(firstValue(properties, ['extra']));
+		const forewordAuthors = splitAuthors(flattenPropertyValue(findProperty(properties, FOREWORD_AUTHOR_KEYS)));
 
 		if (!citekey && !zoteroKey && !title && !authors.length && !year && !reference) {
 			return null;
@@ -601,15 +649,26 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 			vaultPath: file.path,
 			title: title || file.basename,
 			authors,
+			translators,
 			year,
 			reference,
 			itemType: firstValue(properties, ['itemType', 'item_type', 'type']),
 			publisher: firstValue(properties, PUBLISHER_KEYS),
 			containerTitle: firstValue(properties, CONTAINER_TITLE_KEYS),
+			volume: firstValue(properties, VOLUME_KEYS),
+			issue: firstValue(properties, ISSUE_KEYS),
 			place: firstValue(properties, PLACE_KEYS),
 			pages: firstValue(properties, PAGES_KEYS),
 			doi: firstValue(properties, DOI_KEYS),
 			url: firstValue(properties, URL_KEYS),
+			isbn: firstValue(properties, ISBN_KEYS),
+			edition: firstValue(properties, EDITION_KEYS),
+			language: firstValue(properties, LANGUAGE_KEYS),
+			originalTitle: firstValue(properties, ORIGINAL_TITLE_KEYS) || extraMetadata.originalTitle,
+			originalDatePublished: firstValue(properties, ORIGINAL_DATE_KEYS) || extraMetadata.originalDatePublished,
+			originalPublisher: firstValue(properties, ORIGINAL_PUBLISHER_KEYS) || extraMetadata.originalPublisher,
+			originalLanguage: firstValue(properties, ORIGINAL_LANGUAGE_KEYS) || extraMetadata.originalLanguage,
+			forewordAuthors: forewordAuthors.length ? forewordAuthors : extraMetadata.forewordAuthors,
 			properties,
 		};
 	}
@@ -874,6 +933,31 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 		return record;
 	}
 
+	async findZoteroRecordForPdfFile(pdf: TFile): Promise<ScholiaReferenceRecord | null> {
+		const query = encodeURIComponent(pdf.basename);
+		const items = await this.requestZoteroItemList(
+			`/api/users/0/items?itemType=attachment&format=json&include=data&qmode=everything&q=${query}`,
+		);
+		const expectedFilename = pdf.name.toLocaleLowerCase();
+		const exactMatches = items.filter((item) => {
+			const data = getZoteroItemData(item);
+			if (!data || data.itemType !== 'attachment') return false;
+			const storedPath = stringValue(data.path).replace(/^storage:/i, '');
+			const pathFilename = storedPath.split(/[\\/]/).pop() ?? '';
+			const filename = stringValue(data.filename) || pathFilename || stringValue(data.title);
+			return filename.toLocaleLowerCase() === expectedFilename;
+		});
+		if (exactMatches.length !== 1) return null;
+
+		const item = exactMatches[0];
+		const data = getZoteroItemData(item);
+		if (!data) return null;
+		const attachmentKey = normalizedZoteroItemKey(
+			stringValue(data.key) || (isRecord(item) ? stringValue(item.key) : ''),
+		);
+		return attachmentKey ? await this.getZoteroSourceRecordForItemKey(attachmentKey) : null;
+	}
+
 	async getAnnotatedPdfsForSource(source: ScholiaReferenceRecord): Promise<ScholiaZoteroPdf[]> {
 		if (!source.zoteroKey) return [];
 		const candidates = source.itemType === 'attachment'
@@ -1053,36 +1137,54 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 		});
 	}
 
-		recordFromZoteroItem(item: unknown): ScholiaReferenceRecord | null {
-			if (!isRecord(item)) return null;
-			const data = isRecord(item.data) ? item.data : item;
-
-			const creators = Array.isArray(data.creators) ? data.creators.filter(isRecord) : [];
-			const authorCreators = creators.filter((creator) => !creator.creatorType || ['author', 'bookAuthor'].includes(stringValue(creator.creatorType)));
-			const fallbackCreators = authorCreators.length ? authorCreators : creators.filter((creator) => creator.creatorType === 'editor');
-			const authors = fallbackCreators
-				.map((creator) => {
-					if (typeof creator.name === 'string') return creator.name;
-					return `${stringValue(creator.firstName)} ${stringValue(creator.lastName)}`.trim();
-				})
-				.filter(Boolean);
+	recordFromZoteroItem(item: unknown): ScholiaReferenceRecord | null {
+		if (!isRecord(item)) return null;
+		const data = isRecord(item.data) ? item.data : item;
+		const extra = stringValue(data.extra);
+		const extraMetadata = parseTranslatedBookExtraMetadata(extra);
+		const creators = Array.isArray(data.creators) ? data.creators.filter(isRecord) : [];
+		const creatorName = (creator: UnknownRecord) => {
+			if (typeof creator.name === 'string') return creator.name;
+			return `${stringValue(creator.firstName)} ${stringValue(creator.lastName)}`.trim();
+		};
+		const authorCreators = creators.filter((creator) => !creator.creatorType
+			|| ['author', 'bookAuthor'].includes(stringValue(creator.creatorType)));
+		const fallbackCreators = authorCreators.length
+			? authorCreators
+			: creators.filter((creator) => creator.creatorType === 'editor');
+		const authors = fallbackCreators.map(creatorName).filter(Boolean);
+		const translators = creators
+			.filter((creator) => creator.creatorType === 'translator')
+			.map(creatorName)
+			.filter(Boolean);
 
 		const record = {
 			...emptyRecord('zotero'),
-				citekey: stringValue(data.citationKey) || this.parseCitationKeyFromExtra(stringValue(data.extra)),
-				zoteroKey: stringValue(data.key) || stringValue(item.key),
-				title: cleanText(stringValue(data.title)),
-				authors,
-				year: extractYear(stringValue(data.date)),
-				reference: typeof item.bib === 'string' ? normalizeReference(item.bib) : '',
-				itemType: stringValue(data.itemType),
-				publisher: cleanText(stringValue(data.publisher)),
-				containerTitle: cleanText(stringValue(data.publicationTitle) || stringValue(data.bookTitle) || stringValue(data.proceedingsTitle)),
-				place: cleanText(stringValue(data.place)),
-				pages: cleanText(stringValue(data.pages)),
-				doi: cleanText(stringValue(data.DOI) || stringValue(data.doi)),
-				url: cleanText(stringValue(data.url)),
-			};
+			citekey: stringValue(data.citationKey) || this.parseCitationKeyFromExtra(extra),
+			zoteroKey: stringValue(data.key) || stringValue(item.key),
+			title: cleanText(stringValue(data.title)),
+			authors,
+			translators,
+			year: extractYear(stringValue(data.date)),
+			reference: typeof item.bib === 'string' ? normalizeReference(item.bib) : '',
+			itemType: stringValue(data.itemType),
+			publisher: cleanText(stringValue(data.publisher)),
+			containerTitle: cleanText(stringValue(data.publicationTitle) || stringValue(data.bookTitle) || stringValue(data.proceedingsTitle)),
+			volume: cleanText(stringValue(data.volume)),
+			issue: cleanText(stringValue(data.issue)),
+			place: cleanText(stringValue(data.place)),
+			pages: cleanText(stringValue(data.pages) || stringValue(data.numPages)),
+			doi: cleanText(stringValue(data.DOI) || stringValue(data.doi)),
+			url: cleanText(stringValue(data.url)),
+			isbn: cleanText(stringValue(data.ISBN) || stringValue(data.isbn)),
+			edition: cleanText(stringValue(data.edition)),
+			language: cleanText(stringValue(data.language)),
+			originalTitle: cleanText(stringValue(data.originalTitle)) || extraMetadata.originalTitle,
+			originalDatePublished: cleanText(stringValue(data.originalDate)) || extraMetadata.originalDatePublished,
+			originalPublisher: cleanText(stringValue(data.originalPublisher)) || extraMetadata.originalPublisher,
+			originalLanguage: cleanText(stringValue(data.originalLanguage)) || extraMetadata.originalLanguage,
+			forewordAuthors: extraMetadata.forewordAuthors,
+		};
 
 		if (!record.title && !record.citekey && !record.zoteroKey) return null;
 		return record;

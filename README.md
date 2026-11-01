@@ -80,6 +80,10 @@ Pires argues that urban agriculture needs planning support (2011:47).
 
 For notes with many citations, **Update reference list for current note** creates or refreshes a managed reference list at the end of the note. The updater recognises citations inserted by PDF Scholia Scribe, ordinary `@citekey` references, links to vault source notes, and PDF quote links that can be matched to a source note.
 
+To fill a reading-note template from its source, open the Markdown note with the PDF visible beside it and run **Fill empty reading-note properties from open PDF**. The same action is available by right-clicking inside the note or on the note/PDF file. Scholia previews values from an exact Zotero attachment match, embedded PDF/XMP metadata, and a unique DOI found on the first page. It fills only supported properties that already exist and are empty; it never replaces entered values or guesses analytical fields. An empty `concepts` property can be filled from explicit PDF keyword metadata, but method, summaries, projects, rating, reading status, tags, and CSS classes remain untouched. PDF creation and modification dates are not treated as publication years. If several PDFs are visible, Scholia asks which one to use.
+
+Translated-book templates can also use `translator`, `original_title`, `original_date_published`, `original_publisher`, `original_language`, and `forward_author` (or `foreword_author`). Original-publication values come only from explicit Zotero fields, labelled Zotero Extra lines, or specialised PDF metadata; Scholia does not guess them from generic contributors, the current edition's language, or book prose. Custom original-language and foreword-author values are left unchecked for review.
+
 To change the alignment of an entire Markdown note, run **Set text alignment for current note** or right-click inside the note (or on its file) and choose **Set note text alignment...**. Select **Left**, **Centre**, **Right**, or **Justified**. Scholia stores the choice as one managed class in the note's standard `cssclasses` frontmatter, preserves any other CSS classes, and applies it in both editing and reading views.
 
 To reorganise writing without cutting and pasting, use **Move line or selection up/down** for exact Markdown source lines, or **Move paragraph or block up/down** for prose separated by blank lines. All four actions are also under **Reorder text** in the editing-view right-click menu. They preserve the moved Markdown text and can be assigned Word-like shortcuts from Obsidian's Hotkeys settings; PDF Scholia Scribe's settings page includes a direct shortcut to those commands.
@@ -108,7 +112,7 @@ Apple Books itself supports coloured highlights, attached notes, and navigation 
 
 Handwriting recognition has **not** yet been implemented. PDF Scholia Scribe can preserve a Zotero, Kindle PDF, Apple Books PDF, or Apple Preview ink annotation as a coloured, page-linked annotation entry, but it does not transcribe pen strokes, run handwriting OCR, or connect directly to Nebo or OneNote. Typed or already-recognised text exported from those apps can be used after it appears as text in a PDF, shared Apple Books text, or Zotero note; handwritten marks that remain only as ink or an image are not converted to searchable Markdown.
 
-These Zotero features are separate from PDF++'s original **Citations in PDF (experimental)** section. That original feature is for citation links already inside a PDF. PDF Scholia Scribe's added citation workflow is for writing in your Obsidian note, using Zotero metadata and your vault source notes.
+These Zotero features are separate from PDF++'s original **Citations in PDF (experimental)** section. That original feature follows citation links already embedded in a PDF: hovering a linked citation can show the bibliography entry at its internal destination and offer a Google Scholar search. It does not locate a bibliography by its heading. PDF Scholia Scribe's added citation workflow is for writing in your Obsidian note, using Zotero metadata and your vault source notes.
 
 ## DOCX, Google Docs, and collaboration
 
@@ -521,7 +525,7 @@ Fortunately, it seems to be compatible with PDF++, meaning you can use features 
 
 ## Installation
 
-When approved, you will be able to install this plugin from within Obsidian's community plugin browser.
+Install **PDF Scholia Scribe** from Obsidian's **Community plugins** browser, then enable it under **Settings → Community plugins**.
 
 Alternatively, you can install the current GitHub release directly from this repository using [BRAT](https://github.com/TfTHacker/obsidian42-brat).
 

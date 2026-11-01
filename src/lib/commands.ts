@@ -332,6 +332,10 @@ export class PDFPlusCommands extends PDFPlusLibSubmodule {
                 name: 'Create new note for auto-focus or auto-paste',
                 callback: () => this.createNewNote()
             }, {
+                id: 'fill-reading-note-properties',
+                name: 'Fill empty reading-note properties from open PDF',
+                checkCallback: (checking) => this.fillReadingNoteProperties(checking)
+            }, {
                 id: 'copy-debug-info',
                 name: 'Copy debug info',
                 callback: () => this.copyDebugInfo()
@@ -1154,6 +1158,17 @@ export class PDFPlusCommands extends PDFPlusLibSubmodule {
                 }, 100);
             }
         });
+    }
+
+    fillReadingNoteProperties(checking: boolean) {
+        if (!this.lib.readingNoteMetadata.canFill()) return false;
+        if (!checking) {
+            void this.lib.readingNoteMetadata.openPreview().catch((error) => {
+                console.error(`${this.plugin.manifest.name}: Failed to prepare reading-note metadata.`, error);
+                new Notice(`${this.plugin.manifest.name}: Could not read metadata from the selected PDF.`);
+            });
+        }
+        return true;
     }
 
     extractHighlightedText(checking: boolean) {
