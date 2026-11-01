@@ -19,6 +19,7 @@ import { hasPagePreviewModifierSettings } from 'lib/page-preview-contract';
 import { registerScholiaDocumentWorkspace } from 'collaboration-portal';
 import { registerNoteTextAlignment } from 'note-text-alignment';
 import { registerTextReordering } from 'text-reordering';
+import { registerColumnAwareReading } from 'column-aware-reading-view';
 
 
 type WorkspaceWithProtocolUnregister = Workspace & {
@@ -425,6 +426,7 @@ export default class PDFPlus extends Plugin {
 		registerScholiaDocumentWorkspace(this);
 		registerNoteTextAlignment(this);
 		registerTextReordering(this);
+		registerColumnAwareReading(this);
 
 		this.registerHoverLinkSources();
 

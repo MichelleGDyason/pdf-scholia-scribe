@@ -1300,3 +1300,209 @@ mark.scholia-import-highlight {
 .scholia-note-align-justify + .markdown-reading-view .markdown-preview-sizer {
     text-align: justify;
 }
+
+/* Experimental, read-only projection for reading multi-column PDFs in sequence. */
+.scholia-column-aware-view {
+    display: flex;
+    overflow: hidden;
+    flex-direction: column;
+    height: 100%;
+    background: var(--background-secondary);
+}
+
+.scholia-column-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--size-4-3);
+    padding: var(--size-4-2) var(--size-4-3);
+    border-bottom: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+}
+
+.scholia-column-title,
+.scholia-column-controls,
+.scholia-column-mode,
+.scholia-column-control,
+.scholia-column-region-header {
+    display: flex;
+    align-items: center;
+}
+
+.scholia-column-title {
+    min-width: 0;
+    gap: var(--size-4-2);
+    font-weight: var(--font-semibold);
+}
+
+.scholia-column-title-icon {
+    flex: 0 0 auto;
+}
+
+.scholia-column-title-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.scholia-column-controls {
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--size-4-2);
+}
+
+.scholia-column-mode,
+.scholia-column-control {
+    gap: var(--size-4-1);
+}
+
+.scholia-column-mode > span {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.scholia-column-status {
+    padding: var(--size-4-1) var(--size-4-4);
+    border-bottom: 1px solid var(--background-modifier-border);
+    color: var(--text-muted);
+    background: var(--background-primary-alt);
+    font-size: var(--font-ui-smaller);
+}
+
+.scholia-column-reader {
+    overflow: auto;
+    flex: 1 1 auto;
+    scroll-behavior: smooth;
+}
+
+.scholia-column-page {
+    width: min(100%, 900px);
+    min-height: 320px;
+    margin: var(--size-4-6) auto;
+    padding: 0 var(--size-4-4) var(--size-4-6);
+}
+
+.scholia-column-page-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--size-4-3);
+    max-width: 760px;
+    margin: 0 auto var(--size-4-2);
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.scholia-column-page-header h3 {
+    margin: 0;
+    color: var(--text-normal);
+    font-size: var(--font-ui-medium);
+}
+
+.scholia-column-regions {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    gap: var(--size-4-4);
+}
+
+.scholia-column-region {
+    max-width: 100%;
+    overflow: hidden;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    background: white;
+    box-shadow: var(--shadow-s);
+}
+
+.scholia-column-region-header {
+    justify-content: space-between;
+    gap: var(--size-4-3);
+    padding: var(--size-4-1) var(--size-4-2);
+    border-bottom: 1px solid var(--background-modifier-border);
+    color: var(--text-muted);
+    background: var(--background-primary);
+    font-size: var(--font-ui-smaller);
+    text-transform: capitalize;
+}
+
+.scholia-column-region-header button {
+    height: auto;
+    padding: 2px var(--size-4-2);
+    font-size: var(--font-ui-smaller);
+}
+
+.scholia-column-canvas-frame {
+    position: relative;
+    max-width: 100%;
+    overflow: hidden;
+    background: white;
+}
+
+.scholia-column-canvas-frame canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.scholia-column-link-overlay {
+    position: absolute;
+    inset: 0;
+}
+
+.scholia-column-link-zone {
+    position: absolute;
+    min-width: 3px;
+    min-height: 3px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    background: transparent;
+    box-shadow: none;
+    cursor: pointer;
+}
+
+.scholia-column-link-zone:hover,
+.scholia-column-link-zone:focus-visible {
+    background: color-mix(in srgb, var(--interactive-accent) 24%, transparent);
+    outline: 1px solid var(--interactive-accent);
+}
+
+.scholia-column-page-placeholder,
+.scholia-column-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 280px;
+    color: var(--text-muted);
+}
+
+.scholia-column-error {
+    flex-direction: column;
+    gap: var(--size-4-2);
+    text-align: center;
+}
+
+.scholia-column-error h3,
+.scholia-column-error p {
+    margin: 0;
+}
+
+@media (max-width: 720px) {
+    .scholia-column-toolbar {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .scholia-column-controls {
+        justify-content: flex-start;
+        width: 100%;
+    }
+
+    .scholia-column-mode > span,
+    .scholia-column-control > span:not(:first-child) {
+        display: none;
+    }
+}

@@ -114,6 +114,12 @@ Handwriting recognition has **not** yet been implemented. PDF Scholia Scribe can
 
 These Zotero features are separate from PDF++'s original **Citations in PDF (experimental)** section. That original feature follows citation links already embedded in a PDF: hovering a linked citation can show the bibliography entry at its internal destination and offer a Google Scholar search. It does not locate a bibliography by its heading. PDF Scholia Scribe's added citation workflow is for writing in your Obsidian note, using Zotero metadata and your vault source notes.
 
+### Experimental column-aware reading
+
+For a PDF with a difficult multi-column layout, run **Open column-aware reading mode** from the command palette while the PDF is active, or right-click the PDF in the file menu and choose **Open in column-aware reading mode**. This opens a separate, read-only companion view that shows page regions in reading order without changing the original PDF.
+
+Use **Auto** to let the companion view choose a layout for each page. Detection is experimental and will not suit every PDF, so use **Force one column** or **Force two columns** when needed, and use **Swap column reading order** (shown as **Left → right** or **Right → left**) to reverse the sequence. Annotation work stays in the original PDF view: choose **Annotate in original** for a region, or **Show original**, to continue selecting and annotating there. The companion view does not move or duplicate annotations.
+
 ## DOCX, Google Docs, and collaboration
 
 PDF Scholia Scribe can also open `.docx`, `.gdoc`, `.txt`, and `.text` files inside Obsidian. DOCX files are rendered as clean, selectable pages while the original Word file remains unchanged. The viewer reads Word's Open XML document content directly and never executes document HTML, scripts, macros, or remote Word resources. Headings, paragraphs, lists, tables, basic formatting, line breaks, and safe external links are rendered for reading and annotation.
