@@ -8,7 +8,7 @@ import { AutoCopyMode } from 'auto-copy';
 import { ColorPalette } from 'color-palette';
 import { DomManager } from 'dom-manager';
 import { PDFCroppedEmbed } from 'pdf-cropped-embed';
-import { DEFAULT_SETTINGS, NamedTemplate, PDFPlusSettings, PDFPlusSettingTab } from 'settings';
+import { DEFAULT_SETTINGS, HIGHLIGHTED_IN_TEXT_CITATION_TEMPLATE, NamedTemplate, PDFPlusSettings, PDFPlusSettingTab } from 'settings';
 import { subpathToParams, focusObsidian, isTargetHTMLElement, KeysOfType } from 'utils';
 import { DestArray, PDFEmbed, PDFView, PDFViewerChild, PDFViewerComponent, PDFViewState, Rect } from 'typings';
 import { InstallerVersionModal } from 'modals';
@@ -651,8 +651,9 @@ export default class PDFPlus extends Plugin {
 			|| inTextCitation?.template === '{{linkWithDisplay}}'
 			|| inTextCitation?.template === '"{{text}}"{{linkWithDisplay}}'
 			|| inTextCitation?.template === '"{{text}}" {{linkWithDisplay}}'
+			|| inTextCitation?.template === '"{{textMarkdown}}" {{linkWithDisplay}}'
 		) {
-			inTextCitation.template = '"{{textMarkdown}}" {{linkWithDisplay}}';
+			inTextCitation.template = HIGHLIGHTED_IN_TEXT_CITATION_TEMPLATE;
 		}
 		migrateTemplate('Quote', ['> ({{linkWithDisplay}})\n> {{text}}\n'], '> ({{linkWithDisplay}})\n> {{textMarkdown}}\n');
 		migrateTemplate(

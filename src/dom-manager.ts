@@ -87,14 +87,25 @@ export class DomManager extends PDFPlusComponent {
 			this.styleEl.textContent += [
 				`\n.${ColorPalette.CLS}-item[data-highlight-color="${name.toLowerCase()}"] > .${ColorPalette.CLS}-item-inner {`,
 				`    background-color: ${color};`,
-				`}`
+				`}`,
+				`\nmark.pdf-plus-quote-highlight[data-highlight-color="${name.toLowerCase()}"] {`,
+				`    --pdf-plus-quote-highlight-rgb: var(${this.toCSSVariableName(name) ?? '--pdf-plus-default-color-rgb'});`,
+				`}`,
 			].join('\n');
 		}
 
 		this.styleEl.textContent += [
 			`\n.${ColorPalette.CLS}-item:not([data-highlight-color]) > .${ColorPalette.CLS}-item-inner {`,
 			`    background-color: transparent;`,
-			`}`
+			`}`,
+			`\nmark.pdf-plus-quote-highlight {`,
+			`    background-color: rgba(var(--pdf-plus-quote-highlight-rgb, var(--pdf-plus-default-color-rgb)), var(--pdf-plus-highlight-opacity, 0.3));`,
+			`    color: inherit;`,
+			`    box-decoration-break: clone;`,
+			`    -webkit-box-decoration-break: clone;`,
+			`    padding: 0.08em 0.18em;`,
+			`    border-radius: 0.18em;`,
+			`}`,
 		].join('\n');
 
 		this.styleEl.textContent += [

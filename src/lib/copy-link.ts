@@ -22,6 +22,15 @@ function getErrorMessage(err: unknown): string {
     return err instanceof Error ? err.message : String(err);
 }
 
+function isPermissionDeniedError(error: unknown): boolean {
+    if (typeof error === 'object' && error !== null && 'code' in error) {
+        const code = (error as { code?: unknown }).code;
+        if (code === 'EACCES' || code === 'EPERM' || code === 'EROFS') return true;
+    }
+
+    return /\b(?:EACCES|EPERM|EROFS)\b|permission denied|read-only file system/i.test(getErrorMessage(error));
+}
+
 export class copyLinkLib extends PDFPlusLibSubmodule {
     statusDurationMs = 2000;
 
@@ -590,6 +599,16 @@ export class copyLinkLib extends PDFPlusLibSubmodule {
                     }, 300);
                 })
                 .catch((err) => {
+                    if (isPermissionDeniedError(err)) {
+                        // The quote has already been copied (and, for palette actions,
+                        // pasted). Turn off direct PDF writing for this pane so a
+                        // read-only book does not produce the same error on every click.
+                        palette?.setWriteFile(false);
+                        const action = autoPaste || this.settings.autoPaste ? 'pasted' : 'copied';
+                        palette?.setStatus(`Quote ${action}; PDF is read-only`, 6000);
+                        return;
+                    }
+
                     console.error(err);
                     new Notice(`${this.plugin.manifest.name}: Could not write the highlight into the PDF file, but the link was copied.`, 6000);
                     palette?.setStatus('Link copied without writing to PDF', this.statusDurationMs);
