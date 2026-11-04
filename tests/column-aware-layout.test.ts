@@ -50,6 +50,74 @@ test('detects a conventional single-column page', () => {
 	assertBoundedAndUnique(result, items.length);
 });
 
+test('keeps EPUB body lines split around inline ligatures in one column', () => {
+	const items: ColumnAwareTextBox[] = [];
+	for (const [index, y] of [700, 670, 640, 610, 580, 550].entries()) {
+		items.push(
+			box(`Body line ${index + 1} before the ligature`, 60, y, 205, 12),
+			box('fi', 268, y, 6, 12),
+			box(`continues across the rest of the same line ${index + 1}`, 277, y, 263, 12),
+		);
+	}
+
+	const result = layoutColumnAwarePage(PAGE, items);
+
+	assert.equal(result.resolvedMode, 'one-column');
+	assert.equal(result.decision, 'detected-one-column');
+	assert.deepEqual(result.regions.map((region) => region.kind), ['full-width']);
+	assertBoundedAndUnique(result, items.length);
+});
+
+test('keeps linked EPUB index rows fragmented into inline runs in one column', () => {
+	const items: ColumnAwareTextBox[] = [];
+	for (const [index, y] of [700, 670, 640, 610, 580, 550].entries()) {
+		let x = 60;
+		for (const [text, width] of [
+			[`Index term ${index + 1}`, 170],
+			['123', 18],
+			[',', 3],
+			['456', 18],
+			['–', 6],
+			['7', 6],
+			[',', 3],
+			['512', 18],
+			[',', 3],
+			['600', 18],
+		] as const) {
+			items.push(box(text, x, y, width, 12));
+			x += width + 3;
+		}
+	}
+
+	const result = layoutColumnAwarePage(PAGE, items);
+
+	assert.equal(result.resolvedMode, 'one-column');
+	assert.equal(result.decision, 'detected-one-column');
+	assert.deepEqual(result.regions.map((region) => region.kind), ['full-width']);
+	assertBoundedAndUnique(result, items.length);
+});
+
+test('still detects genuine columns when each line contains fragmented inline runs', () => {
+	const items: ColumnAwareTextBox[] = [];
+	for (const [index, y] of [700, 670, 640, 610, 580, 550].entries()) {
+		items.push(
+			box(`Left ${index + 1} before`, 50, y, 80, 12),
+			box('fi', 133, y, 6, 12),
+			box(`left continuation ${index + 1}`, 142, y, 100, 12),
+			box(`Right ${index + 1} before`, 330, y, 80, 12),
+			box('fi', 413, y, 6, 12),
+			box(`right continuation ${index + 1}`, 422, y, 100, 12),
+		);
+	}
+
+	const result = layoutColumnAwarePage(PAGE, items);
+
+	assert.equal(result.resolvedMode, 'two-column');
+	assert.equal(result.decision, 'detected-two-column');
+	assert.deepEqual(result.regions.map((region) => region.column), ['left', 'right']);
+	assertBoundedAndUnique(result, items.length);
+});
+
 test('detects a clean two-column page and reads left before right', () => {
 	const items = cleanTwoColumnItems();
 	const result = layoutColumnAwarePage(PAGE, items);

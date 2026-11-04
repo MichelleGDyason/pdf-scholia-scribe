@@ -162,11 +162,11 @@ export class ColorPalette extends PDFPlusComponent {
 
         let handled = false;
         if (this.writeFile) {
-            handled = this.lib.copyLink.writeHighlightAnnotationToSelectionIntoFileAndCopyLink(false, { copyFormat: template }, name ?? undefined, undefined, selection);
+            handled = this.lib.copyLink.writeHighlightAnnotationToSelectionIntoFileAndCopyLink(false, { copyFormat: template }, name ?? undefined, true, selection);
         }
 
         if (!handled) {
-            handled = this.lib.copyLink.copyLinkToSelection(false, { copyFormat: template }, name ?? undefined, undefined, selection);
+            handled = this.lib.copyLink.copyLinkToSelection(false, { copyFormat: template }, name ?? undefined, true, selection);
         }
 
         if (!handled) {
@@ -178,7 +178,7 @@ export class ColorPalette extends PDFPlusComponent {
                     { copyFormat: template },
                     annotation.page,
                     annotation.id,
-                    undefined,
+                    true,
                     true
                 );
             }

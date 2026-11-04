@@ -3,6 +3,7 @@ import * as obsidian from 'obsidian';
 
 import PDFPlus from 'main';
 import { PDFPlusLib } from 'lib';
+import { formatCitationPageWithOffset } from 'lib/citation-page';
 import { selectAssociatedMarkdownFile } from 'template-associated-markdown';
 
 type CitationInfo = {
@@ -422,7 +423,7 @@ function getCitationPage(sources: TemplateVariables[], pageLabel: string, rawPag
     }
 
     if (offset !== null && Number.isFinite(rawPage)) {
-        return String(rawPage + offset);
+        return formatCitationPageWithOffset(rawPage, offset, pageLabel);
     }
 
     return pageLabel;

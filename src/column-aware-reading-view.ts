@@ -15,6 +15,7 @@ import type {
 
 import type PDFPlus from 'main';
 import type { PDFView } from 'typings';
+import { ReadingNotePdfSuggestModal } from 'modals';
 import {
 	ColumnAwareMode,
 	ColumnAwareRegion,
@@ -456,7 +457,7 @@ export class ColumnAwareReadingView extends ItemView {
 			pageHeader.createEl('h3', { text: `Page ${pageNumber}` });
 			pageHeader.createSpan({
 				text: regions.length === 1 && regions[0].kind === 'full-width'
-					? 'full-page fallback'
+					? this.mode === 'two-column' ? 'full-page safe view' : 'single-column page'
 					: regions.map((region) => regionLabel(region)).join(' → '),
 			});
 			const regionsEl = section.createDiv('scholia-column-regions');
@@ -874,6 +875,46 @@ export async function openColumnAwareReading(plugin: PDFPlus, file: TFile): Prom
 	await plugin.app.workspace.revealLeaf(leaf);
 }
 
+function getActivePdfFile(plugin: PDFPlus): TFile | null {
+	const childFile = plugin.lib.getPDFViewerChild(true)?.file;
+	if (childFile instanceof TFile && childFile.extension === 'pdf') return childFile;
+	const activeFile = plugin.app.workspace.getActiveFile();
+	return activeFile instanceof TFile && activeFile.extension === 'pdf' ? activeFile : null;
+}
+
+function getVisiblePdfFiles(plugin: PDFPlus): TFile[] {
+	const files: TFile[] = [];
+	plugin.app.workspace.iterateAllLeaves((leaf) => {
+		if (!leaf.containerEl.isShown()) return;
+		const path = plugin.lib.workspace.getFilePathFromView(leaf.view);
+		if (!path) return;
+		const file = plugin.app.vault.getAbstractFileByPath(path);
+		if (!(file instanceof TFile) || file.extension !== 'pdf' || files.includes(file)) return;
+		files.push(file);
+	});
+	return files;
+}
+
+function openColumnAwareTarget(plugin: PDFPlus, files: TFile[]): void {
+	const open = (file: TFile | null) => {
+		if (!file) return;
+		void openColumnAwareReading(plugin, file).catch((error) => {
+			console.error(`${plugin.manifest.name}: Could not open column-aware reading mode.`, error);
+			new Notice(`${plugin.manifest.name}: Column-aware reading mode could not be opened.`);
+		});
+	};
+	if (files.length === 1) {
+		open(files[0]);
+		return;
+	}
+	new ReadingNotePdfSuggestModal(
+		plugin,
+		files,
+		open,
+		'Choose the PDF to open in column-aware reading mode',
+	).open();
+}
+
 export function registerColumnAwareReading(plugin: PDFPlus): void {
 	plugin.registerView(
 		COLUMN_AWARE_READING_VIEW_TYPE,
@@ -883,12 +924,10 @@ export function registerColumnAwareReading(plugin: PDFPlus): void {
 		id: 'open-column-aware-reading',
 		name: 'Open column-aware reading mode',
 		checkCallback: (checking) => {
-			const file = plugin.lib.getPDFViewerChild(true)?.file ?? plugin.app.workspace.getActiveFile();
-			if (!(file instanceof TFile) || file.extension !== 'pdf') return false;
-			if (!checking) void openColumnAwareReading(plugin, file).catch((error) => {
-				console.error(`${plugin.manifest.name}: Could not open column-aware reading mode.`, error);
-				new Notice(`${plugin.manifest.name}: Column-aware reading mode could not be opened.`);
-			});
+			const activePdf = getActivePdfFile(plugin);
+			const files = activePdf ? [activePdf] : getVisiblePdfFiles(plugin);
+			if (!files.length) return false;
+			if (!checking) openColumnAwareTarget(plugin, files);
 			return true;
 		},
 	});

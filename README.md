@@ -116,9 +116,11 @@ These Zotero features are separate from PDF++'s original **Citations in PDF (exp
 
 ### Experimental column-aware reading
 
-For a PDF with a difficult multi-column layout, run **Open column-aware reading mode** from the command palette while the PDF is active, or right-click the PDF in the file menu and choose **Open in column-aware reading mode**. This opens a separate, read-only companion view that shows page regions in reading order without changing the original PDF.
+For a PDF with a difficult multi-column layout, run **Open column-aware reading mode** from the command palette while the PDF is active, or right-click the PDF in the file menu and choose **Open in column-aware reading mode**. The command also remains available while an adjacent note has focus; when several PDFs are visible, it asks which one to use. This opens a separate, read-only companion view that shows page regions in reading order without changing the original PDF.
 
 Use **Auto** to let the companion view choose a layout for each page. Detection is experimental and will not suit every PDF, so use **Force one column** or **Force two columns** when needed, and use **Swap column reading order** (shown as **Left → right** or **Right → left**) to reverse the sequence. Annotation work stays in the original PDF view: choose **Annotate in original** for a region, or **Show original**, to continue selecting and annotating there. The companion view does not move or duplicate annotations.
+
+EPUB-to-PDF converters often split a single visual line into separate PDF text runs around links, punctuation, or ligatures. Auto groups those adjacent runs for layout detection so an already single-column converted book stays in one reading stream instead of being mistaken for two columns. This is a facsimile reading view, not editable EPUB-style text reflow.
 
 ## DOCX, Google Docs, and collaboration
 

@@ -73,6 +73,8 @@ export interface NamedTemplate {
 	template: string;
 }
 
+export const HIGHLIGHTED_IN_TEXT_CITATION_TEMPLATE = '<mark class="pdf-plus-quote-highlight" data-highlight-color="{{color}}">"{{textMarkdown}}"</mark> {{linkWithDisplay}}';
+
 export const DEFAULT_BACKLINK_HOVER_COLOR = 'green';
 
 const ACTION_ON_CITATION_HOVER = {
@@ -390,7 +392,7 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 		},
 		{
 			name: 'In-text citation',
-			template: '"{{textMarkdown}}" {{linkWithDisplay}}',
+			template: HIGHLIGHTED_IN_TEXT_CITATION_TEMPLATE,
 		},
 		{
 			name: 'Quote',

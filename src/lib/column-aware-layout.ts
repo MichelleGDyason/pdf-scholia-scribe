@@ -288,6 +288,86 @@ function normalizeTextBox(
 	};
 }
 
+function verticalOverlapRatio(first: NormalizedTextBox, second: NormalizedTextBox) {
+	const overlap = Math.max(0, Math.min(first.top, second.top) - Math.max(first.bottom, second.bottom));
+	const smallerHeight = Math.min(first.height, second.height);
+	return smallerHeight > GEOMETRY_EPSILON ? overlap / smallerHeight : 0;
+}
+
+/**
+ * PDF generators used by EPUB converters commonly emit one visual line as a
+ * series of adjacent TextItems (for example around links, punctuation, and
+ * ligatures). Treating each run as independent column evidence can make an
+ * ordinary line look like balanced left and right columns. Coalesce only
+ * nearby runs on the same baseline for detection; the original boxes remain
+ * available for assigning content to the resulting crop regions.
+ */
+function coalesceVisualLineBoxes(
+	items: readonly NormalizedTextBox[],
+	pageWidth: number,
+) {
+	interface VisualLine {
+		items: NormalizedTextBox[];
+		bottom: number;
+		top: number;
+	}
+
+	const lines: VisualLine[] = [];
+	const verticallySorted = [...items].sort((first, second) => (
+		second.bottom - first.bottom || first.left - second.left
+	));
+	for (const item of verticallySorted) {
+		const line = lines.find((candidate) => {
+			const lineHeight = candidate.top - candidate.bottom;
+			const overlap = Math.max(0, Math.min(candidate.top, item.top) - Math.max(candidate.bottom, item.bottom));
+			const smallerHeight = Math.min(lineHeight, item.height);
+			const baselineTolerance = Math.max(1, smallerHeight * 0.25);
+			return (smallerHeight > GEOMETRY_EPSILON && overlap / smallerHeight >= 0.65)
+				|| Math.abs(item.bottom - candidate.bottom) <= baselineTolerance;
+		});
+		if (line) {
+			line.items.push(item);
+			line.bottom = Math.min(line.bottom, item.bottom);
+			line.top = Math.max(line.top, item.top);
+		} else {
+			lines.push({ items: [item], bottom: item.bottom, top: item.top });
+		}
+	}
+
+	const coalesced: NormalizedTextBox[] = [];
+	for (const line of lines) {
+		const fragments = [...line.items].sort((first, second) => first.left - second.left);
+		let current: NormalizedTextBox | null = null;
+		for (const fragment of fragments) {
+			if (!current) {
+				current = { ...fragment };
+				continue;
+			}
+
+			const gap = fragment.left - current.right;
+			const maximumGap = Math.max(
+				2,
+				Math.min(pageWidth * 0.03, Math.min(current.height, fragment.height) * 1.5),
+			);
+			if (gap <= maximumGap && verticalOverlapRatio(current, fragment) >= 0.65) {
+				const separator = gap > Math.min(current.height, fragment.height) * 0.2 ? ' ' : '';
+				current.text += separator + fragment.text;
+				current.left = Math.min(current.left, fragment.left);
+				current.right = Math.max(current.right, fragment.right);
+				current.bottom = Math.min(current.bottom, fragment.bottom);
+				current.top = Math.max(current.top, fragment.top);
+				current.width = current.right - current.left;
+				current.height = current.top - current.bottom;
+			} else {
+				coalesced.push(current);
+				current = { ...fragment };
+			}
+		}
+		if (current) coalesced.push(current);
+	}
+	return coalesced;
+}
+
 function itemWeight(item: NormalizedTextBox) {
 	return clamp(item.text.length / 24, 1, 4);
 }
@@ -483,14 +563,15 @@ function findSpanningBands(
 }
 
 function createTwoColumnRegions(
-	items: readonly NormalizedTextBox[],
+	detectionItems: readonly NormalizedTextBox[],
+	assignmentItems: readonly NormalizedTextBox[],
 	pageWidth: number,
 	pageHeight: number,
 	splitX: number,
 	swapColumns: boolean,
 	providedBands: readonly ColumnAwareSpanningBand[],
 ) {
-	const spanningBands = findSpanningBands(items, pageWidth, pageHeight, splitX, providedBands)
+	const spanningBands = findSpanningBands(detectionItems, pageWidth, pageHeight, splitX, providedBands)
 		.sort((a, b) => b.top - a.top);
 	const regionShells: Array<Omit<ColumnAwareLayoutRegion, 'sourceItemIndices'>> = [];
 	const columnOrder: ColumnAwareColumn[] = swapColumns ? ['right', 'left'] : ['left', 'right'];
@@ -525,7 +606,7 @@ function createTwoColumnRegions(
 		...region,
 		sourceItemIndices: [],
 	}));
-	for (const item of items) {
+	for (const item of assignmentItems) {
 		const centreX = (item.left + item.right) / 2;
 		const centreY = (item.bottom + item.top) / 2;
 		const matchingRegion = regions.find((region) => {
@@ -601,8 +682,9 @@ export function layoutColumnAwarePage(
 			'unsupported-text-geometry',
 		);
 	}
+	const detectionItems = coalesceVisualLineBoxes(normalizedItems, pageWidth);
 
-	if (requestedMode === 'auto' && normalizedItems.length < MINIMUM_AUTOMATIC_TEXT_ITEMS) {
+	if (requestedMode === 'auto' && detectionItems.length < MINIMUM_AUTOMATIC_TEXT_ITEMS) {
 		return fallbackResult(
 			requestedMode,
 			pageWidth,
@@ -612,12 +694,12 @@ export function layoutColumnAwarePage(
 		);
 	}
 
-	const bestSplit = findBestSplit(normalizedItems, pageWidth);
+	const bestSplit = findBestSplit(detectionItems, pageWidth);
 	const minimumConfidence = isFiniteNumber(options.minimumConfidence)
 		? clamp(options.minimumConfidence, 0, 1)
 		: DEFAULT_MINIMUM_CONFIDENCE;
 	if (requestedMode === 'auto' && bestSplit.score < minimumConfidence) {
-		if (looksClearlySingleColumn(normalizedItems, pageWidth, bestSplit)) {
+		if (looksClearlySingleColumn(detectionItems, pageWidth, bestSplit)) {
 			return {
 				page: { x: 0, y: 0, width: pageWidth, height: pageHeight },
 				requestedMode,
@@ -646,6 +728,7 @@ export function layoutColumnAwarePage(
 		confidence: bestSplit.score,
 		splitX,
 		regions: createTwoColumnRegions(
+			detectionItems,
 			normalizedItems,
 			pageWidth,
 			pageHeight,

@@ -91,9 +91,10 @@ export class ReadingNotePdfSuggestModal extends FuzzySuggestModal<TFile> {
 		plugin: PDFPlus,
 		private files: TFile[],
 		private choose: ChoosePdfCallback,
+		placeholder = 'Choose the PDF whose metadata should fill this note',
 	) {
 		super(plugin.app);
-		this.setPlaceholder('Choose the PDF whose metadata should fill this note');
+		this.setPlaceholder(placeholder);
 	}
 
 	getItems(): TFile[] {

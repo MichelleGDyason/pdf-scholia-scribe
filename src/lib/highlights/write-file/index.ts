@@ -9,6 +9,15 @@ import { DestArray, PDFViewerChild, Rect } from 'typings';
 
 export type TextMarkupAnnotationSubtype = 'Highlight' | 'Underline' | 'Squiggly' | 'StrikeOut';
 
+function isPermissionDeniedError(error: unknown): boolean {
+    if (typeof error === 'object' && error !== null && 'code' in error) {
+        const code = (error as { code?: unknown }).code;
+        return code === 'EACCES' || code === 'EPERM' || code === 'EROFS';
+    }
+
+    return false;
+}
+
 export class AnnotationWriteFileLib extends PDFPlusLibSubmodule {
     pdflib: PdfLibIO;
 
@@ -73,6 +82,11 @@ export class AnnotationWriteFileLib extends PDFPlusLibSubmodule {
                     try {
                         annotationID = await annotator(child.file, pageNumber, rects);
                     } catch (e) {
+                        // Palette actions handle read-only PDFs as a normal fallback:
+                        // the quote remains copied/pasted and direct PDF writing is
+                        // switched off for that pane.
+                        if (isPermissionDeniedError(e)) throw e;
+
                         new Notice(`${this.plugin.manifest.name}: An error occurred while attemping to add an annotation.`);
                         console.error(e);
                     }
