@@ -11,6 +11,44 @@ import {
 	normalizeDoi,
 	parseTranslatedBookExtraMetadata,
 } from '../src/lib/reading-note-metadata-core';
+import { collectPdfFrontMatterPages } from '../src/lib/pdf-front-matter-text';
+
+test('front-matter collection stays bounded and preserves page slots across errors', async () => {
+	const requested: number[] = [];
+	const cleaned: number[] = [];
+	const errors: Array<{ pageNumber: number, phase: string }> = [];
+	const pages = await collectPdfFrontMatterPages({
+		numPages: 20,
+		async getPage(pageNumber) {
+			requested.push(pageNumber);
+			return {
+				async getTextContent() {
+					if (pageNumber === 2) throw new Error('Unreadable text layer');
+					return { items: [{ str: `page ${pageNumber}`, hasEOL: true }] };
+				},
+				cleanup() {
+					cleaned.push(pageNumber);
+					if (pageNumber === 3) throw new Error('Cleanup failed');
+				},
+			};
+		},
+	}, {
+		pageLimit: 12,
+		characterLimit: 50_000,
+		onError: (pageNumber, phase) => errors.push({ pageNumber, phase }),
+	});
+
+	assert.deepEqual(requested, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+	assert.equal(pages.length, 12);
+	assert.equal(pages[1], '');
+	assert.equal(pages[2], 'page 3');
+	assert.equal(pages[3], 'page 4');
+	assert.deepEqual(cleaned, requested);
+	assert.deepEqual(errors, [
+		{ pageNumber: 2, phase: 'read' },
+		{ pageNumber: 3, phase: 'cleanup' },
+	]);
+});
 
 test('rich journal XMP maps bibliographic values without using PDF lifecycle dates', () => {
 	const candidates = extractEmbeddedPdfMetadata({
@@ -125,6 +163,178 @@ test('Info metadata accepts sane title and author but never derives publication 
 	assert.equal(candidates.title?.value, 'A Useful Article');
 	assert.equal(candidates.author?.value, 'Michelle Scholar');
 	assert.equal(candidates.year, undefined);
+});
+
+test('converted EPUB front matter supplies conservative book metadata after blank pages', () => {
+	const candidates = extractEmbeddedPdfMetadata({
+		fileBasename: 'somers_hall_2026_reading_a_thousand_plateaus_adventures_in_nomad_thought_2',
+		info: {
+			Title: 'Reading a Thousand Plateaus: Adventures in Nomad Thought',
+			CreationDate: "D:20261104133252+11'00'",
+			ModDate: "D:20261104133252+11'00'",
+		},
+		firstPageText: [
+			'Reading a Thousand Plateaus: Adventures in Nomad Thought',
+			'Henry Somers-Hall',
+			'2026-05-31T20:22:33.111893+00:00',
+		].join('\n'),
+		frontMatterPages: [
+			'Reading a Thousand Plateaus: Adventures in Nomad Thought\nHenry Somers-Hall\n2026-05-31T20:22:33.111893+00:00',
+			'',
+			'',
+			[
+				'Reading A Thousand Plateaus',
+				'Adventures in Nomad Thought',
+				'Henry Somers-Hall',
+				'Edinburgh University Press is one of the leading university presses in the UK.',
+				'© Henry Somers-Hall, 2026',
+				'Edinburgh University Press Ltd',
+				'13 In fi rmary Street, Edinburgh EH1 1LT',
+				'A CIP record for this book is available from the British Library',
+				'ISBN 978 1 3995 4062 9',
+				'The right of Henry Somers-Hall to be identi fi ed as the author of this work has been asserted.',
+				'For more information, visit www.edinburghuniversitypress.com.',
+			].join('\n'),
+		],
+	});
+
+	assert.equal(candidates.title?.value, 'Reading a Thousand Plateaus: Adventures in Nomad Thought');
+	assert.equal(candidates.author?.value, 'Henry Somers-Hall');
+	assert.equal(candidates.author?.confidence, 'high');
+	assert.equal(candidates.year?.value, '2026');
+	assert.equal(candidates.year?.confidence, 'review');
+	assert.equal(candidates.publisher?.value, 'Edinburgh University Press Ltd');
+	assert.equal(candidates.isbn?.value, '9781399540629');
+	assert.equal(candidates.sourceUrl, undefined);
+	assert.equal(candidates.pages, undefined);
+	assert.equal(candidates.concepts, undefined);
+});
+
+test('converted-file timestamps and generic XMP dates never become publication years', () => {
+	const candidates = extractEmbeddedPdfMetadata({
+		fileBasename: 'converted-book',
+		info: {
+			CreationDate: 'D:20261104133252',
+			ModDate: 'D:20261104133252',
+		},
+		xmp: { 'dc:date': '2026-11-04T13:32:52+11:00' },
+		firstPageText: 'A Book\nAn Author\n2026-05-31T20:22:33.111893+00:00',
+		frontMatterPages: ['A Book\nAn Author\n2026-05-31T20:22:33.111893+00:00'],
+	});
+
+	assert.equal(candidates.year, undefined);
+});
+
+test('book front-matter heuristics ignore journal copyright and permission lines', () => {
+	const candidates = extractEmbeddedPdfMetadata({
+		fileBasename: 'journal-article',
+		frontMatterPages: [
+			'Copyright © The Author(s), 2024\nPublished by permission of the author',
+		],
+	});
+
+	assert.equal(candidates.author, undefined);
+	assert.equal(candidates.year, undefined);
+	assert.equal(candidates.publisher, undefined);
+});
+
+test('Copyright plus a symbol parses a clean book author name', () => {
+	const candidates = extractEmbeddedPdfMetadata({
+		fileBasename: 'book',
+		frontMatterPages: [[
+			'Copyright © Jane Scholar, 2024',
+			'Jane Scholar to be identified as the author of this work',
+			'A CIP record for this book is available',
+			'ISBN 978-0-306-40615-7',
+		].join('\n')],
+	});
+
+	assert.equal(candidates.author?.value, 'Jane Scholar');
+});
+
+test('only a line-anchored first-published statement can outrank a copyright year', () => {
+	const explicit = extractEmbeddedPdfMetadata({
+		fileBasename: 'book',
+		info: { CreationDate: 'D:20261104133252' },
+		frontMatterPages: [[
+			'First published 2018',
+			'© Jane Scholar, 2024',
+			'ISBN 978-0-306-40615-7',
+		].join('\n')],
+	});
+	assert.equal(explicit.year?.value, '2018');
+	assert.equal(explicit.year?.confidence, 'high');
+
+	const prose = extractEmbeddedPdfMetadata({
+		fileBasename: 'book',
+		frontMatterPages: [[
+			'Notes. First published as an essay in 1968, it was revised later.',
+			'© Jane Scholar, 2024',
+			'ISBN 978-0-306-40615-7',
+		].join('\n')],
+	});
+	assert.equal(prose.year?.value, '2024');
+	assert.equal(prose.year?.confidence, 'review');
+
+	const ambiguous = extractEmbeddedPdfMetadata({
+		fileBasename: 'book',
+		frontMatterPages: [[
+			'First published 2018',
+			'First published 2020',
+			'© Jane Scholar, 2024',
+			'ISBN 978-0-306-40615-7',
+		].join('\n')],
+	});
+	assert.equal(ambiguous.year, undefined);
+});
+
+test('a book title ending in Press is not mistaken for a publisher', () => {
+	const candidates = extractEmbeddedPdfMetadata({
+		fileBasename: 'the-printing-press',
+		frontMatterPages: [[
+			'The Printing Press',
+			'© Jane Scholar, 2024',
+			'ISBN 978-0-306-40615-7',
+		].join('\n')],
+	});
+
+	assert.equal(candidates.publisher, undefined);
+});
+
+test('front-matter ISBNs must be uniquely labelled and checksum-valid', () => {
+	const invalid = extractEmbeddedPdfMetadata({
+		fileBasename: 'book',
+		frontMatterPages: ['ISBN 978 1 3995 4062 8'],
+	});
+	assert.equal(invalid.isbn, undefined);
+
+	const multiple = extractEmbeddedPdfMetadata({
+		fileBasename: 'book',
+		frontMatterPages: ['ISBN 978 1 3995 4062 9; ISBN (ebook) 978-0-306-40615-7'],
+	});
+	assert.equal(multiple.isbn, undefined);
+
+	const advertised = extractEmbeddedPdfMetadata({
+		fileBasename: 'book',
+		frontMatterPages: ['Other titles available\nISBN 978-0-306-40615-7'],
+	});
+	assert.equal(advertised.isbn, undefined);
+
+	const embeddedSuffix = extractEmbeddedPdfMetadata({
+		fileBasename: 'book',
+		frontMatterPages: ['© Jane Scholar, 2024\nISBN 9999781399540629'],
+	});
+	assert.equal(embeddedSuffix.isbn, undefined);
+});
+
+test('a DOI found after page one is not assumed to identify the converted book', () => {
+	const candidates = extractEmbeddedPdfMetadata({
+		fileBasename: 'book',
+		firstPageText: 'Book title\nBook author',
+		frontMatterPages: ['Book title\nBook author', '', 'References\n10.1234/cited-work'],
+	});
+
+	assert.equal(candidates.doi, undefined);
 });
 
 test('custom metadata and first-page text provide exact identifiers conservatively', () => {
@@ -418,6 +628,64 @@ test('the supplied translated-book template fills its bibliographic fields and p
 	assert.ok(!properties.includes('theory'));
 	assert.ok(!properties.includes('reading_status'));
 	assert.ok(!properties.includes('cssclasses'));
+});
+
+test('the existing foreward_author misspelling is supported without adding a new property', () => {
+	const proposals = buildReadingNoteMetadataProposals(
+		{ foreward_author: null },
+		candidatesFromReferenceMetadata({ forewordAuthors: ['Fran Foreword'] }),
+	);
+
+	assert.equal(proposals.length, 1);
+	assert.equal(proposals[0]?.property, 'foreward_author');
+	assert.equal(proposals[0]?.value, 'Fran Foreword');
+});
+
+test('converted-book candidates fill only blank bibliography fields in the live note shape', () => {
+	const embedded = extractEmbeddedPdfMetadata({
+		fileBasename: 'somers-hall',
+		info: { Title: 'Reading a Thousand Plateaus: Adventures in Nomad Thought' },
+		frontMatterPages: [[
+			'© Henry Somers-Hall, 2026',
+			'Henry Somers-Hall to be identified as the author of this work',
+			'Edinburgh University Press Ltd',
+			'A CIP record for this book is available from the British Library',
+			'ISBN 978 1 3995 4062 9',
+		].join('\n')],
+	});
+	const candidates = mergeReadingNoteCandidates(embedded, {
+		pdf: {
+			field: 'pdf',
+			value: '[[somers-hall.pdf]]',
+			source: 'pdf-link',
+			confidence: 'exact',
+		},
+	});
+	const proposals = buildReadingNoteMetadataProposals({
+		created: '2025-04-03 22:03:18',
+		updated: '04-11-2026 07:39:19',
+		author: null,
+		year: null,
+		title: null,
+		publisher: null,
+		isbn: null,
+		PDF: null,
+		type: 'reading_note',
+		publication_type: 'book?',
+		ai_summary: null,
+		epistemological_stance: '[[Epistemological stance]]',
+		tags: 'review',
+		reading_status: ['reading'],
+	}, candidates);
+	const properties = proposals.map((proposal) => proposal.property).sort();
+
+	assert.deepEqual(properties, ['PDF', 'author', 'isbn', 'publisher', 'title', 'year'].sort());
+	assert.ok(!properties.includes('created'));
+	assert.ok(!properties.includes('updated'));
+	assert.ok(!properties.includes('publication_type'));
+	assert.ok(!properties.includes('epistemological_stance'));
+	assert.ok(!properties.includes('tags'));
+	assert.ok(!properties.includes('reading_status'));
 });
 
 test('absent properties are not added and duplicate aliases are skipped', () => {

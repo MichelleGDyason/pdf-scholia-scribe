@@ -15,6 +15,7 @@ const SOURCE_LABELS: Record<ReadingNoteMetadataSource, string> = {
 	'pdf-info': 'PDF document information',
 	'pdf-custom': 'custom PDF metadata',
 	'first-page': 'first-page text',
+	'front-matter': 'PDF front matter',
 	filename: 'PDF file name',
 };
 

@@ -1,6 +1,7 @@
 import { FileView, MarkdownView, Notice, TFile, getLinkpath, parseYaml } from 'obsidian';
 import { PDFDocumentProxy } from 'pdfjs-dist';
 
+import { collectPdfFrontMatterPages } from './pdf-front-matter-text';
 import { PDFPlusLibSubmodule } from './submodule';
 import {
 	buildReadingNoteMetadataProposals,
@@ -17,6 +18,9 @@ import {
 import { ReadingNoteMetadataPreviewModal, ReadingNotePdfSuggestModal } from 'modals';
 
 type UnknownRecord = Record<string, unknown>;
+
+const FRONT_MATTER_PAGE_LIMIT = 12;
+const FRONT_MATTER_PAGE_CHARACTER_LIMIT = 50_000;
 
 function isRecord(value: unknown): value is UnknownRecord {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -80,17 +84,6 @@ function metadataMap(value: unknown): Record<string, unknown> {
 		}
 	}
 	return metadata;
-}
-
-function firstPageText(items: unknown[]): string {
-	const parts: string[] = [];
-	for (const item of items) {
-		if (!isRecord(item) || typeof item.str !== 'string') continue;
-		parts.push(item.str);
-		if (item.hasEOL === true) parts.push('\n');
-		else parts.push(' ');
-	}
-	return parts.join('').replace(/[ \t]+\n/g, '\n').replace(/[ \t]{2,}/g, ' ').trim();
 }
 
 export class ReadingNoteMetadataManager extends PDFPlusLibSubmodule {
@@ -281,16 +274,18 @@ export class ReadingNoteMetadataManager extends PDFPlusLibSubmodule {
 		try {
 			document = await this.lib.loadPDFDocument(pdf);
 			const result = await document.getMetadata() as { info?: unknown, metadata?: unknown };
-			let pageText = '';
-			if (document.numPages > 0) {
-				const page = await document.getPage(1);
-				const content = await page.getTextContent({ includeMarkedContent: false });
-				pageText = firstPageText(content.items);
-			}
+			const frontMatterPages = await collectPdfFrontMatterPages(document, {
+				pageLimit: FRONT_MATTER_PAGE_LIMIT,
+				characterLimit: FRONT_MATTER_PAGE_CHARACTER_LIMIT,
+				onError: (pageNumber, phase, error) => {
+					console.warn(`${this.plugin.manifest.name}: Could not ${phase} PDF front-matter page ${pageNumber} from ${pdf.path}.`, error);
+				},
+			});
 			return extractEmbeddedPdfMetadata({
 				info: result.info,
 				xmp: metadataMap(result.metadata),
-				firstPageText: pageText,
+				firstPageText: frontMatterPages[0] ?? '',
+				frontMatterPages,
 				fileBasename: pdf.basename,
 			});
 		} finally {

@@ -25,7 +25,7 @@ export type ReadingNoteMetadataField =
 	| 'concepts';
 
 export type ReadingNoteMetadataValue = string | number | string[];
-export type ReadingNoteMetadataSource = 'pdf-link' | 'zotero' | 'xmp' | 'pdf-info' | 'pdf-custom' | 'first-page' | 'filename';
+export type ReadingNoteMetadataSource = 'pdf-link' | 'zotero' | 'xmp' | 'pdf-info' | 'pdf-custom' | 'first-page' | 'front-matter' | 'filename';
 export type ReadingNoteMetadataConfidence = 'exact' | 'high' | 'review';
 
 export interface ReadingNoteMetadataCandidate {
@@ -42,6 +42,7 @@ export interface EmbeddedPdfMetadataInput {
 	info?: unknown;
 	xmp?: Record<string, unknown>;
 	firstPageText?: string;
+	frontMatterPages?: string[];
 	fileBasename: string;
 }
 
@@ -104,7 +105,7 @@ const FIELD_ALIASES: Record<ReadingNoteMetadataField, string[]> = {
 	originalDatePublished: ['original_date_published', 'originaldatepublished', 'original_date', 'originaldate', 'orig_date', 'origdate'],
 	originalPublisher: ['original_publisher', 'originalpublisher', 'orig_publisher', 'origpublisher'],
 	originalLanguage: ['original_language', 'originallanguage', 'orig_language', 'origlanguage'],
-	forewordAuthor: ['forward_author', 'forwardauthor', 'foreword_author', 'forewordauthor'],
+	forewordAuthor: ['forward_author', 'forwardauthor', 'foreword_author', 'forewordauthor', 'foreward_author', 'forewardauthor'],
 	concepts: ['concepts', 'concept'],
 };
 
@@ -185,6 +186,141 @@ function cleanKeywords(values: string[], splitCommas: boolean): string[] {
 function extractYear(value: string): string {
 	const match = value.match(/(?:^|\D)((?:1[5-9]|20|21)\d{2})(?:\D|$)/);
 	return match?.[1] ?? '';
+}
+
+interface CopyrightStatement {
+	name: string;
+	year: string;
+	pageText: string;
+}
+
+function normalizedFrontMatterText(value: string): string {
+	return value
+		.normalize('NFKC')
+		.replace(/\s+/g, ' ')
+		.trim();
+}
+
+function frontMatterLines(pageText: string): string[] {
+	return pageText
+		.normalize('NFKC')
+		.split(/\r?\n/)
+		.map((line) => line.replace(/\s+/g, ' ').trim())
+		.filter(Boolean);
+}
+
+function hasCopyrightPageContext(pageText: string): boolean {
+	return /(?:©|\bcopyright\b|\bCIP\s+record\b|\bpublished\s+by\b)/iu.test(pageText);
+}
+
+function hasPublicationYearContext(pageText: string): boolean {
+	return /(?:©|\bcopyright\b|\bISBN(?:-1[03])?\b|\bCIP\s+record\b)/iu.test(pageText);
+}
+
+function uniqueStrings(values: string[]): string[] {
+	const unique = new Map<string, string>();
+	for (const value of values) {
+		const cleaned = value.replace(/\s+/g, ' ').trim();
+		if (cleaned) unique.set(cleaned.toLocaleLowerCase(), cleaned);
+	}
+	return [...unique.values()];
+}
+
+function isLikelyPersonName(value: string): boolean {
+	return value.length >= 3
+		&& value.length <= 100
+		&& /\p{L}/u.test(value)
+		&& !/\d|\b(?:press|publishing|publishers?|university|ltd|limited|inc|llc|gmbh|foundation|society|company|corporation)\b/iu.test(value);
+}
+
+function copyrightStatements(pages: string[]): CopyrightStatement[] {
+	const statements: CopyrightStatement[] = [];
+	for (const pageText of pages) {
+		const text = normalizedFrontMatterText(pageText);
+		const pattern = /(?:\bcopyright\s*(?:©|\(c\))?|©|\(c\))\s*(?:by\s+)?([^,]{2,100}?),\s*((?:1[5-9]|20|21)\d{2})\b/giu;
+		for (const line of frontMatterLines(pageText)) {
+			for (const match of line.matchAll(pattern)) {
+				const name = match[1].replace(/\s+/g, ' ').trim();
+				if (isLikelyPersonName(name)) statements.push({ name, year: match[2], pageText: text });
+			}
+		}
+	}
+	return statements;
+}
+
+function escapeRegExp(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function copyrightNameIsExplicitAuthor(statement: CopyrightStatement): boolean {
+	const name = escapeRegExp(statement.name);
+	return new RegExp(`(?:the\\s+right\\s+of\\s+)?${name}\\s+to\\s+be\\s+identi(?:fied|\\s+fi\\s+ed)\\s+as\\s+the\\s+author\\b`, 'iu')
+		.test(statement.pageText);
+}
+
+function validIsbn(value: string): boolean {
+	if (/^\d{13}$/.test(value)) {
+		const sum = [...value.slice(0, 12)].reduce((total, digit, index) => total + Number(digit) * (index % 2 ? 3 : 1), 0);
+		return (10 - (sum % 10)) % 10 === Number(value[12]);
+	}
+	if (!/^\d{9}[\dX]$/.test(value)) return false;
+	const sum = [...value].reduce((total, digit, index) => {
+		const numeric = digit === 'X' ? 10 : Number(digit);
+		return total + numeric * (10 - index);
+	}, 0);
+	return sum % 11 === 0;
+}
+
+function labelledIsbns(pages: string[]): string[] {
+	const isbns: string[] = [];
+	for (const pageText of pages) {
+		if (!hasCopyrightPageContext(pageText)) continue;
+		for (const line of frontMatterLines(pageText)) {
+			const labelIndex = line.search(/\bISBN(?:-1[03])?\b/i);
+			if (labelIndex < 0) continue;
+			const labelledText = line.slice(labelIndex);
+			const tokens = labelledText.match(/\b(?:97[89](?:[\s-]*\d){10}|\d(?:[\s-]*\d){8}[\s-]*[\dX])\b/gi) ?? [];
+			for (const token of tokens) {
+				const normalized = token.replace(/[^0-9X]/gi, '').toUpperCase();
+				if (validIsbn(normalized)) isbns.push(normalized);
+			}
+		}
+	}
+	return uniqueStrings(isbns);
+}
+
+function frontMatterPublishers(pages: string[]): string[] {
+	const publishers: string[] = [];
+	const legalSuffixPattern = /\b(?:Ltd|Limited|Inc\.?|LLC|GmbH|PLC|S\.?A\.?)\.?$/iu;
+	const publishingNamePattern = /\b(?:University\s+Press|Press|Publishing|Publishers|Books)(?:\s+(?:Ltd|Limited|Inc\.?|LLC|GmbH|PLC|S\.?A\.?))?\.?$/iu;
+	for (const pageText of pages) {
+		const hasImprintContext = /(?:\bISBN(?:-1[03])?\b|\bCIP\s+record\b|©|\bcopyright\b)/iu.test(pageText);
+		for (const line of frontMatterLines(pageText)) {
+			const publishedBy = line.match(/^published\s+by\s+(.{2,100}?)\.?$/i)?.[1]?.trim();
+			const looksLikePublisher = publishedBy
+				&& /(?:\bUniversity\s+Press\b|\bPress\b|\bPublishing\b|\bPublishers?\b|\bBooks\b|\bHouse\b|\bGroup\b|\b(?:Ltd|Limited|Inc\.?|LLC|GmbH|PLC|S\.?A\.?)$)/iu.test(publishedBy);
+			if (hasImprintContext && looksLikePublisher && !/[?!]|\b(?:https?|www\.|permission\s+of)\b/i.test(publishedBy)) {
+				publishers.push(publishedBy.replace(/[.,;:]+$/, ''));
+				continue;
+			}
+			if (!hasImprintContext || line.length < 3 || line.length > 100) continue;
+			if (!publishingNamePattern.test(line)) continue;
+			if (!/\bUniversity\s+Press\b/iu.test(line) && !legalSuffixPattern.test(line)) continue;
+			if (/\b(?:is|are|was|were|publishing\s+new)\b/iu.test(line)) continue;
+			publishers.push(line.replace(/\.$/, ''));
+		}
+	}
+	return uniqueStrings(publishers);
+}
+
+function firstPublishedYears(pages: string[]): string[] {
+	return uniqueStrings(pages.flatMap((pageText) => {
+		if (!hasPublicationYearContext(pageText)) return [];
+		return frontMatterLines(pageText).flatMap((line) => {
+			const match = line.match(/^first\s+published(?:\s+in)?\s*[:,-]?\s*((?:1[5-9]|20|21)\d{2})\b/iu);
+			return match ? [match[1]] : [];
+		});
+	}));
 }
 
 function normalizeUrl(value: string): string {
@@ -399,9 +535,45 @@ export function extractEmbeddedPdfMetadata(input: EmbeddedPdfMetadataInput): Rea
 
 	const customPublicationDate = firstValue(custom, ['publicationdate', 'publication_date', 'published', 'issued', 'year']);
 	setCandidate(candidates, 'year', extractYear(customPublicationDate), 'pdf-custom', 'high', customPublicationDate);
-	if (!candidates.year) {
-		const dcDate = firstValue(xmp, ['dc:date']);
-		setCandidate(candidates, 'year', extractYear(dcDate), 'xmp', 'review', dcDate);
+
+	const frontMatterPages = input.frontMatterPages?.length
+		? input.frontMatterPages
+		: input.firstPageText ? [input.firstPageText] : [];
+	const isbns = labelledIsbns(frontMatterPages);
+	const hasBookFrontMatter = isbns.length > 0
+		|| frontMatterPages.some((pageText) => /\bCIP\s+record\s+for\s+this\s+book\b/iu.test(pageText));
+	if (hasBookFrontMatter) {
+		const copyrights = copyrightStatements(frontMatterPages);
+		const explicitAuthors = uniqueStrings(copyrights
+			.filter((statement) => copyrightNameIsExplicitAuthor(statement))
+			.map((statement) => statement.name));
+		if (explicitAuthors.length === 1) {
+			setCandidate(candidates, 'author', explicitAuthors[0], 'front-matter', 'high', 'Copyright-page author assertion');
+		} else if (!explicitAuthors.length) {
+			const copyrightNames = uniqueStrings(copyrights.map((statement) => statement.name));
+			if (copyrightNames.length === 1) {
+				setCandidate(candidates, 'author', copyrightNames[0], 'front-matter', 'review', 'Copyright holder');
+			}
+		}
+
+		const publicationYears = firstPublishedYears(frontMatterPages);
+		if (publicationYears.length === 1) {
+			setCandidate(candidates, 'year', publicationYears[0], 'front-matter', 'high', 'First published');
+		} else if (!publicationYears.length) {
+			const copyrightYears = uniqueStrings(copyrights.map((statement) => statement.year));
+			if (copyrightYears.length === 1) {
+				setCandidate(candidates, 'year', copyrightYears[0], 'front-matter', 'review', 'Copyright year');
+			}
+		}
+
+		const publishers = frontMatterPublishers(frontMatterPages);
+		if (publishers.length === 1) {
+			setCandidate(candidates, 'publisher', publishers[0], 'front-matter', 'high', 'Copyright-page imprint');
+		}
+	}
+
+	if (isbns.length === 1) {
+		setCandidate(candidates, 'isbn', isbns[0], 'front-matter', 'high', 'Labelled ISBN');
 	}
 
 	const infoDoiValues = [
@@ -411,7 +583,7 @@ export function extractEmbeddedPdfMetadata(input: EmbeddedPdfMetadataInput): Rea
 	const infoDois = uniqueDois(infoDoiValues);
 	if (infoDois.length === 1) setCandidate(candidates, 'doi', infoDois[0], 'pdf-custom', 'exact');
 
-	const firstPageDois = uniqueDois([input.firstPageText ?? '']);
+	const firstPageDois = uniqueDois([input.firstPageText ?? frontMatterPages[0] ?? '']);
 	if (firstPageDois.length === 1) setCandidate(candidates, 'doi', firstPageDois[0], 'first-page', 'high');
 
 	setCandidate(candidates, 'title', cleanTitle(input.fileBasename), 'filename', 'review');
