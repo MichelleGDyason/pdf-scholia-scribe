@@ -18,6 +18,7 @@ import { DataviewInlineFieldsModal, withFilesWithInlineFields } from 'lib/datavi
 import { hasPagePreviewModifierSettings } from 'lib/page-preview-contract';
 import { registerScholiaDocumentWorkspace } from 'collaboration-portal';
 import { registerNoteTextAlignment } from 'note-text-alignment';
+import { registerTextCaseTools } from 'text-case';
 import { registerTextReordering } from 'text-reordering';
 import { registerColumnAwareReading } from 'column-aware-reading-view';
 
@@ -426,6 +427,7 @@ export default class PDFPlus extends Plugin {
 		registerScholiaDocumentWorkspace(this);
 		registerNoteTextAlignment(this);
 		registerTextReordering(this);
+		registerTextCaseTools(this);
 		registerColumnAwareReading(this);
 
 		this.registerHoverLinkSources();

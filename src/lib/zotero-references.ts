@@ -1,7 +1,8 @@
-import { EditorPosition, MarkdownView, Notice, Platform, TFile, getLinkpath, requestUrl } from 'obsidian';
+import { EditorPosition, FileSystemAdapter, MarkdownView, Notice, Platform, TFile, getLinkpath, requestUrl } from 'obsidian';
 
 import { PDFPlusLibSubmodule } from './submodule';
 import { parseTranslatedBookExtraMetadata } from './reading-note-metadata-core';
+import { chooseZoteroAttachmentMatch, ZoteroAttachmentMatchConfidence } from './zotero-attachment-match';
 
 
 export type ScholiaCitationStyle = 'asa' | 'harvard' | 'apa' | 'numeric';
@@ -126,6 +127,7 @@ const ORIGINAL_PUBLISHER_KEYS = ['originalPublisher', 'original_publisher', 'ori
 const ORIGINAL_LANGUAGE_KEYS = ['originalLanguage', 'original_language', 'origLanguage', 'orig_language'];
 const FOREWORD_AUTHOR_KEYS = ['forewordAuthor', 'foreword_author', 'forwardAuthor', 'forward_author'];
 const PDF_LINK_KEYS = ['PDF', 'pdf', 'sourcePdf', 'source_pdf', 'pdfFile', 'pdf_file', 'file'];
+const ZOTERO_LOCAL_API_TIMEOUT_MS = 15_000;
 
 
 function emptyRecord(source: ScholiaReferenceSource): ScholiaReferenceRecord {
@@ -933,29 +935,41 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 		return record;
 	}
 
-	async findZoteroRecordForPdfFile(pdf: TFile): Promise<ScholiaReferenceRecord | null> {
+	async findZoteroMetadataForPdfFile(pdf: TFile): Promise<{
+		record: ScholiaReferenceRecord,
+		confidence: ZoteroAttachmentMatchConfidence,
+	} | null> {
 		const query = encodeURIComponent(pdf.basename);
 		const items = await this.requestZoteroItemList(
 			`/api/users/0/items?itemType=attachment&format=json&include=data&qmode=everything&q=${query}`,
 		);
-		const expectedFilename = pdf.name.toLocaleLowerCase();
-		const exactMatches = items.filter((item) => {
+		const attachments = items.flatMap((item) => {
 			const data = getZoteroItemData(item);
-			if (!data || data.itemType !== 'attachment') return false;
-			const storedPath = stringValue(data.path).replace(/^storage:/i, '');
-			const pathFilename = storedPath.split(/[\\/]/).pop() ?? '';
-			const filename = stringValue(data.filename) || pathFilename || stringValue(data.title);
-			return filename.toLocaleLowerCase() === expectedFilename;
+			if (!data || data.itemType !== 'attachment') return [];
+			return [{
+				item,
+				data,
+				path: stringValue(data.path),
+				filename: stringValue(data.filename),
+				title: stringValue(data.title),
+			}];
 		});
-		if (exactMatches.length !== 1) return null;
+		const adapter = this.app.vault.adapter;
+		const expectedFullPath = adapter instanceof FileSystemAdapter ? adapter.getFullPath(pdf.path) : '';
+		const match = chooseZoteroAttachmentMatch(attachments, pdf.name, expectedFullPath);
+		if (!match) return null;
 
-		const item = exactMatches[0];
-		const data = getZoteroItemData(item);
-		if (!data) return null;
+		const { item, data } = match.attachment;
 		const attachmentKey = normalizedZoteroItemKey(
 			stringValue(data.key) || (isRecord(item) ? stringValue(item.key) : ''),
 		);
-		return attachmentKey ? await this.getZoteroSourceRecordForItemKey(attachmentKey) : null;
+		if (!attachmentKey) return null;
+		const record = await this.getZoteroSourceRecordForItemKey(attachmentKey);
+		return record ? { record, confidence: match.confidence } : null;
+	}
+
+	async findZoteroRecordForPdfFile(pdf: TFile): Promise<ScholiaReferenceRecord | null> {
+		return (await this.findZoteroMetadataForPdfFile(pdf))?.record ?? null;
 	}
 
 	async getAnnotatedPdfsForSource(source: ScholiaReferenceRecord): Promise<ScholiaZoteroPdf[]> {
@@ -1126,7 +1140,7 @@ export class ZoteroReferenceManager extends PDFPlusLibSubmodule {
 						}
 					});
 				});
-				request.setTimeout(5000, () => {
+				request.setTimeout(ZOTERO_LOCAL_API_TIMEOUT_MS, () => {
 					request.destroy();
 					finish(null);
 				});

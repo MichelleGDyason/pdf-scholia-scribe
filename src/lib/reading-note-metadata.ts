@@ -117,13 +117,14 @@ export class ReadingNoteMetadataManager extends PDFPlusLibSubmodule {
 		if (!pdf) return;
 
 		new Notice(`${this.plugin.manifest.name}: Reading metadata from ${pdf.name}…`, 2500);
-		const [embeddedCandidates, zoteroRecord] = await Promise.all([
+		const [embeddedCandidates, zoteroMatch] = await Promise.all([
 			this.extractPdfCandidates(pdf),
-			this.lib.zoteroReferences.findZoteroRecordForPdfFile(pdf).catch((error) => {
+			this.lib.zoteroReferences.findZoteroMetadataForPdfFile(pdf).catch((error) => {
 				console.warn(`${this.plugin.manifest.name}: Zotero metadata lookup was unavailable.`, error);
 				return null;
 			}),
 		]);
+		const zoteroRecord = zoteroMatch?.record ?? null;
 		const referenceMetadata = zoteroRecord
 			? {
 					citekey: zoteroRecord.citekey,
@@ -152,7 +153,9 @@ export class ReadingNoteMetadataManager extends PDFPlusLibSubmodule {
 		const zoteroCandidates = referenceMetadata
 			? candidatesFromReferenceMetadata(
 				referenceMetadata,
-				getReferenceMetadataConfidence(referenceMetadata, embeddedCandidates),
+				zoteroMatch?.confidence === 'exact'
+					? 'exact'
+					: getReferenceMetadataConfidence(referenceMetadata, embeddedCandidates),
 			)
 			: {};
 		const pdfLink = this.app.metadataCache.fileToLinktext(pdf, note.path);
