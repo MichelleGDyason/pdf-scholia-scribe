@@ -413,9 +413,10 @@ test('suspicious office defaults are rejected and filename fallback requires rev
 	assert.equal(candidates.author, undefined);
 });
 
-test('DOI normalization accepts resolver URLs and trims trailing punctuation', () => {
+test('DOI normalization accepts resolver URLs, repairs filename-safe delimiters, and trims punctuation', () => {
 	assert.equal(normalizeDoi('https://doi.org/10.1000/xyz.12).'), '10.1000/xyz.12');
 	assert.equal(normalizeDoi('DOI: 10.4321/ABC_def'), '10.4321/ABC_def');
+	assert.equal(normalizeDoi('10.1515_semi.2001.034'), '10.1515/semi.2001.034');
 	assert.equal(normalizeDoi('10.1002/(SICI)1234-5678(199901)1:1<1::AID-TEST>3.0.CO;2-A'), '10.1002/(SICI)1234-5678(199901)1:1<1::AID-TEST>3.0.CO;2-A');
 });
 

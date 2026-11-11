@@ -337,7 +337,8 @@ export function normalizeDoi(value: string): string {
 		.replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '')
 		.replace(/^doi\s*:\s*/i, '')
 		.trim();
-	const match = decoded.match(DOI_PATTERN)?.[0] ?? '';
+	const repairedDelimiter = decoded.replace(/^(10\.\d{4,9})_/, '$1/');
+	const match = repairedDelimiter.match(DOI_PATTERN)?.[0] ?? '';
 	let normalized = match.replace(/[\s\u00a0]+/g, '').replace(/[.,;:]+$/g, '');
 	for (const [opening, closing] of [['(', ')'], ['[', ']'], ['{', '}']] as const) {
 		while (normalized.endsWith(closing)

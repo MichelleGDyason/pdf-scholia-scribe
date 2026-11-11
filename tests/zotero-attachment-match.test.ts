@@ -61,3 +61,85 @@ test('linked paths compare case-insensitively with either slash style', () => {
 		'exact',
 	);
 });
+
+test('a percent-encoded Zotero file URL matches the decoded vault path exactly', () => {
+	const attachment = {
+		key: 'JOURNAL',
+		path: 'file:///Users/example/Obsidian%20Vault/Attachments/Seeing%20virtuality%20in%20nature%7BHoffmeyer%7D.pdf',
+		filename: '',
+		title: 'Seeing virtuality in nature',
+	};
+	assert.deepEqual(
+		chooseZoteroAttachmentMatch(
+			[attachment],
+			'Seeing virtuality in nature{Hoffmeyer}.pdf',
+			'/Users/example/Obsidian Vault/Attachments/Seeing virtuality in nature{Hoffmeyer}.pdf',
+		),
+		{ attachment, confidence: 'exact' },
+	);
+});
+
+test('a percent-encoded file URL supplies a reviewable filename fallback', () => {
+	const attachment = {
+		key: 'URL_ONLY',
+		path: 'file:///Users/example/Attachments/Journal%20article.pdf',
+		filename: '',
+		title: 'Journal article',
+	};
+	assert.deepEqual(
+		chooseZoteroAttachmentMatch([attachment], 'Journal article.pdf', ''),
+		{ attachment, confidence: 'review' },
+	);
+});
+
+test('a Windows file URL matches a drive-letter path', () => {
+	const attachment = {
+		key: 'WINDOWS_URL',
+		path: 'file:///C:/Vault/Attachments/Book%20chapter.pdf',
+		filename: '',
+		title: 'Book chapter',
+	};
+	assert.equal(
+		chooseZoteroAttachmentMatch(
+			[attachment],
+			'Book chapter.pdf',
+			'C:\\Vault\\Attachments\\Book chapter.pdf',
+		)?.confidence,
+		'exact',
+	);
+});
+
+test('a network file URL matches a UNC path', () => {
+	const attachment = {
+		key: 'NETWORK_URL',
+		path: 'file://server/share/Journal%20article.pdf',
+		filename: '',
+		title: 'Journal article',
+	};
+	assert.equal(
+		chooseZoteroAttachmentMatch(
+			[attachment],
+			'Journal article.pdf',
+			'\\\\server\\share\\Journal article.pdf',
+		)?.confidence,
+		'exact',
+	);
+});
+
+test('malformed file URL escapes do not throw or become exact matches', () => {
+	const attachment = {
+		key: 'MALFORMED',
+		path: 'file:///Users/example/Bad%2Path.pdf',
+		filename: '',
+		title: 'Bad path',
+	};
+	assert.doesNotThrow(() => chooseZoteroAttachmentMatch(
+		[attachment],
+		'Bad path.pdf',
+		'/Users/example/Bad path.pdf',
+	));
+	assert.equal(
+		chooseZoteroAttachmentMatch([attachment], 'Bad path.pdf', '/Users/example/Bad path.pdf'),
+		null,
+	);
+});

@@ -12,16 +12,39 @@ export type ZoteroAttachmentMatch<T> = {
 };
 
 function normalizedPath(value: string): string {
-	return value
+	return decodedLinkedPath(value)
 		.normalize('NFKC')
-		.replace(/^file:\/\//i, '')
 		.replace(/\\/g, '/')
 		.replace(/\/+$/g, '')
 		.toLocaleLowerCase();
 }
 
+function decodedLinkedPath(value: string): string {
+	if (!/^file:/i.test(value)) return value;
+
+	try {
+		const url = new URL(value);
+		let path = decodeURIComponent(url.pathname);
+		if (url.hostname && url.hostname.toLocaleLowerCase() !== 'localhost') {
+			path = `//${url.hostname}${path}`;
+		} else if (/^\/[a-z]:\//i.test(path)) {
+			path = path.slice(1);
+		}
+		return path;
+	} catch {
+		const path = value.replace(/^file:(?:\/\/)?/i, '');
+		try {
+			return decodeURIComponent(path);
+		} catch {
+			return path;
+		}
+	}
+}
+
 function attachmentFilename(attachment: ZoteroAttachmentIdentity): string {
-	const storedPath = attachment.path.replace(/^storage:/i, '');
+	const storedPath = /^storage:/i.test(attachment.path)
+		? attachment.path.replace(/^storage:/i, '')
+		: decodedLinkedPath(attachment.path);
 	return (attachment.filename || storedPath.split(/[\\/]/).pop() || attachment.title).trim();
 }
 
