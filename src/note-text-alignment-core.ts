@@ -1,8 +1,10 @@
 export const NOTE_TEXT_ALIGNMENTS = ['left', 'center', 'right', 'justify'] as const;
+export const NOTE_PARAGRAPH_STYLES = ['indented', 'spaced'] as const;
 
 export const NOTE_HEADING_INDENT_CLASS = 'scholia-note-heading-indents';
 
 export type NoteTextAlignment = typeof NOTE_TEXT_ALIGNMENTS[number];
+export type NoteParagraphStyle = typeof NOTE_PARAGRAPH_STYLES[number];
 
 export const NOTE_TEXT_ALIGNMENT_CLASSES: Record<NoteTextAlignment, string> = {
 	left: 'scholia-note-align-left',
@@ -11,7 +13,13 @@ export const NOTE_TEXT_ALIGNMENT_CLASSES: Record<NoteTextAlignment, string> = {
 	justify: 'scholia-note-align-justify',
 };
 
-const managedClasses = new Set(Object.values(NOTE_TEXT_ALIGNMENT_CLASSES));
+export const NOTE_PARAGRAPH_STYLE_CLASSES: Record<NoteParagraphStyle, string> = {
+	indented: 'scholia-note-paragraph-indented',
+	spaced: 'scholia-note-paragraph-spaced',
+};
+
+const managedAlignmentClasses = new Set(Object.values(NOTE_TEXT_ALIGNMENT_CLASSES));
+const managedParagraphClasses = new Set(Object.values(NOTE_PARAGRAPH_STYLE_CLASSES));
 
 export interface HeadingPosition {
 	level: number;
@@ -49,8 +57,21 @@ export function getNoteTextAlignment(value: unknown): NoteTextAlignment {
 
 /** Replace only the alignment class managed by PDF Scholia Scribe. */
 export function setNoteTextAlignmentClass(value: unknown, alignment: NoteTextAlignment): string[] {
-	const classes = parseCssClasses(value).filter((className) => !managedClasses.has(className));
+	const classes = parseCssClasses(value).filter((className) => !managedAlignmentClasses.has(className));
 	classes.push(NOTE_TEXT_ALIGNMENT_CLASSES[alignment]);
+	return classes;
+}
+
+/** Treat Obsidian's ordinary spaced paragraphs as the default for notes without a managed class. */
+export function getNoteParagraphStyle(value: unknown): NoteParagraphStyle {
+	const classes = parseCssClasses(value);
+	return NOTE_PARAGRAPH_STYLES.find((style) => classes.includes(NOTE_PARAGRAPH_STYLE_CLASSES[style])) ?? 'spaced';
+}
+
+/** Replace only the paragraph-appearance class managed by PDF Scholia Scribe. */
+export function setNoteParagraphStyleClass(value: unknown, style: NoteParagraphStyle): string[] {
+	const classes = parseCssClasses(value).filter((className) => !managedParagraphClasses.has(className));
+	classes.push(NOTE_PARAGRAPH_STYLE_CLASSES[style]);
 	return classes;
 }
 

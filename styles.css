@@ -1319,6 +1319,21 @@ mark.scholia-import-highlight {
     text-align: justify;
 }
 
+/* Per-note paragraph appearance. Markdown paragraphs remain semantic (separated by a blank
+   source line); these classes only change their Reading-view presentation. `.el-p > p` avoids
+   changing list items, blockquotes, callouts, tables, and other nested prose containers. */
+.scholia-note-paragraph-indented .markdown-preview-sizer .el-p > p,
+.scholia-note-paragraph-indented + .markdown-reading-view .markdown-preview-sizer .el-p > p {
+    margin-block: 0;
+    text-indent: 2em;
+}
+
+.scholia-note-paragraph-spaced .markdown-preview-sizer .el-p > p,
+.scholia-note-paragraph-spaced + .markdown-reading-view .markdown-preview-sizer .el-p > p {
+    margin-block: 0 1em;
+    text-indent: 0;
+}
+
 /* Optional note-level hierarchy: headings remain at the margin and the text following them
    moves right by one 2em step per Markdown heading level. Editor lines use padding because
    CodeMirror neutralizes line margins; reading mode can use ordinary block margins. */

@@ -5,12 +5,16 @@ import type PDFPlus from 'main';
 import {
 	getHeadingIndentDepthAtLine,
 	getMarkdownHeadingIndentDepths,
+	getNoteParagraphStyle,
 	getNoteTextAlignment,
 	isNoteHeadingIndentEnabled,
 	markdownHasNoteHeadingIndentClass,
+	NOTE_PARAGRAPH_STYLES,
+	NoteParagraphStyle,
 	NOTE_TEXT_ALIGNMENTS,
 	NoteTextAlignment,
 	setNoteHeadingIndentClass,
+	setNoteParagraphStyleClass,
 	setNoteTextAlignmentClass,
 } from 'note-text-alignment-core';
 
@@ -26,6 +30,16 @@ const ALIGNMENT_DESCRIPTIONS: Record<NoteTextAlignment, string> = {
 	center: 'Centre each line between the margins.',
 	right: 'Align each line with the right margin.',
 	justify: 'Space words so prose meets both margins.',
+};
+
+const PARAGRAPH_STYLE_LABELS: Record<NoteParagraphStyle, string> = {
+	indented: 'Book paragraphs',
+	spaced: 'Spaced paragraphs',
+};
+
+const PARAGRAPH_STYLE_DESCRIPTIONS: Record<NoteParagraphStyle, string> = {
+	indented: 'Indent the first line and remove the extra vertical gap between paragraphs.',
+	spaced: 'Keep the first line flush with the margin and show a visible gap between paragraphs.',
 };
 
 type MutableFrontmatter = Record<string, unknown>;
@@ -113,15 +127,17 @@ export class NoteTextAlignmentModal extends Modal {
 		this.contentEl.addClass('scholia-note-alignment-modal');
 		this.setTitle('Note text layout');
 		this.contentEl.createEl('p', {
-			text: `Choose the alignment and heading indentation for ${this.file.basename}. These apply in editing and reading views.`,
+			text: `Choose the layout for ${this.file.basename}. Paragraph appearance applies in Reading view; create a real Markdown paragraph by pressing Return twice in Editing view.`,
 			cls: 'setting-item-description',
 		});
 
 		let current: NoteTextAlignment;
+		let paragraphStyle: NoteParagraphStyle;
 		let headingIndentEnabled: boolean;
 		try {
 			const cssclasses = getFileCssClasses(this.plugin, this.file);
 			current = getNoteTextAlignment(cssclasses);
+			paragraphStyle = getNoteParagraphStyle(cssclasses);
 			headingIndentEnabled = isNoteHeadingIndentEnabled(cssclasses);
 		} catch (error) {
 			this.close();
@@ -144,6 +160,21 @@ export class NoteTextAlignmentModal extends Modal {
 				});
 		}
 
+		for (const style of NOTE_PARAGRAPH_STYLES) {
+			const isCurrent = style === paragraphStyle;
+			new Setting(this.contentEl)
+				.setName(`${PARAGRAPH_STYLE_LABELS[style]}${isCurrent ? ' (current)' : ''}`)
+				.setDesc(PARAGRAPH_STYLE_DESCRIPTIONS[style])
+				.addButton((button) => {
+					button
+						.setButtonText('Apply')
+						.onClick(() => {
+							void this.applyParagraphStyle(style);
+						});
+					if (isCurrent) button.setCta();
+				});
+		}
+
 		new Setting(this.contentEl)
 			.setName('Indent text under headings')
 			.setDesc('Keep headings at the margin, then indent their text by heading level: heading 1 once, heading 2 twice, through heading 6.')
@@ -159,6 +190,18 @@ export class NoteTextAlignmentModal extends Modal {
 						}
 					});
 			});
+	}
+
+	private async applyParagraphStyle(style: NoteParagraphStyle) {
+		try {
+			await this.plugin.app.fileManager.processFrontMatter(this.file, (frontmatter: MutableFrontmatter) => {
+				frontmatter.cssclasses = setNoteParagraphStyleClass(frontmatter.cssclasses, style);
+			});
+			this.close();
+			new Notice(`${this.plugin.manifest.name}: ${this.file.basename} now uses ${PARAGRAPH_STYLE_LABELS[style].toLowerCase()}.`);
+		} catch (error) {
+			this.showError(error);
+		}
 	}
 
 	private async applyAlignment(alignment: NoteTextAlignment) {
@@ -247,7 +290,7 @@ export function registerNoteTextAlignment(plugin: PDFPlus) {
 
 	plugin.addCommand({
 		id: 'set-note-text-alignment',
-		name: 'Set text alignment for current note',
+		name: 'Set text layout for current note',
 		icon: 'align-justify',
 		checkCallback: (checking) => {
 			const file = plugin.app.workspace.getActiveFile();

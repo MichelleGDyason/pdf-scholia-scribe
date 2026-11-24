@@ -4,11 +4,13 @@ import { test } from 'node:test';
 import {
 	getHeadingIndentDepthAtLine,
 	getMarkdownHeadingIndentDepths,
+	getNoteParagraphStyle,
 	getNoteTextAlignment,
 	isNoteHeadingIndentEnabled,
 	markdownHasNoteHeadingIndentClass,
 	parseCssClasses,
 	setNoteHeadingIndentClass,
+	setNoteParagraphStyleClass,
 	setNoteTextAlignmentClass,
 } from '../src/note-text-alignment-core';
 
@@ -30,6 +32,28 @@ test('changing alignment preserves unrelated classes and replaces managed classe
 	assert.deepEqual(
 		setNoteTextAlignmentClass('research-note scholia-note-align-right', 'center'),
 		['research-note', 'scholia-note-align-center'],
+	);
+});
+
+test('paragraph appearance defaults to spaced and detects either managed style', () => {
+	assert.equal(getNoteParagraphStyle(undefined), 'spaced');
+	assert.equal(getNoteParagraphStyle(['research-note']), 'spaced');
+	assert.equal(getNoteParagraphStyle('research-note scholia-note-paragraph-indented'), 'indented');
+	assert.equal(getNoteParagraphStyle(['scholia-note-paragraph-spaced']), 'spaced');
+});
+
+test('changing paragraph appearance preserves alignment and unrelated classes', () => {
+	assert.deepEqual(
+		setNoteParagraphStyleClass([
+			'research-note',
+			'scholia-note-align-justify',
+			'scholia-note-paragraph-spaced',
+		], 'indented'),
+		['research-note', 'scholia-note-align-justify', 'scholia-note-paragraph-indented'],
+	);
+	assert.deepEqual(
+		setNoteParagraphStyleClass('research-note scholia-note-paragraph-indented', 'spaced'),
+		['research-note', 'scholia-note-paragraph-spaced'],
 	);
 });
 
