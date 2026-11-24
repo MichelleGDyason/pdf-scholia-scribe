@@ -113,6 +113,11 @@ export class ReadingNotePdfSuggestModal extends FuzzySuggestModal<TFile> {
 
 	onClose(): void {
 		super.onClose();
-		if (!this.chosen) this.choose(null);
+		// Obsidian can close a suggest modal before it delivers the chosen item.
+		// Defer cancellation so mouse and keyboard choices get a chance to run
+		// onChooseItem first instead of being mistaken for a dismissed chooser.
+		window.setTimeout(() => {
+			if (!this.chosen) this.choose(null);
+		}, 0);
 	}
 }

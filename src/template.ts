@@ -4,7 +4,7 @@ import * as obsidian from 'obsidian';
 import PDFPlus from 'main';
 import { PDFPlusLib } from 'lib';
 import { formatCitationPageWithOffset } from 'lib/citation-page';
-import { selectAssociatedMarkdownFile } from 'template-associated-markdown';
+import { selectAssociatedMarkdownFile, selectCitationMetadataSources } from 'template-associated-markdown';
 
 type CitationInfo = {
     author: string;
@@ -547,13 +547,29 @@ export class PDFPlusTemplateProcessor extends TemplateProcessor {
         const linkedFileProperties = this.getFileProperties(linkedFile);
         const targetFile = this.findTargetMarkdownFile(variables.file, linkedFile);
         const targetProperties = this.getFileProperties(targetFile);
+        const citationSources = selectCitationMetadataSources(md, properties, [
+            {
+                file: linkedFile,
+                properties: linkedFileProperties,
+                pointsToPdf: linkedFile !== null
+                    && this.propertiesPointToPDF(linkedFileProperties, variables.file, linkedFile.path),
+            },
+            {
+                file: targetFile,
+                properties: targetProperties,
+                pointsToPdf: targetFile !== null
+                    && this.propertiesPointToPDF(targetProperties, variables.file, targetFile.path),
+            },
+        ]);
+        const citationSourceFiles = citationSources.map(({ file }) => file);
+        const citationSourceProperties = citationSources.map(({ properties: sourceProperties }) => sourceProperties);
         const pageAdjustmentProperties = this.findPageAdjustmentProperties(
             variables.file,
-            [targetFile, linkedFile, md],
-            [targetProperties, linkedFileProperties, properties]
+            citationSourceFiles,
+            citationSourceProperties,
         );
-        const citationProperties = this.mergePropertiesForCitation(pageAdjustmentProperties, targetProperties, linkedFileProperties, properties);
-        const citation = buildCitationInfo([targetProperties, linkedFileProperties, properties, pageAdjustmentProperties], variables.file, variables.pageLabel, variables.page);
+        const citationProperties = this.mergePropertiesForCitation(pageAdjustmentProperties, ...citationSourceProperties);
+        const citation = buildCitationInfo([...citationSourceProperties, pageAdjustmentProperties], variables.file, variables.pageLabel, variables.page);
         this.setVariable('citation', citation);
         this.setVariable('cite', citation);
         this.setVariable('author', citation.author);

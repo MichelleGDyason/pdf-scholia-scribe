@@ -9,11 +9,16 @@ import { PDFPlusComponent } from 'lib/component';
 
 export class DomManager extends PDFPlusComponent {
 	styleEl: HTMLStyleElement;
+	rootDocument: Document;
 
 	constructor(plugin: PDFPlus) {
 		super(plugin);
+		// `activeDocument` can be the temporary Settings window when a plugin is re-enabled there.
+		// The workspace document owns the PDF toolbars and rendered notes, so dynamic colour rules
+		// must always be attached to it regardless of which window currently has focus.
+		this.rootDocument = plugin.app.workspace.containerEl.ownerDocument;
 		this.styleEl = plugin.registerEl(createEl('style', { attr: { id: 'pdf-plus-style' } }));
-		activeDocument.head.append(this.styleEl);
+		this.rootDocument.head.append(this.styleEl);
 	}
 
 	update() {
@@ -41,8 +46,8 @@ export class DomManager extends PDFPlusComponent {
 	}
 
 	updateClass(className: string, condition: boolean) {
-		activeDocument.body.toggleClass(className, condition);
-		this.register(() => activeDocument.body.removeClass(className));
+		this.rootDocument.body.toggleClass(className, condition);
+		this.register(() => this.rootDocument.body.removeClass(className));
 	}
 
 	updateStyleEl() {
@@ -225,6 +230,15 @@ export class DomManager extends PDFPlusComponent {
 	}
 
 	getRgb(colorName?: string): RGB {
+		const configuredColor = colorName
+			? Object.entries(this.settings.colors)
+				.find(([name]) => name.toLowerCase() === colorName.toLowerCase())?.[1]
+			: this.settings.colors[this.settings.defaultColor];
+		if (configuredColor) {
+			const configuredRgb = hexToRgb(configuredColor);
+			if (configuredRgb) return configuredRgb;
+		}
+
 		let colorVarName = '--pdf-plus-default-color-rgb';
 		if (colorName) {
 			const specificColorVarName = this.toCSSVariableName(colorName);
@@ -232,7 +246,9 @@ export class DomManager extends PDFPlusComponent {
 				colorVarName = specificColorVarName;
 			}
 		}
-		const rgbString = getComputedStyle(activeDocument.body).getPropertyValue(colorVarName); // "R, G, B"
+		const rgbString = this.rootDocument.defaultView
+			?.getComputedStyle(this.rootDocument.body)
+			.getPropertyValue(colorVarName) ?? ''; // "R, G, B"
 		const rgbColor = rgbStringToObject(rgbString);
 		return rgbColor;
 	}

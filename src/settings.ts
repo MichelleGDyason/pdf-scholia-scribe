@@ -2278,7 +2278,7 @@ export class PDFPlusSettingTab extends LegacyCompatiblePluginSettingTab {
 				'',
 				'Where author and date come from:',
 				'',
-				'PDF Scholia Scribe first checks the front matter/properties of the note you are pasting into. If it cannot find citation details there, it checks a separate reference note linked to the PDF, then finally the PDF file name.',
+				'PDF Scholia Scribe first checks a reference note whose PDF property points to the source PDF. A destination note can supply citation details only when its own PDF property points to that PDF; otherwise the PDF file name is the fallback.',
 				'',
 				'For an author-date citation, use either of these in the note front matter:',
 				'',

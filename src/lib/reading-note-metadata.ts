@@ -21,6 +21,8 @@ type UnknownRecord = Record<string, unknown>;
 
 const FRONT_MATTER_PAGE_LIMIT = 12;
 const FRONT_MATTER_PAGE_CHARACTER_LIMIT = 50_000;
+const PDF_METADATA_LOOKUP_TIMEOUT_MS = 5_000;
+const ZOTERO_METADATA_LOOKUP_TIMEOUT_MS = 5_000;
 
 function isRecord(value: unknown): value is UnknownRecord {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -86,6 +88,23 @@ function metadataMap(value: unknown): Record<string, unknown> {
 	return metadata;
 }
 
+async function withTimeout<T>(promise: Promise<T>, milliseconds: number, onTimeout: () => void): Promise<T | null> {
+	let timeoutId: number | null = null;
+	try {
+		return await Promise.race([
+			promise,
+			new Promise<null>((resolve) => {
+				timeoutId = window.setTimeout(() => {
+					onTimeout();
+					resolve(null);
+				}, milliseconds);
+			}),
+		]);
+	} finally {
+		if (timeoutId !== null) window.clearTimeout(timeoutId);
+	}
+}
+
 export class ReadingNoteMetadataManager extends PDFPlusLibSubmodule {
 	getTargetNote(explicitNote?: TFile | null): TFile | null {
 		if (explicitNote?.extension === 'md') return explicitNote;
@@ -117,13 +136,29 @@ export class ReadingNoteMetadataManager extends PDFPlusLibSubmodule {
 		if (!pdf) return;
 
 		new Notice(`${this.plugin.manifest.name}: Reading metadata from ${pdf.name}…`, 2500);
-		const [embeddedCandidates, zoteroMatch] = await Promise.all([
-			this.extractPdfCandidates(pdf),
-			this.lib.zoteroReferences.findZoteroMetadataForPdfFile(pdf).catch((error) => {
-				console.warn(`${this.plugin.manifest.name}: Zotero metadata lookup was unavailable.`, error);
-				return null;
-			}),
+		const [embeddedResult, zoteroMatch] = await Promise.all([
+			withTimeout(
+				this.extractPdfCandidates(pdf).catch((error) => {
+					console.warn(`${this.plugin.manifest.name}: Embedded PDF metadata lookup was unavailable.`, error);
+					new Notice(`${this.plugin.manifest.name}: The PDF metadata could not be read. Continuing with Zotero and the PDF link.`);
+					return {};
+				}),
+				PDF_METADATA_LOOKUP_TIMEOUT_MS,
+				() => {
+					console.warn(`${this.plugin.manifest.name}: Embedded PDF metadata lookup timed out.`);
+					new Notice(`${this.plugin.manifest.name}: PDF metadata is taking too long. Continuing with Zotero and the PDF link.`);
+				},
+			),
+			withTimeout(
+				this.lib.zoteroReferences.findZoteroMetadataForPdfFile(pdf).catch((error) => {
+					console.warn(`${this.plugin.manifest.name}: Zotero metadata lookup was unavailable.`, error);
+					return null;
+				}),
+				ZOTERO_METADATA_LOOKUP_TIMEOUT_MS,
+				() => console.warn(`${this.plugin.manifest.name}: Zotero metadata lookup timed out.`),
+			),
 		]);
+		const embeddedCandidates = embeddedResult ?? {};
 		const zoteroRecord = zoteroMatch?.record ?? null;
 		const referenceMetadata = zoteroRecord
 			? {
@@ -292,7 +327,12 @@ export class ReadingNoteMetadataManager extends PDFPlusLibSubmodule {
 				fileBasename: pdf.basename,
 			});
 		} finally {
-			await document?.destroy();
+			try {
+				await document?.destroy();
+			} catch (error) {
+				// PDF.js cleanup must not discard metadata that was read successfully.
+				console.warn(`${this.plugin.manifest.name}: Could not dispose the temporary PDF document.`, error);
+			}
 		}
 	}
 

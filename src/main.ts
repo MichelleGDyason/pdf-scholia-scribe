@@ -1220,7 +1220,10 @@ export default class PDFPlus extends Plugin {
 				.setTitle('Fill empty properties from open PDF…')
 				.setIcon('file-search')
 				.onClick(() => {
-					void this.lib.readingNoteMetadata.openPreview(note).catch(console.error);
+					void this.lib.readingNoteMetadata.openPreview(note).catch((error) => {
+						console.error(`${this.manifest.name}: Failed to prepare reading-note metadata.`, error);
+						new Notice(`${this.manifest.name}: Could not prepare properties from the selected PDF.`);
+					});
 				}));
 		}));
 
@@ -1233,7 +1236,10 @@ export default class PDFPlus extends Plugin {
 				.onClick(() => {
 					void this.lib.readingNoteMetadata
 						.openPreview(isPdf ? null : file, isPdf ? file : null)
-						.catch(console.error);
+						.catch((error) => {
+							console.error(`${this.manifest.name}: Failed to prepare reading-note metadata.`, error);
+							new Notice(`${this.manifest.name}: Could not prepare properties from the selected PDF.`);
+						});
 				}));
 		}));
 

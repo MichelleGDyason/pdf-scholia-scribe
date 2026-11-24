@@ -68,6 +68,7 @@ Changes made in this fork so far include:
 - hid the extra PDF/source marker under the citation text where possible, so the note is less cluttered;
 - removed the noisy callout icon by default and allowed callout headings to show the colour label you gave the highlight colour;
 - fixed the colour-toolbar copy action so choosing `In-text citation`, `Quote`, or `Quote in callout` is respected when you click a colour;
+- allowed a fresh text selection to be dragged across an existing saved or backlinked highlight, so overlapping passages can be highlighted and cited independently;
 - improved page-number handling by using page labels where the PDF provides them;
 - added a setting to reduce note-jumping after auto-paste;
 - added a desktop fallback for Zotero's local API, so Zotero search still works when Obsidian's browser-style request path cannot reach Zotero.
@@ -86,7 +87,7 @@ The command fills only supported properties that already exist and are empty; it
 
 Translated-book templates can also use `translator`, `original_title`, `original_date_published`, `original_publisher`, `original_language`, and `forward_author` (or `foreword_author`; the existing `foreward_author` spelling is also recognised). Original-publication values come only from explicit Zotero fields, labelled Zotero Extra lines, or specialised PDF metadata; Scholia does not guess them from generic contributors, the current edition's language, or book prose. Custom original-language and foreword-author values are left unchecked for review.
 
-To change the alignment of an entire Markdown note, run **Set text alignment for current note** or right-click inside the note (or on its file) and choose **Set note text alignment...**. Select **Left**, **Centre**, **Right**, or **Justified**. Scholia stores the choice as one managed class in the note's standard `cssclasses` frontmatter, preserves any other CSS classes, and applies it in both editing and reading views.
+To change the layout of a Markdown note, run **Set text alignment for current note** or right-click inside the note (or on its file) and choose **Set note text layout...**. Select **Left**, **Centre**, **Right**, or **Justified**. The same panel can toggle **Indent text under headings**: headings remain at the margin, while text under H1 is indented once, text under H2 twice, and so on through H6. The indentation also has its own **Toggle text indentation under headings for current note** command and right-click switch. Scholia stores these choices as managed classes in the note's standard `cssclasses` frontmatter, preserves any other CSS classes, and applies them in both editing and reading views.
 
 To change capitalization while editing, select the text, right-click, and open **Change case**. Choose **UPPER CASE**, **lower case**, **Sentence case**, or **Title Case**. Matching commands are also available for optional hotkeys. Only the selected Markdown source is changed, and the whole conversion is one undoable edit.
 

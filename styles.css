@@ -373,6 +373,24 @@ settings:
     cursor: text;
 }
 
+/* A drag across a saved text-markup annotation selects the text below it; a click still opens it. */
+.annotationLayer .highlightAnnotation,
+.annotationLayer .underlineAnnotation,
+.annotationLayer .squigglyAnnotation,
+.annotationLayer .strikeoutAnnotation {
+    cursor: text;
+}
+
+.page.pdf-plus-selecting-through-highlights :is(
+    .annotationLayer .highlightAnnotation,
+    .annotationLayer .underlineAnnotation,
+    .annotationLayer .squigglyAnnotation,
+    .annotationLayer .strikeoutAnnotation,
+    .pdf-plus-backlink-highlight-layer .pdf-plus-backlink-selection
+) {
+    pointer-events: none;
+}
+
 .pdf-plus-backlink-highlight-layer .rect-highlight {
     background-color: rgb(var(--text-highlight-bg-rgb));
     border-radius: var(--radius-m);
@@ -1301,6 +1319,43 @@ mark.scholia-import-highlight {
     text-align: justify;
 }
 
+/* Optional note-level hierarchy: headings remain at the margin and the text following them
+   moves right by one 2em step per Markdown heading level. Editor lines use padding because
+   CodeMirror neutralizes line margins; reading mode can use ordinary block margins. */
+.scholia-heading-indent-1 {
+    --scholia-heading-indent: 2em;
+}
+
+.scholia-heading-indent-2 {
+    --scholia-heading-indent: 4em;
+}
+
+.scholia-heading-indent-3 {
+    --scholia-heading-indent: 6em;
+}
+
+.scholia-heading-indent-4 {
+    --scholia-heading-indent: 8em;
+}
+
+.scholia-heading-indent-5 {
+    --scholia-heading-indent: 10em;
+}
+
+.scholia-heading-indent-6 {
+    --scholia-heading-indent: 12em;
+}
+
+.cm-line[class*="scholia-heading-indent-"] {
+    box-sizing: border-box;
+    padding-inline-start: var(--scholia-heading-indent) !important;
+}
+
+.scholia-note-heading-indents .markdown-preview-sizer [class*="scholia-heading-indent-"],
+.scholia-note-heading-indents + .markdown-reading-view .markdown-preview-sizer [class*="scholia-heading-indent-"] {
+    margin-inline-start: var(--scholia-heading-indent);
+}
+
 /* Experimental, read-only projection for reading multi-column PDFs in sequence. */
 .scholia-column-aware-view {
     display: flex;
@@ -1324,6 +1379,7 @@ mark.scholia-import-highlight {
 .scholia-column-controls,
 .scholia-column-mode,
 .scholia-column-control,
+.scholia-column-zoom,
 .scholia-column-region-header {
     display: flex;
     align-items: center;
@@ -1357,6 +1413,21 @@ mark.scholia-import-highlight {
     gap: var(--size-4-1);
 }
 
+.scholia-column-zoom {
+    gap: 2px;
+}
+
+.scholia-column-zoom-button {
+    justify-content: center;
+    min-width: 32px;
+}
+
+.scholia-column-zoom-level {
+    justify-content: center;
+    min-width: 54px;
+    font-variant-numeric: tabular-nums;
+}
+
 .scholia-column-mode > span {
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
@@ -1377,7 +1448,9 @@ mark.scholia-import-highlight {
 }
 
 .scholia-column-page {
-    width: min(100%, 900px);
+    box-sizing: border-box;
+    width: max-content;
+    min-width: min(100%, 900px);
     min-height: 320px;
     margin: var(--size-4-6) auto;
     padding: 0 var(--size-4-4) var(--size-4-6);
@@ -1408,7 +1481,6 @@ mark.scholia-import-highlight {
 }
 
 .scholia-column-region {
-    max-width: 100%;
     overflow: hidden;
     border: 1px solid var(--background-modifier-border);
     border-radius: var(--radius-m);
@@ -1435,7 +1507,6 @@ mark.scholia-import-highlight {
 
 .scholia-column-canvas-frame {
     position: relative;
-    max-width: 100%;
     overflow: hidden;
     background: white;
 }

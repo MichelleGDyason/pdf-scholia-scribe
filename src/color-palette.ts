@@ -5,6 +5,16 @@ import { KeysOfType, getEventCoords, isHexString, showMenuUnderParentEl, isTarge
 import { PDFViewerChild, Rect } from 'typings';
 import { PDFPlusComponent } from 'lib/component';
 
+const TEXT_HIGHLIGHT_OVERLAY_SELECTOR = [
+    '.annotationLayer .highlightAnnotation',
+    '.annotationLayer .underlineAnnotation',
+    '.annotationLayer .squigglyAnnotation',
+    '.annotationLayer .strikeoutAnnotation',
+    '.pdf-plus-backlink-highlight-layer .pdf-plus-backlink-selection',
+].join(', ');
+
+type TextCaret = { node: Node, offset: number };
+
 
 export type ColorPaletteState = Pick<ColorPalette, 'selectedColorName' | 'actionIndex' | 'displayTextFormatIndex' | 'writeFile'>;
 
@@ -60,6 +70,8 @@ export class ColorPalette extends PDFPlusComponent {
         this.toolbarLeftEl.querySelectorAll<HTMLElement>('.' + ColorPalette.CLS).forEach((el) => {
             ColorPalette.elInstanceMap.get(el)?.unload();
         });
+
+        this.enableTextSelectionThroughHighlights();
 
         if (!this.plugin.settings.colorPaletteInEmbedToolbar && this.toolbarLeftEl.closest('.pdf-embed')) return;
 
@@ -251,6 +263,104 @@ export class ColorPalette extends PDFPlusComponent {
             this.setCheckedIndex('actionIndex', newIndex, this.actionMenuEl);
         }
         this.updateTooltips();
+    }
+
+    /**
+     * PDF.js places saved highlight annotations above its text layer. A click should continue to
+     * open the annotation popup, but a drag should select the text underneath so overlapping
+     * highlights and citations can be created from the ordinary colour palette workflow.
+     */
+    enableTextSelectionThroughHighlights() {
+        const viewerEl = this.child.pdfViewer.dom?.viewerEl;
+        if (!viewerEl) return;
+        const doc = viewerEl.doc;
+
+        const getCaretAtPoint = (pageEl: HTMLElement, x: number, y: number): TextCaret | null => {
+            const alreadySelectingThrough = pageEl.hasClass('pdf-plus-selecting-through-highlights');
+            pageEl.addClass('pdf-plus-selecting-through-highlights');
+
+            try {
+                const caretPosition = doc.caretPositionFromPoint?.(x, y);
+                if (caretPosition && pageEl.querySelector('.textLayer')?.contains(caretPosition.offsetNode)) {
+                    return { node: caretPosition.offsetNode, offset: caretPosition.offset };
+                }
+
+                const legacyCandidate = (doc as unknown as Record<string, unknown>)['caretRangeFromPoint'];
+                if (typeof legacyCandidate === 'function') {
+                    const range = legacyCandidate.call(doc, x, y) as Range | null;
+                    if (range && pageEl.querySelector('.textLayer')?.contains(range.startContainer)) {
+                        return { node: range.startContainer, offset: range.startOffset };
+                    }
+                }
+            } finally {
+                if (!alreadySelectingThrough) pageEl.removeClass('pdf-plus-selecting-through-highlights');
+            }
+
+            return null;
+        };
+
+        const onPointerDown = (evt: PointerEvent) => {
+            if (evt.button !== 0 || !isTargetHTMLElement(evt, evt.target)) return;
+            if (!evt.target.closest(TEXT_HIGHLIGHT_OVERLAY_SELECTOR)) return;
+
+            const pageEl = evt.target.closest<HTMLElement>('div.page[data-page-number]');
+            if (!pageEl) return;
+            const anchor = getCaretAtPoint(pageEl, evt.clientX, evt.clientY);
+            if (!anchor) return;
+
+            const pointerId = evt.pointerId;
+            const startX = evt.clientX;
+            const startY = evt.clientY;
+            let selecting = false;
+
+            const updateSelection = (moveEvent: PointerEvent) => {
+                if (moveEvent.pointerId !== pointerId) return;
+                if (!selecting && Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) < 3) return;
+
+                const focus = getCaretAtPoint(pageEl, moveEvent.clientX, moveEvent.clientY);
+                if (!focus) return;
+                selecting = true;
+                doc.getSelection()?.setBaseAndExtent(anchor.node, anchor.offset, focus.node, focus.offset);
+                moveEvent.preventDefault();
+                moveEvent.stopImmediatePropagation();
+            };
+
+            const removePointerListeners = () => {
+                doc.removeEventListener('pointermove', updateSelection, true);
+                doc.removeEventListener('pointerup', finishSelection, true);
+                doc.removeEventListener('pointercancel', cancelSelection, true);
+            };
+
+            const suppressAnnotationClick = (clickEvent: MouseEvent) => {
+                clickEvent.preventDefault();
+                clickEvent.stopImmediatePropagation();
+            };
+
+            const finishSelection = (upEvent: PointerEvent) => {
+                if (upEvent.pointerId !== pointerId) return;
+                if (selecting) {
+                    updateSelection(upEvent);
+                    upEvent.preventDefault();
+                    upEvent.stopImmediatePropagation();
+                    viewerEl.addEventListener('click', suppressAnnotationClick, { capture: true, once: true });
+                    viewerEl.win.setTimeout(() => viewerEl.removeEventListener('click', suppressAnnotationClick, true), 0);
+                    this.setStatus('Text selected — choose a colour', 4000);
+                }
+                removePointerListeners();
+            };
+
+            const cancelSelection = (cancelEvent: PointerEvent) => {
+                if (cancelEvent.pointerId !== pointerId) return;
+                removePointerListeners();
+            };
+
+            doc.addEventListener('pointermove', updateSelection, true);
+            doc.addEventListener('pointerup', finishSelection, true);
+            doc.addEventListener('pointercancel', cancelSelection, true);
+        };
+
+        viewerEl.addEventListener('pointerdown', onPointerDown, true);
+        this.register(() => viewerEl.removeEventListener('pointerdown', onPointerDown, true));
     }
 
     setDisplayTextFormatIndex(newIndex: number) {

@@ -33,6 +33,7 @@ interface ColumnAwareReadingState {
 	file?: string;
 	mode?: ColumnAwareMode;
 	swapColumns?: boolean;
+	zoom?: number;
 }
 
 interface PdfLinkAnnotation {
@@ -69,6 +70,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isColumnAwareMode(value: unknown): value is ColumnAwareMode {
 	return value === 'auto' || value === 'one-column' || value === 'two-column';
+}
+
+const COLUMN_ZOOM_MIN = 0.75;
+const COLUMN_ZOOM_MAX = 2;
+const COLUMN_ZOOM_STEP = 0.25;
+
+function normalizedColumnZoom(value: unknown): number {
+	if (typeof value !== 'number' || !Number.isFinite(value)) return 1;
+	const stepped = Math.round(value / COLUMN_ZOOM_STEP) * COLUMN_ZOOM_STEP;
+	return Math.min(COLUMN_ZOOM_MAX, Math.max(COLUMN_ZOOM_MIN, stepped));
 }
 
 function isPdfTextGeometryItem(value: unknown): value is PdfTextGeometryItem {
@@ -175,6 +186,7 @@ export class ColumnAwareReadingView extends ItemView {
 	private document: PDFDocumentProxy | null = null;
 	private mode: ColumnAwareMode = 'auto';
 	private swapColumns = false;
+	private zoom = 1;
 	private opened = false;
 	private generation = 0;
 	private observer: IntersectionObserver | null = null;
@@ -215,6 +227,7 @@ export class ColumnAwareReadingView extends ItemView {
 			file: this.sourceFile?.path ?? this.filePath,
 			mode: this.mode,
 			swapColumns: this.swapColumns,
+			zoom: this.zoom,
 		};
 	}
 
@@ -224,6 +237,7 @@ export class ColumnAwareReadingView extends ItemView {
 		this.filePath = typeof record.file === 'string' ? record.file : '';
 		this.mode = isColumnAwareMode(record.mode) ? record.mode : 'auto';
 		this.swapColumns = record.swapColumns === true;
+		this.zoom = normalizedColumnZoom(record.zoom);
 		if (this.opened) await this.loadSource();
 	}
 
@@ -315,6 +329,39 @@ export class ColumnAwareReadingView extends ItemView {
 			this.app.workspace.requestSaveLayout();
 		});
 
+		const zoomControls = controls.createDiv('scholia-column-zoom');
+		const zoomOutButton = zoomControls.createEl('button', {
+			cls: 'scholia-column-control scholia-column-zoom-button',
+			attr: { type: 'button', 'aria-label': 'Zoom out' },
+		});
+		setIcon(zoomOutButton.createSpan(), 'minus');
+		const zoomResetButton = zoomControls.createEl('button', {
+			cls: 'scholia-column-control scholia-column-zoom-level',
+			attr: { type: 'button', 'aria-label': 'Reset zoom to 100%' },
+		});
+		const zoomInButton = zoomControls.createEl('button', {
+			cls: 'scholia-column-control scholia-column-zoom-button',
+			attr: { type: 'button', 'aria-label': 'Zoom in' },
+		});
+		setIcon(zoomInButton.createSpan(), 'plus');
+		const updateZoomControls = () => {
+			zoomResetButton.setText(`${Math.round(this.zoom * 100)}%`);
+			zoomOutButton.disabled = this.zoom <= COLUMN_ZOOM_MIN;
+			zoomInButton.disabled = this.zoom >= COLUMN_ZOOM_MAX;
+		};
+		const setZoom = (zoom: number) => {
+			const normalized = normalizedColumnZoom(zoom);
+			if (normalized === this.zoom) return;
+			this.zoom = normalized;
+			updateZoomControls();
+			this.resetPages();
+			this.app.workspace.requestSaveLayout();
+		};
+		zoomOutButton.addEventListener('click', () => setZoom(this.zoom - COLUMN_ZOOM_STEP));
+		zoomResetButton.addEventListener('click', () => setZoom(1));
+		zoomInButton.addEventListener('click', () => setZoom(this.zoom + COLUMN_ZOOM_STEP));
+		updateZoomControls();
+
 		const originalButton = controls.createEl('button', {
 			cls: 'scholia-column-control',
 			attr: { type: 'button' },
@@ -394,9 +441,21 @@ export class ColumnAwareReadingView extends ItemView {
 	}
 
 	private resetPages(): void {
+		const pageNumber = this.nearestVisiblePageNumber();
 		this.generation++;
 		this.cancelRendering();
-		if (this.document) this.createPagePlaceholders(this.document.numPages);
+		if (!this.document) return;
+		this.createPagePlaceholders(this.document.numPages);
+		const generation = this.generation;
+		const reader = this.readerEl;
+		const section = this.pageSections.get(pageNumber);
+		if (!reader || !section) return;
+		const ownerWindow = this.containerEl.ownerDocument.defaultView ?? window;
+		ownerWindow.requestAnimationFrame(() => {
+			if (generation !== this.generation || !section.isConnected) return;
+			reader.scrollTop += section.getBoundingClientRect().top - reader.getBoundingClientRect().top;
+			this.queuePage(pageNumber);
+		});
 	}
 
 	private async renderPage(pageNumber: number): Promise<void> {
@@ -570,7 +629,7 @@ export class ColumnAwareReadingView extends ItemView {
 		for (const region of regions) {
 			const crop = normalizeViewportRectangle(baseViewport.convertToViewportRectangle(region.rect));
 			if (!crop) continue;
-			const cssWidth = Math.min(availableWidth, Math.max(300, crop.width * 3));
+			const cssWidth = Math.min(availableWidth, Math.max(300, crop.width * 3)) * this.zoom;
 			desiredScale = Math.max(desiredScale, (cssWidth / crop.width) * pixelRatio);
 		}
 		const pagePixelsAtUnitScale = Math.max(1, baseViewport.width * baseViewport.height);
@@ -626,7 +685,7 @@ export class ColumnAwareReadingView extends ItemView {
 
 		const frame = card.createDiv('scholia-column-canvas-frame');
 		const availableWidth = Math.max(300, Math.min(760, (this.readerEl?.clientWidth ?? 820) - 72));
-		const cssWidth = Math.min(availableWidth, Math.max(300, crop.width * 3));
+		const cssWidth = Math.min(availableWidth, Math.max(300, crop.width * 3)) * this.zoom;
 		const ownerWindow = this.containerEl.ownerDocument.defaultView ?? window;
 		const pixelRatio = Math.min(ownerWindow.devicePixelRatio || 1, 2);
 		const scaledCrop = normalizeViewportRectangle(source.viewport.convertToViewportRectangle(region.rect));
