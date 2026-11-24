@@ -311,12 +311,23 @@ export class WorkspaceLib extends PDFPlusLibSubmodule {
         return this.app.workspace.getGroupLeaves(activeGroup);
     }
 
-    async openMarkdownLinkFromPDF(linktext: string, sourcePath: string, paneType: PaneType | boolean, position?: { pos: Pos } | { line: number }) {
+    async openMarkdownLinkFromPDF(
+        linktext: string,
+        sourcePath: string,
+        paneType: PaneType | boolean,
+        position?: { pos: Pos } | { line: number },
+        originatingPDFLeaf?: WorkspaceLeaf
+    ) {
         const sourceActiveLeaf = this.app.workspace.getMostRecentLeaf();
-        const sourcePDFLeaf = sourceActiveLeaf?.view.getViewType() === 'pdf'
+        const exactSourcePDFLeaf = originatingPDFLeaf?.containerEl.isConnected
+            && originatingPDFLeaf.view.getViewType() === 'pdf'
+            && this.getFilePathFromView(originatingPDFLeaf.view) === sourcePath
+            ? originatingPDFLeaf
+            : null;
+        const sourcePDFLeaf = exactSourcePDFLeaf ?? (sourceActiveLeaf?.view.getViewType() === 'pdf'
             && this.getFilePathFromView(sourceActiveLeaf.view) === sourcePath
             ? sourceActiveLeaf
-            : null;
+            : null);
         const { path: markdownLinkPath } = parseLinktext(linktext);
         const targetMarkdownFile = this.app.metadataCache.getFirstLinkpathDest(markdownLinkPath, sourcePath);
         let markdownLeaf: WorkspaceLeaf | undefined;

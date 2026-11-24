@@ -251,11 +251,13 @@ export class BacklinkDomManager extends PDFPlusComponent {
      */
     openBacklink(cache: PDFBacklinkCache, paneType: ReturnType<typeof Keymap.isModEvent>) {
         const pos = 'position' in cache.refCache ? cache.refCache.position : undefined;
+        const sourcePDFLeaf = this.lib.getPDFViewFromChild(this.visualizer.child)?.leaf;
         void this.lib.workspace.openMarkdownLinkFromPDF(
             cache.sourcePath,
             this.file.path,
             paneType,
-            pos ? { pos } : undefined
+            pos ? { pos } : undefined,
+            sourcePDFLeaf ?? undefined
         );
     }
 
