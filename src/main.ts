@@ -6,6 +6,7 @@ import { patchPDFView, patchPDFInternals, patchBacklink, patchWorkspace, patchPa
 import { PDFPlusLib } from 'lib';
 import { AutoCopyMode } from 'auto-copy';
 import { ColorPalette } from 'color-palette';
+import { migrateScholiaSixColorPalette } from 'color-palette-defaults';
 import { DomManager } from 'dom-manager';
 import { PDFCroppedEmbed } from 'pdf-cropped-embed';
 import { DEFAULT_SETTINGS, HIGHLIGHTED_IN_TEXT_CITATION_TEMPLATE, NamedTemplate, PDFPlusSettings, PDFPlusSettingTab } from 'settings';
@@ -699,31 +700,7 @@ export default class PDFPlus extends Plugin {
 	}
 
 	private migrateScholiaDefaults() {
-		const staleDefaultColors = {
-			'Yellow': '#ffd000',
-			'Red': '#ea5252',
-			'Note': '#086ddd',
-			'Important': '#bb61e5',
-		};
-		const scholiaColors = this.getDefaultSettings().colors;
-		const colorsMatch = (colors: Record<string, string>) => {
-			const entries = Object.entries(colors);
-			return entries.length === Object.keys(staleDefaultColors).length
-				&& entries.every(([name, color]) => staleDefaultColors[name as keyof typeof staleDefaultColors] === color);
-		};
-
-		if (colorsMatch(this.settings.colors)) {
-			this.settings.colors = scholiaColors;
-			if (this.settings.defaultColor === 'Yellow') {
-				this.settings.defaultColor = 'Great Insight!';
-			} else if (this.settings.defaultColor === 'Red') {
-				this.settings.defaultColor = 'Controversial';
-			} else if (this.settings.defaultColor === 'Note') {
-				this.settings.defaultColor = 'Conceptual information';
-			} else if (this.settings.defaultColor === 'Important') {
-				this.settings.defaultColor = 'argument premise';
-			}
-		}
+		migrateScholiaSixColorPalette(this.settings);
 
 		if (this.settings.autoCopyToggleRibbonIcon && this.settings.autoFocusToggleRibbonIcon && this.settings.autoPasteToggleRibbonIcon) {
 			this.settings.autoCopyToggleRibbonIcon = false;

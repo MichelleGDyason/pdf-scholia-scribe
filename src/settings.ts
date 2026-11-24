@@ -10,6 +10,7 @@ import { ScrollMode, SidebarView, SpreadMode } from 'pdfjs-enums';
 import { Menu } from 'obsidian';
 import { PDFExternalLinkPostProcessor, PDFInternalLinkPostProcessor, PDFOutlineItemPostProcessor, PDFThumbnailItemPostProcessor } from 'post-process';
 import { BibliographyManager } from 'bib';
+import { SCHOLIA_SIX_COLOR_PALETTE } from 'color-palette-defaults';
 
 
 const SELECTION_BACKLINK_VISUALIZE_STYLE = {
@@ -446,12 +447,7 @@ export const DEFAULT_SETTINGS: PDFPlusSettings = {
 	highlightBacklinksPane: true,
 	highlightOnHoverBacklinkPane: true,
 	backlinkHoverColor: '',
-	colors: {
-		'Great Insight!': '#ffd000',
-		'Controversial': '#ea5252',
-		'Conceptual information': '#086ddd',
-		'argument premise': '#bb61e5',
-	},
+	colors: { ...SCHOLIA_SIX_COLOR_PALETTE },
 	defaultColor: '',
 	defaultColorPaletteItemIndex: 0,
 	syncColorPaletteItem: true,

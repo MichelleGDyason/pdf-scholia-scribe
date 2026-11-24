@@ -69,6 +69,7 @@ Changes made in this fork so far include:
 - removed the noisy callout icon by default and allowed callout headings to show the colour label you gave the highlight colour;
 - fixed the colour-toolbar copy action so choosing `In-text citation`, `Quote`, or `Quote in callout` is respected when you click a colour;
 - allowed a fresh text selection to be dragged across an existing saved or backlinked highlight, so overlapping passages can be highlighted and cited independently;
+- supplied six clear default highlight colours—Orange, Green, Yellow, Red, Blue, and Pink—while retaining customised palettes during upgrades;
 - improved page-number handling by using page labels where the PDF provides them;
 - added a setting to reduce note-jumping after auto-paste;
 - added a desktop fallback for Zotero's local API, so Zotero search still works when Obsidian's browser-style request path cannot reach Zotero.
